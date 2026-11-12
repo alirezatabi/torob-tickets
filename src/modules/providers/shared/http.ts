@@ -33,6 +33,11 @@ export interface RateLimitConfig {
 export interface HttpClientConfig {
   /** Hosts this client may call (no wildcards, no redirects off-list). */
   allowedHosts: string[];
+  /**
+   * Hosts explicitly permitted over plain http. Used only for an operator-supplied local
+   * mirror (`SEPEHR360_BASE_URL=http://127.0.0.1:4000`), never for a real source.
+   */
+  insecureHosts?: string[];
   /** Hosts whose robots.txt must be honoured before requesting (HTML sources). */
   robotsHosts?: string[];
   /** Per-request timeout. */
@@ -121,7 +126,10 @@ export class HttpClient {
    */
   /** True when a URL is on this connector's allowlist (used by API discovery). */
   isAllowedHost(url: URL): boolean {
-    return this.config.allowedHosts.includes(url.host) && url.protocol === "https:";
+    if (!this.config.allowedHosts.includes(url.host)) return false;
+    if (url.protocol === "https:") return true;
+    // Plain http is only ever the explicit local-mirror escape hatch.
+    return url.protocol === "http:" && (this.config.insecureHosts ?? []).includes(url.host);
   }
 
   async request(request: HttpRequest): Promise<HttpResponse> {

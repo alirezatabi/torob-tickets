@@ -112,9 +112,14 @@ export class Sepehr360Adapter implements LiveProviderAdapter<Sepehr360RawOffer> 
 
   constructor(config: Sepehr360Config = sepehr360ConfigFromEnv()) {
     this.config = config;
+    // A mirror configured by the operator (`SEPEHR360_BASE_URL`) is part of the allowlist:
+    // otherwise the documented test hook would be rejected by our own guard.
+    const overrideHost = config.baseUrl ? safeHost(config.baseUrl) : null;
+    const insecureHosts = overrideHost && config.baseUrl?.startsWith("http://") ? [overrideHost] : [];
     this.http = new HttpClient({
-      allowedHosts: [SEPEHR360_HOST, "www.sepehr360.ir"],
-      robotsHosts: [SEPEHR360_HOST],
+      allowedHosts: [SEPEHR360_HOST, "www.sepehr360.ir", ...(overrideHost ? [overrideHost] : [])],
+      insecureHosts,
+      robotsHosts: [...(overrideHost ? [overrideHost] : []), SEPEHR360_HOST],
       timeoutMs: 8_000,
       maxBytes: 2_500_000,
       // A search is one page request; discovery may add a bundle and an endpoint probe,
@@ -604,6 +609,15 @@ export function matchPersianAirport(label: string): string | null {
     if (pattern.test(normalized)) return getAirport(code) ? code : null;
   }
   return null;
+}
+
+/** Host of a configured base URL, or null when it is not a usable absolute URL. */
+function safeHost(value: string): string | null {
+  try {
+    return new URL(value).host;
+  } catch {
+    return null;
+  }
 }
 
 /** `https://host/api/flight/search?x=1` → `/api/flight/search` — enough to recognise a route. */

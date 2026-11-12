@@ -95,6 +95,20 @@ inflated in the provider strip or in the docs.
   Without `--save-html`, an empty parse only writes a **sanitized** snapshot (title,
   headings, a few short numeric snippets) — no raw HTML is ever stored by default.
 
+### Verifying against a mirror (no egress needed)
+
+`SEPEHR360_BASE_URL` points the connector at a local copy of a real response. The host of
+that URL is added to the connector's allowlist (plain http is allowed **only** for this
+explicit operator override), so the documented hook actually works:
+
+```bash
+mkdir -p .mirror && cp <saved>.html .mirror/page.html   # git-ignored
+node -e '...'                                          # serve it on :3210
+SEPEHR360_BASE_URL=http://127.0.0.1:3210 TOROB_SEARCH_MODE=live npm run search:live THR MHD 2026-11-20
+```
+
+That run is the end-to-end proof path: page → parser → normalizer → ranking → UI.
+
 ### Redirect to the source
 
 A live Sepehr360 card renders **دیدن در سپهر۳۶۰**, whose `href` is our own hop:

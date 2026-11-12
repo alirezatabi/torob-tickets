@@ -65,3 +65,6 @@ pnpm-debug.log*
 
 # ————— Provider diagnostics (opt-in; may contain source content) —————
 /.provider-snapshots/
+
+# Local mirror of a source page for manual/offline verification (see docs/PROVIDERS.md).
+.mirror/
