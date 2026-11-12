@@ -105,3 +105,209 @@ model RoutePriceStat {
   @@unique([originCode, destinationCode, monthIso])
   @@map("route_price_stats")
 }
+
+// ————————————————————————————————————————————————————————————————
+// Live aggregation schema (v2, additive — v1 tables above stay untouched)
+//
+// Rules encoded here:
+//   • money is an integer in toman (`priceToman` is BigInt: rial prices exceed Int)
+//     plus the exact original amount and the unit scale, so nothing is ever 10× off;
+//   • demo and live data are separated by `Provider.mode` and never mixed in queries;
+//   • `FlightOffer.id` is derived from the fare-level offer key, so re-seeing the same
+//     product updates one row instead of inserting a duplicate;
+//   • `PriceObservation` is append-only history, keyed by the *fare-level* key.
+// ————————————————————————————————————————————————————————————————
+
+/// A live (or demo) source, with its compliance + capability declaration.
+model LiveProvider {
+  id                String   @id
+  name              String
+  mode              ProviderMode
+  sourceKind        String   // "html" | "api" | "demo"
+  quotedCurrency    String   // IRT | IRR | USD | EUR
+  capabilities      Json     // ProviderCapabilities
+  complianceNote    String
+  enabled           Boolean  @default(true)
+  lastSuccessAt     DateTime?
+  lastFailureAt     DateTime?
+  lastErrorCode     String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  searches          FlightSearch[]
+  offers            FlightOffer[]
+
+  @@map("live_providers")
+}
+
+/// One user search (or scheduled re-check) and its outcome, per request.
+model FlightSearch {
+  id              String   @id @default(cuid())
+  /// Dedupe token for identical concurrent requests (cache + idempotency).
+  requestHash     String
+  originCity      String
+  destinationCity String
+  departDate      DateTime @db.Date
+  passengers      Int      @default(1)
+  cabin           String   @default("economy")
+  mode            ProviderMode
+  status          String   @default("running") // running | ok | partial | failed
+  offerCount      Int      @default(0)
+  startedAt       DateTime @default(now())
+  finishedAt      DateTime?
+  durationMs      Int?
+  /// Serialized provider reports (latency, retries, error codes).
+  providerReport  Json?
+
+  providerLogs    ProviderFetchLog[]
+  offers          FlightOffer[]
+  observations    PriceObservation[]
+
+  @@unique([requestHash, startedAt])
+  @@index([originCity, destinationCity, departDate])
+  @@index([startedAt])
+  @@map("flight_searches")
+}
+
+/// Per-provider fetch evidence: the operational record that makes "it worked" checkable.
+model ProviderFetchLog {
+  id            String   @id @default(cuid())
+  searchId      String?
+  search        FlightSearch? @relation(fields: [searchId], references: [id], onDelete: SetNull)
+  providerId    String
+  ok            Boolean
+  httpStatus    Int?
+  latencyMs     Int
+  retries       Int      @default(0)
+  rawCount      Int      @default(0)
+  acceptedCount Int      @default(0)
+  rejectedCount Int      @default(0)
+  errorCode     String?
+  errorSummary  String?
+  endpoint      String?
+  fromCache     Boolean  @default(false)
+  fetchedAt     DateTime @default(now())
+
+  @@index([providerId, fetchedAt])
+  @@index([ok, fetchedAt])
+  @@map("provider_fetch_logs")
+}
+
+/// A normalized, live offer. Identity = provider + fare-level offer key.
+model FlightOffer {
+  /// `${providerId}:${offerKey}` — deterministic, so upserts are safe.
+  id                  String   @id
+  providerId          String
+  provider            LiveProvider @relation(fields: [providerId], references: [id])
+  searchId            String?
+  search              FlightSearch? @relation(fields: [searchId], references: [id], onDelete: SetNull)
+  rawOfferId          String?
+  /// Fare-level identity, also stored for indexed history lookups.
+  offerKey            String
+  /// Display identity (same physical flight, any fare conditions).
+  groupKey            String
+
+  airlineCode         String
+  airlineName         String
+  flightNumber        String?
+  originAirport       String?
+  destinationAirport  String?
+  originCity          String
+  destinationCity     String
+  departAt            DateTime
+  arriveAt            DateTime
+  durationMinutes     Int
+  stops               Int
+
+  cabin               String
+  fareClass           String?
+  fareName            String?
+  ticketType          String   @default("unknown")
+
+  priceToman          BigInt
+  priceMinor          BigInt
+  currency            String
+  priceUnitScale      Int      @default(1)
+  priceConverted      Boolean  @default(false)
+
+  baggageChecked      BaggageState
+  baggageCheckedKg    Int?
+  baggageCabinKg      Int?
+  refundable          Boolean?
+  seatsAvailable      Int?
+
+  fareFreshness       String   // fresh | possibly-stale | unverified | unavailable | demo
+  priceObservedAt     DateTime
+  fetchedAt           DateTime
+  lastVerifiedAt      DateTime?
+  completeness        Float    @default(0)
+
+  offerUrl            String
+  sellerLabel         String?
+  warnings            String[]
+  segments            Json?
+  /// True only while the search that produced it is the latest for its requestHash.
+  isLatest            Boolean  @default(true)
+
+  observations        PriceObservation[]
+
+  @@unique([providerId, offerKey])
+  @@index([groupKey, isLatest])
+  @@index([originCity, destinationCity, departAt])
+  @@index([offerKey, priceObservedAt])
+  @@index([searchId])
+  @@map("flight_offers")
+}
+
+/// Append-only price history. Never backfilled with synthetic points.
+model PriceObservation {
+  id             String   @id @default(cuid())
+  providerId     String
+  /// Fare-level key — the only key that may be plotted as one line.
+  offerKey       String
+  groupKey       String
+  routeKey       String
+  airlineCode    String
+  flightNumber   String?
+  originAirport  String?
+  destinationAirport String?
+  departDate     DateTime @db.Date
+  cabin          String
+  fareClass      String?
+  baggageSignature String
+  ticketType     String
+  priceToman     BigInt
+  currency       String
+  observedAt     DateTime @default(now())
+  freshness      String
+  searchId       String?
+  search         FlightSearch? @relation(fields: [searchId], references: [id], onDelete: SetNull)
+
+  @@index([offerKey, observedAt])
+  @@index([routeKey, departDate, observedAt])
+  @@index([observedAt])
+  @@map("price_observations")
+}
+
+// ————————————————————————————————————————————————————————————————
+// Serving cache (read-only projections) — avoids re-scraping on every page view.
+// Not history: deleting every row here loses no evidence.
+// ————————————————————————————————————————————————————————————————
+model SearchSnapshot {
+  id              String   @id @default(cuid())
+  requestHash     String
+  originCity      String
+  destinationCity String
+  departDate      DateTime @db.Date
+  cabin           String
+  passengers      Int      @default(1)
+  mode            ProviderMode
+  /// Serialized SearchResponse payload (offers already normalized+scored).
+  payload         Json
+  createdAt       DateTime @default(now())
+  expiresAt       DateTime
+
+  @@index([requestHash, createdAt])
+  @@index([expiresAt])
+  @@map("search_snapshots")
+}
