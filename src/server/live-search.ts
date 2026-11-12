@@ -18,6 +18,8 @@ import type { RankInput } from "@/modules/ranking/types";
 import { createOrchestrator, describeLiveProviders, searchMode, type SearchMode } from "@/modules/providers/registry-live";
 import { dedupeSameOffer, SearchOrchestrator } from "@/modules/providers/orchestrator";
 import { groupOffers } from "@/dedupe/group";
+import { selectCheapestOffer, type CheapestSelection } from "@/modules/pricing/select-cheapest";
+import type { OfferGroup } from "@/domain/flight";
 import { AmadeusAdapter, amadeusConfigFromEnv } from "@/modules/providers/amadeus/adapter";
 import { createLogger } from "@/modules/providers/shared/logger";
 import type { ProviderRunReport } from "@/modules/providers/contracts/provider";
@@ -99,6 +101,15 @@ export interface LiveGroupView extends LiveOfferView {
   providerCount: number;
   /** One row per source selling this exact flight, cheapest first. */
   prices: QuoteView[];
+  /**
+   * The shared pricing verdict (`selectCheapestOffer`): the same rule the demo results page
+   * and `/api/search` use. `cheapestOfferId` is null when nothing is purchasable.
+   */
+  cheapestOfferId: string | null;
+  /** Seats on this flight: max of the known purchasable quotes, or null when unknown. */
+  seatsAvailable: number | null;
+  /** True when no source can serve the requested passenger count. */
+  soldOut: boolean;
 }
 
 export interface QuoteView {
@@ -107,6 +118,8 @@ export interface QuoteView {
   providerName: string;
   priceToman: number;
   isCheapest: boolean;
+  /** What *this* source says about seats; null means it did not say. */
+  seatsAvailable: number | null;
 }
 
 export interface LiveSearchOptions {
@@ -190,9 +203,20 @@ export async function runLiveSearch(query: TripQuery, options: LiveSearchOptions
     groupSource = [...groupSource, ...clones];
   }
   const groups = groupOffers(groupSource);
+  const selectionByGroup = new Map<string, CheapestSelection>(
+    groups.map((group) => [
+      group.groupKey,
+      selectCheapest(group, query.passengers ?? 1, query.cabin),
+    ]),
+  );
   const groupViews: LiveGroupView[] = groups
     .map((group) => {
-      const row = views.find((view) => view.id === group.primary.id);
+      const selection = selectionByGroup.get(group.groupKey);
+      const cheapestId = selection?.cheapest?.id ?? null;
+      const row = views.find((view) => view.id === (cheapestId ?? group.primary.id));
+      const seatsByOffer = new Map(
+        group.offers.map((offer) => [offer.id, typeof offer.seatsAvailable === "number" ? offer.seatsAvailable : null]),
+      );
       if (!row) return null;
       return {
         ...row,
@@ -201,16 +225,22 @@ export async function runLiveSearch(query: TripQuery, options: LiveSearchOptions
         identity: group.identity,
         knownSellers: group.knownSellers,
         providerCount: group.providers.length,
-        prices: group.providers.map((provider, index) => ({
+        prices: group.providers.map((provider) => ({
           id: provider.offerId,
           providerId: provider.providerId,
           providerName: provider.providerName,
           priceToman: provider.priceToman,
-          isCheapest: index === 0,
+          isCheapest: provider.offerId === cheapestId,
+          seatsAvailable: seatsByOffer.get(provider.offerId) ?? null,
         })),
+        cheapestOfferId: cheapestId,
+        seatsAvailable: selection?.seatsAvailable ?? null,
+        soldOut: cheapestId === null,
       } satisfies LiveGroupView;
     })
-    .filter((view): view is LiveGroupView => view !== null);
+    .filter((view): view is LiveGroupView => view !== null)
+    // Sold out flights last, exactly like the demo list.
+    .sort((a, b) => Number(a.soldOut) - Number(b.soldOut));
 
   const persistence = await persistIfPossible(query, reports, offers, mode, options.persist ?? true);
 
@@ -318,6 +348,19 @@ function toView(
     violations,
     dataSource: offer.dataSource,
   };
+}
+
+/**
+ * The shared pricing rule, applied to a live/demo group.
+ *
+ * `dataSource` decides the cabin convention: live rows carry the real cabin string, while
+ * demo rows always sell economy. Both then go through the one implementation.
+ */
+function selectCheapest(group: OfferGroup, passengers: number, cabin: string | undefined): CheapestSelection {
+  return selectCheapestOffer(group, {
+    passengers,
+    ...(cabin === "economy" || cabin === "premium" || cabin === "business" ? { cabin } : {}),
+  });
 }
 
 /**

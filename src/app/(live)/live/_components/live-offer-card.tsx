@@ -9,6 +9,7 @@ import { formatJalaliFull } from "@/lib/jalali";
 import { getCity } from "@/lib/cities";
 import { formatTimeInZone } from "@/lib/format";
 import { localDepartDate } from "@/lib/time";
+import { LOW_SEATS_THRESHOLD } from "@/modules/pricing/select-cheapest";
 import { cn } from "@/lib/cn";
 import { demoSearchHref, sourceRedirectFor } from "@/modules/live/source-link";
 
@@ -190,9 +191,20 @@ export function LiveOfferCard({ offer, index }: { offer: LiveOfferView | LiveGro
                   : "ندارد"}
             </span>
             {offer.seatsAvailable !== null ? (
-              <span className="inline-flex items-center gap-1 rounded-md bg-teal-50 px-1.5 py-0.5 text-teal-700">
+              <span
+                className={cn(
+                  "inline-flex items-center gap-1 rounded-md px-1.5 py-0.5",
+                  offer.seatsAvailable <= LOW_SEATS_THRESHOLD ? "bg-saffron-50 text-saffron-700" : "bg-teal-50 text-teal-700",
+                )}
+              >
                 <Users className="size-3" aria-hidden="true" />
                 {toPersianDigits(offer.seatsAvailable)} صندلی
+                {offer.seatsAvailable <= LOW_SEATS_THRESHOLD ? " · کم" : ""}
+              </span>
+            ) : null}
+            {group?.soldOut ? (
+              <span className="inline-flex items-center gap-1 rounded-md bg-ink-100 px-1.5 py-0.5 text-ink-600">
+                تکمیل ظرفیت برای این تعداد مسافر
               </span>
             ) : null}
             {offer.badges.map((badge) => (
