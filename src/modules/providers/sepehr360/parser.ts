@@ -26,8 +26,19 @@ import { parsePersianDuration, parseStops, parseWallClock } from "./parse-durati
 import type { Sepehr360ParseResult, Sepehr360RawOffer } from "./types";
 
 const PRICE_MARKER = /(تومان|تومن|ريال|ریال)/;
-const CLOCK = /(\d{1,2}:\d{2})/;
 const MAX_CARDS = 400;
+
+/**
+ * A clock that is *plausible as a departure/arrival time* (00:00–23:59).
+ *
+ * This matters more than it looks: `.` is a thousands separator on Iranian price
+ * widgets, so "1.450.000 تومان" satisfies a naive `\d{1,2}:\d{2}`-style check once a
+ * colon or a `,`-as-decimal variant sneaks in — and every price box then looks like a
+ * flight card. Requiring `hh < 24 && mm < 60` kills that false positive at the root.
+ */
+const PLAUSIBLE_CLOCK = /\b([01]?\d|2[0-3]):([0-5]\d)\b/;
+/** Cheap pre-check: anything that *looks* like a clock; the precise check follows. */
+const CLOCK_SHAPE = /\d{1,2}:\d{2}/;
 
 export function parseSearchPage(html: string): Sepehr360ParseResult {
   const warnings: string[] = [];
@@ -60,6 +71,9 @@ export function parseSearchPage(html: string): Sepehr360ParseResult {
   const cards = findCards($);
   if (cards.length === 0 && !emptyState) {
     warnings.push("no-result-cards-found");
+    // Evidence for the adapter's diagnosis: was there *any* markup that looks like a
+    // result (a price box, a time block, a "departure" label)?
+    warnings.push(`clues:price=${countElements($, PRICE_MARKER)} clock=${countPlausibleClocks($)}`);
   }
   if (cards.length === 0 && resultCount && resultCount > 0) {
     warnings.push(`page-declares-${resultCount}-results-but-none-parsed`);
@@ -102,17 +116,20 @@ function findCards($: cheerio.CheerioAPI): Element[] {
   const candidates: Element[] = [];
   $("body *").each((_, element) => {
     const $element = $(element);
-    // Cards are leaf-ish: skip containers with many element children (layout wrappers).
-    const text = normalizeDigits($element.text());
-    if (text.length < 8 || text.length > 600) return;
-    if (!PRICE_MARKER.test(text)) return;
-    if (!CLOCK.test(text)) return;
+    // Cheap prefilter on the raw text, before paying for the separated-text pass.
+    const flat = normalizeDigits($element.text());
+    if (flat.length < 8 || flat.length > 600) return;
+    if (!PRICE_MARKER.test(flat)) return;
+    if (!CLOCK_SHAPE.test(flat)) return;
+
+    const text = elementText($, element);
+    if (!PLAUSIBLE_CLOCK.test(text)) return;
     const hasQualifyingChild = $element
       .children()
       .toArray()
       .some((child) => {
-        const childText = normalizeDigits($(child).text());
-        return PRICE_MARKER.test(childText) && CLOCK.test(childText) && childText.length >= 8;
+        const childText = elementText($, child);
+        return PRICE_MARKER.test(childText) && PLAUSIBLE_CLOCK.test(childText) && childText.length >= 8;
       });
     if (hasQualifyingChild) return; // a descendant is the real card
     candidates.push(element);
@@ -121,8 +138,8 @@ function findCards($: cheerio.CheerioAPI): Element[] {
   // If nothing matched (very different markup), fall back to the classic card containers.
   if (candidates.length === 0) {
     $("[class*='result'], [class*='flight'], [data-testid*='result']").each((_, element) => {
-      const text = normalizeDigits($(element).text());
-      if (PRICE_MARKER.test(text) && CLOCK.test(text) && text.length <= 1200) candidates.push(element);
+      const text = elementText($, element);
+      if (PRICE_MARKER.test(text) && PLAUSIBLE_CLOCK.test(text) && text.length <= 1200) candidates.push(element);
     });
   }
 
@@ -142,23 +159,43 @@ function dedupeNested(elements: Element[]): Element[] {
   });
 }
 
+/**
+ * Element text with a separator between sibling tags.
+ *
+ * `$(el).text()` concatenates children verbatim ("07:30" + "09:00" → "07:3009:00"), which
+ * makes every boundary-sensitive pattern (times, prices, airline names) unreliable. A
+ * detached clone with a space after each descendant is cheap enough and fixes it once for
+ * all callers.
+ */
+function elementText($: cheerio.CheerioAPI, element: Element): string {
+  const $clone = $(element).clone();
+  $clone.find("*").each((_, node) => {
+    $(node).after(" ");
+  });
+  return normalizeDigits($clone.text()).replace(/\s+/g, " ").trim();
+}
+
 function parseCard(
   $: cheerio.CheerioAPI,
   element: Element,
   index: number,
 ): Sepehr360RawOffer | null {
   const $card = $(element);
-  const text = normalizeDigits($card.text()).replace(/\s+/g, " ").trim();
+  const text = elementText($, element);
 
-  const clocks = [...text.matchAll(/(\d{1,2}:\d{2})/g)].map((match) => match[1] ?? null);
-  const departTime = parseWallClock(clocks[0] ?? null);
-  const arriveTime = parseWallClock(clocks[1] ?? null);
+  // Times first by their *labels* ("خروج ۰۷:۳۰" / "ورود ۰۹:۰۰") — position alone is
+  // ambiguous when a card also prints a booking deadline. Position is the fallback.
+  const labelled = labelledTimes(text);
+  const clocks = [...text.matchAll(/\b((?:[01]?\d|2[0-3]):[0-5]\d)\b/g)].map((match) => match[1] ?? null);
+  const departTime = labelled.depart !== null ? labelled.depart : parseWallClock(clocks[0] ?? null);
+  const arriveTime = labelled.arrive !== null ? labelled.arrive : parseWallClock(clocks[1] ?? null);
 
   const priceText = findPriceText($, $card, text);
   const price = priceText ? parsePriceText(priceText) : null;
+  const durationFromLabel = labelled.durationMinutes;
 
   const airline = resolveCardAirline($card, text);
-  const durationText = findDurationText(text);
+  const durationText = findDurationText(text) ?? (durationFromLabel ? `${durationFromLabel} دقیقه` : null);
   const stopsLabel = findKeyword(text, /(مستقیم|بدون توقف|\d+\s*توقف|یک توقف|دو توقف)/);
   const cabinLabel = findKeyword(text, /(اکونومی|اقتصادی|بیزنس|بیزینس|درجه یک|فرست کلاس)/);
   const sellerText = findKeyword(text, /فروش توسط\s*\d+\s*سایت(?:\s*مختلف)?|فروشنده:\s*[^·|\d]{2,30}/);
@@ -262,6 +299,34 @@ function matchKnownAirlineName(text: string): string | null {
   return known.find((name) => text.includes(name)) ?? null;
 }
 
+/**
+ * Times by label, and a labelled duration.
+ *
+ * Real cards print "خروج/حرکت/پرواز" next to the first clock and "ورود/رسیدن/فرود"
+ * next to the second, plus occasionally a separate "مدت" duration. Reading the label
+ * instead of the position survives layouts that put the arrival first (RTL) or add an
+ * unrelated clock (e.g. "مهلت خرید تا ۲۳:۵۹").
+ */
+function labelledTimes(text: string): {
+  depart: number | null;
+  arrive: number | null;
+  durationMinutes: number | null;
+} {
+  const clockAfter = (keywords: RegExp): number | null => {
+    const match = new RegExp(`${keywords.source}[^\\d]{0,12}((?:[01]?\\d|2[0-3]):[0-5]\\d)`).exec(text);
+    return parseWallClock(match?.[1] ?? null);
+  };
+  const depart = clockAfter(/(?:خروج|حرکت|پرواز از|بلند شدن)/);
+  const arrive = clockAfter(/(?:ورود|رسیدن|فرود|پرواز به)/);
+
+  const durationMatch = /(?:مدت|طول پرواز)[^\d]{0,10}(\d+)\s*(ساعت|دقیقه)/.exec(text);
+  let durationMinutes: number | null = null;
+  if (durationMatch?.[1]) {
+    durationMinutes = Number(durationMatch[1]) * (durationMatch[2] === "ساعت" ? 60 : 1);
+  }
+  return { depart, arrive, durationMinutes };
+}
+
 function findDurationText(text: string): string | null {
   const match = /(\d+\s*(?:ساعت|دقیقه)(?:\s*و\s*\d+\s*(?:ساعت|دقیقه))?)/.exec(text);
   return match?.[1] ?? null;
@@ -286,8 +351,33 @@ function toClock(minutes: number): string {
 }
 
 function parseResultCount(text: string): number | null {
-  const match = /(\d+)\s*نتیجه/.exec(text);
+  // The page words this differently over time ("۲۳ نتیجه", "۲۳ پرواز", "۲۳ بلیط"); the
+  // number is the only part we rely on.
+  const match = /(\d+)\s*(?:نتیجه|پرواز|بلیط|بلیت)/.exec(text);
   return match?.[1] ? Number(match[1]) : null;
+}
+
+/** How many elements mention a currency — a markup clue, not a card detection. */
+function countElements($: cheerio.CheerioAPI, pattern: RegExp): number {
+  let count = 0;
+  $("body *").each((_, element) => {
+    if (count > 20) return;
+    const $element = $(element);
+    if ($element.children().length > 0) return;
+    if (pattern.test(normalizeDigits($element.text()))) count += 1;
+  });
+  return count;
+}
+
+function countPlausibleClocks($: cheerio.CheerioAPI): number {
+  let count = 0;
+  $("body *").each((_, element) => {
+    if (count > 20) return;
+    const $element = $(element);
+    if ($element.children().length > 0) return;
+    if (PLAUSIBLE_CLOCK.test(normalizeDigits($element.text()))) count += 1;
+  });
+  return count;
 }
 
 function parseUpdatedText(text: string): string | null {

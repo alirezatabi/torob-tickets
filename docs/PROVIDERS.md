@@ -33,6 +33,24 @@ inflated in the provider strip or in the docs.
   availability, per-offer URL.
 - Failure modes are explicit: `prohibited` for CAPTCHA/robots/redirect, `parse` when the
   page structure is no longer understood, empty-but-valid when the route has no flights.
+- **An empty page is diagnosed, not guessed.** When nothing parses, the adapter inspects
+  the response and reports one of three causes, in `ProviderRunReport.error.summaryFa`
+  (so it shows up in `provider:check`, `search:live` and the live UI):
+  - `results-require-js` — the page is a shell; the numbers arrive from the site's own XHR,
+    so an HTML parser will never see them. *This is the honest answer when a public
+    results page stops being server-rendered.*
+  - `markup-changed` — result cards exist but none of our field patterns matched.
+  - `unknown-page` — neither of the above.
+
+  Getting a real fixture to fix the parser against (opt-in, one request, git-ignored output):
+
+  ```bash
+  npm run provider:check sepehr360 THR MHD 2026-11-19 -- --save-html
+  # raw response → .provider-snapshots/<timestamp>-THR_MHD.html
+  ```
+
+  Without `--save-html`, an empty parse only writes a **sanitized** snapshot (title,
+  headings, a few short numeric snippets) — no raw HTML is ever stored by default.
 
 ## Amadeus Self-Service
 

@@ -35,6 +35,12 @@ import { wallClockToInstant } from "@/providers/fare";
 import { airportServesCity, airportsForCity, getAirport } from "@/modules/airports";
 import type { FlightSegment } from "@/domain/flight";
 import type { NormalizationIssue } from "@/providers/types";
+import {
+  diagnosePage,
+  explainEmptyPage,
+  saveRawHtml,
+  saveSnapshot,
+} from "@/modules/providers/shared/diagnostics";
 import { parseSearchPage } from "./parser";
 import { parsePersianDuration, parseStops, parseWallClock } from "./parse-duration";
 import type { Sepehr360RawOffer } from "./types";
@@ -150,7 +156,25 @@ export class Sepehr360Adapter implements LiveProviderAdapter<Sepehr360RawOffer> 
       ctx.logger.info("search.empty", { route: `${request.originCity}>${request.destinationCity}` });
     }
     if (parsed.offers.length === 0 && parsed.warnings.includes("no-result-cards-found") && parsed.meta.resultCount === null) {
-      throw parseError("no result cards and no explicit empty state — markup may have changed");
+      // Do not guess *why*. Look at the page, say what we saw, and leave a sanitized
+      // snapshot behind when the operator asked for one.
+      const diagnostics = diagnosePage(response.body, parsed.offers.length > 0);
+      const label = `${request.originCity}>${request.destinationCity}`;
+      const snapshot =
+        process.env.SEPEHR360_SAVE_HTML === "1"
+          ? saveRawHtml(response.body, label)
+          : saveSnapshot(diagnostics, label);
+      const clues = parsed.warnings.filter((warning) => warning.startsWith("clues:")).join(" ");
+      throw parseError(
+        [
+          explainEmptyPage(diagnostics),
+          clues,
+          diagnostics.title ? `title="${diagnostics.title}"` : "",
+          snapshot ? `snapshot=${snapshot}` : "",
+        ]
+          .filter(Boolean)
+          .join(" | "),
+      );
     }
 
     const meta: FetchMeta = {
@@ -174,7 +198,8 @@ export class Sepehr360Adapter implements LiveProviderAdapter<Sepehr360RawOffer> 
       records: parsed.offers,
       meta,
       rawCount: parsed.offers.length,
-      warnings: parsed.warnings,
+      // `clues:`-prefixed warnings are diagnostics for the empty case, not data problems.
+      warnings: parsed.warnings.filter((warning) => !warning.startsWith("clues:")),
     };
   }
 

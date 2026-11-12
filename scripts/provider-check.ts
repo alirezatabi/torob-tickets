@@ -19,10 +19,22 @@ import { createLogger } from "../src/modules/providers/shared/logger";
 import type { TripQuery } from "../src/domain/trip";
 import { DEFAULT_PREFERENCES } from "../src/domain/trip";
 
-const providerArg = process.argv[2] ?? "all";
-const origin = (process.argv[3] ?? "THR").toUpperCase();
-const destination = (process.argv[4] ?? "MHD").toUpperCase();
-const departDate = process.argv[5] ?? defaultDate();
+const args = process.argv.slice(2);
+/**
+ * `--save-html` writes the raw response to `SEPEHR360_SNAPSHOT_DIR` (default
+ * `./.provider-snapshots`) so a real fixture can be captured and the parser fixed against
+ * it. Off by default: no source content is stored unless the operator asks for it, and
+ * the folder is git-ignored.
+ */
+const saveHtml = args.includes("--save-html");
+const positional = args.filter((arg) => !arg.startsWith("--"));
+
+const providerArg = positional[0] ?? "all";
+const origin = (positional[1] ?? "THR").toUpperCase();
+const destination = (positional[2] ?? "MHD").toUpperCase();
+const departDate = positional[3] ?? defaultDate();
+
+if (saveHtml) process.env.SEPEHR360_SAVE_HTML = "1";
 
 function defaultDate(): string {
   const date = new Date();
@@ -128,7 +140,10 @@ async function checkProvider(provider: LiveProviderAdapter<unknown>): Promise<vo
       console.log("  ⚠ منبع دسترسی را محدود کرده است. این وضعیت تکرار/دور زدن ندارد؛ همان‌جا متوقف می‌شویم.");
     }
     if (info.code === "parse") {
-      console.log("  ⚠ قالب صفحه تغییر کرده است. fixture تازه از همان پاسخ بگیرید و parser را به‌روز کنید.");
+      // The adapter has already diagnosed *why* (in `detail`): JS shell, changed markup,
+      // or an unknown page. Do not repeat a guess here.
+      console.log("  ⚠ تشخیص بالا را ببینید؛ برای گرفتن fixture از پاسخ واقعی:");
+      console.log("     npm run provider:check sepehr360 THR MHD 2026-11-19 -- --save-html");
     }
   }
 }
@@ -137,6 +152,7 @@ async function main(): Promise<void> {
   console.log("Torob Tickets — بررسی اتصال به منابع واقعی");
   console.log(`مسیر: ${origin} → ${destination} | تاریخ: ${departDate}`);
   console.log("این اسکریپت فقط-خواندنی است و برای هر منبع تنها یک درخواست می‌فرستد.");
+  if (saveHtml) console.log("حالت fixture: پاسخ خام در .provider-snapshots ذخیره می‌شود (git-ignored).");
 
   const providers = pick();
   if (providers.length === 0) {

@@ -73,7 +73,13 @@ async function main(): Promise<void> {
   }
 
   if (payload.offers.length === 0) {
-    console.log("\nهیچ نرخی برنگشت. اگر منبع «OK» است، یعنی برای این مسیر/تاریخ نرخی وجود ندارد.");
+    const failed = payload.reports.filter((report) => !report.ok);
+    if (failed.length > 0) {
+      // "No offers" because a provider failed is a different fact from "no flights".
+      console.log("\nهیچ نرخی برنگشت، چون هیچ منبعی نرخ معتبر برنگرداند (دلیل هر منبع بالا آمده است).");
+    } else {
+      console.log("\nهیچ نرخی برنگشت؛ منابع پاسخ دادند و برای این مسیر/تاریخ نرخی نداشتند.");
+    }
   } else {
     console.log("\n— نرخ‌ها —");
     for (const offer of payload.offers) {

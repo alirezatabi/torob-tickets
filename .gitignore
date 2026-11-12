@@ -62,3 +62,6 @@ pnpm-debug.log*
 # ————— Prisma 7 —————
 # Generated client (npm run db:generate writes it here)
 /src/generated/
+
+# ————— Provider diagnostics (opt-in; may contain source content) —————
+/.provider-snapshots/

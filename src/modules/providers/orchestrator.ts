@@ -262,7 +262,12 @@ export class SearchOrchestrator {
           retries: 0,
           error: {
             code: providerError.code as ProviderErrorCode,
-            summaryFa: providerError.summaryFa,
+            // The diagnosis (why the page yielded nothing, and the next action) is part of
+            // the summary — a report that only says "پاسخ منبع قابل تفسیر نبود" makes the
+            // operator re-run the whole thing to learn something we already knew.
+            summaryFa: providerError.detail
+              ? `${providerError.summaryFa} — ${providerError.detail}`
+              : providerError.summaryFa,
             httpStatus: providerError.httpStatus,
             retryable: providerError.retryable,
           },
