@@ -1,77 +1,47 @@
 import Link from "next/link";
-import { CalendarDays, Sparkles } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { addDays, isoToday } from "@/lib/jalali";
-import { formatJalali } from "@/lib/jalali";
 
 /**
- * Curated demo entry points. They are plain links, so the whole demo works with
- * JS disabled and no API key — critical for a 5-minute live presentation.
+ * Ready-made searches. Plain links: the demo works with JS disabled and no API key,
+ * and the label above each one is a date, not a sentence.
  */
 export function DemoSearches() {
   const today = isoToday();
   const nextWeek = addDays(today, 7);
   const samples = [
+    { title: "تهران ← استانبول", meta: "۴ منبع", href: `/search?origin=THR&destination=IST&date=${nextWeek}` },
     {
-      title: "تهران → استانبول",
-      subtitle: "همهٔ ۴ ارائه‌دهنده، مسیر اصلی دمو",
-      href: `/search?origin=THR&destination=IST&date=${nextWeek}`,
-      accent: "teal" as const,
-    },
-    {
-      title: "تهران → استانبول، ارزان و با بار",
-      subtitle: "مستقیم، با بار، ارزان‌ترین",
+      title: "تهران ← استانبول",
+      meta: "بار + مستقیم + ارزان",
       href: `/search?origin=THR&destination=IST&date=${nextWeek}&bag=1&stops=0&price=low`,
-      accent: "saffron" as const,
     },
-    {
-      title: "تهران → دبی",
-      subtitle: "مقایسهٔ سه نرخ در یک روز",
-      href: `/search?origin=THR&destination=DXB&date=${addDays(today, 5)}`,
-      accent: "teal" as const,
-    },
-    {
-      title: "تهران → مشهد",
-      subtitle: "پرواز داخلی",
-      href: `/search?origin=THR&destination=MHD&date=${addDays(today, 3)}`,
-      accent: "ink" as const,
-    },
+    { title: "تهران ← دبی", meta: "۳ نرخ", href: `/search?origin=THR&destination=DXB&date=${addDays(today, 5)}` },
+    { title: "تهران ← مشهد", meta: "داخلی", href: `/search?origin=THR&destination=MHD&date=${addDays(today, 3)}` },
   ];
 
   return (
-    <section aria-labelledby="demo-searches" className="mt-6">
-      <div className="mb-2.5 flex items-center gap-2">
-        <h2 id="demo-searches" className="text-xs font-semibold text-ink-500">
-          جستجوهای آمادهٔ نمایش
-        </h2>
-        <span className="text-[0.68rem] text-ink-400">— {formatJalali(nextWeek, "long")} به بعد</span>
-      </div>
-      <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-4">
+    <section aria-labelledby="demo-searches" className="mt-5">
+      <h2 id="demo-searches" className="mb-2 px-1 text-[0.68rem] font-medium text-ink-400">
+        جستجوهای آماده
+      </h2>
+      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
         {samples.map((sample) => (
           <Link
             key={sample.href}
             href={sample.href}
-            className="group card card-hover flex items-start gap-2.5 px-3.5 py-3"
+            className="group flex items-center justify-between gap-2 rounded-xl border border-ink-200/80 bg-white/80 px-3 py-2.5 transition-colors hover:border-teal-400 hover:bg-white"
           >
-            <span
-              className={
-                "mt-0.5 grid size-8 shrink-0 place-items-center rounded-xl transition-transform group-hover:-translate-x-0.5 " +
-                (sample.accent === "saffron"
-                  ? "bg-saffron-50 text-saffron-600"
-                  : sample.accent === "teal"
-                    ? "bg-teal-50 text-teal-600"
-                    : "bg-ink-100 text-ink-600")
-              }
-            >
-              {sample.accent === "saffron" ? (
-                <Sparkles className="size-3.5" aria-hidden="true" />
-              ) : (
-                <CalendarDays className="size-3.5" aria-hidden="true" />
-              )}
+            <span className="min-w-0">
+              <span className="block truncate text-[0.78rem] font-semibold text-ink-800 group-hover:text-teal-800">
+                {sample.title}
+              </span>
+              <span className="mt-0.5 block truncate text-[0.65rem] text-ink-400">{sample.meta}</span>
             </span>
-            <span className="flex flex-col">
-              <span className="text-xs font-bold text-ink-800 group-hover:text-teal-700">{sample.title}</span>
-              <span className="mt-1 text-[0.68rem] leading-4 text-ink-400">{sample.subtitle}</span>
-            </span>
+            <ArrowLeft
+              className="size-3 shrink-0 text-ink-300 transition-all group-hover:-translate-x-0.5 group-hover:text-teal-600"
+              aria-hidden="true"
+            />
           </Link>
         ))}
       </div>

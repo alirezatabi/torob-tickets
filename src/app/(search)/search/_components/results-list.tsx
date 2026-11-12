@@ -82,9 +82,7 @@ export function ResultsList({
       {feasibleGroups.length === 0 && (
         <div className="card p-8 text-center">
           <h2 className="text-sm font-bold">با این فیلترها نتیجه‌ای نماند</h2>
-          <p className="mt-2 text-xs leading-6 text-ink-500">
-            فیلترها را کمتر کنید یا دکمهٔ «پاک کردن» را در پنل فیلترها بزنید.
-          </p>
+          <p className="mt-2 text-xs leading-6 text-ink-500">فیلترها را کم کنید یا «پاک کردن» را بزنید.</p>
         </div>
       )}
 
@@ -96,9 +94,11 @@ export function ResultsList({
             aria-expanded={showExcluded}
             className="flex w-full items-center justify-between rounded-xl border border-ink-200 bg-white px-4 py-2.5 text-right text-[0.72rem] font-semibold text-ink-600 hover:bg-ink-50"
           >
-            <span id="excluded-heading">
-              خارج از ترجیحات شما ({toPersianDigits(excludedGroups.length)} پرواز)
-              <span className="mr-2 font-normal text-ink-400">— این گزینه‌ها شرایط درخواستی شما را ندارند</span>
+            <span id="excluded-heading" className="inline-flex items-center gap-1.5">
+              خارج از ترجیحات
+              <span className="rounded-full bg-ink-100 px-1.5 text-[0.65rem] font-semibold text-ink-500">
+                {toPersianDigits(excludedGroups.length)}
+              </span>
             </span>
             {showExcluded ? <ChevronUp className="size-4" /> : <ChevronDown className="size-4" />}
           </button>
@@ -124,7 +124,7 @@ export function ResultsList({
 
       {hidden > 0 && (
         <p className="mt-4 text-center text-[0.68rem] text-ink-400">
-          {toPersianDigits(hidden)} پرواز با فیلترهای فعلی پنهان شده است.
+          {toPersianDigits(hidden)} پرواز با فیلترها پنهان شد.
         </p>
       )}
 

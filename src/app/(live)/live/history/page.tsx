@@ -17,7 +17,7 @@ export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "تاریخچهٔ قیمت | ترب بلیت",
-  description: "تغییر قیمت همان نرخ، در بازه‌های زمانی مختلف؛ بدون درهم‌آمیختن شرایط متفاوت بلیت.",
+  description: "تغییر قیمت همان نرخ در بازه‌های زمانی مختلف.",
 };
 
 const RANGES: HistoryRange[] = ["24h", "7d", "30d", "90d", "all"];
@@ -64,7 +64,7 @@ export default async function HistoryPage({
           <h2 className="mt-3 text-sm font-bold">تاریخچه‌ای برای نمایش نیست</h2>
           <p className="mx-auto mt-2 max-w-md text-xs leading-6 text-ink-500">{result.reasonFa}</p>
           <p className="mx-auto mt-2 max-w-md text-[0.65rem] leading-5 text-ink-400">
-            تاریخچه از اولین مشاهدهٔ واقعی شروع می‌شود؛ هیچ داده‌ای برای پر کردن گذشته ساخته نمی‌شود.
+            تاریخچه از اولین مشاهدهٔ واقعی شروع می‌شود؛ گذشته پر نمی‌شود.
           </p>
           <Link href="/live" className="btn-ghost mt-4 inline-flex text-xs">
             بازگشت به جست‌وجوی واقعی
@@ -84,9 +84,8 @@ export default async function HistoryPage({
           </div>
 
           <p className="mt-6 rounded-xl border border-ink-200 bg-white px-4 py-3 text-[0.65rem] leading-5 text-ink-500">
-            هر خط نمایندهٔ یک نرخ مشخص است: مسیر، تاریخ، ایرلاین، شمارهٔ پرواز، کابین، کلاس نرخ، بار مجاز و نوع
-            بلیت در هویت آن اثر دارند. دو نرخی که شرایطشان متفاوت است هرگز روی یک خط نمی‌آیند و نقطه‌ای برای
-            پر کردن فاصله‌ها ساخته نمی‌شود.
+            هر خط یک نرخ مشخص است (مسیر، تاریخ، پرواز، کابین، بار، نوع بلیت)؛ نرخ‌های با شرایط متفاوت روی یک خط
+            نمی‌آیند.
           </p>
         </>
       )}

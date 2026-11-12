@@ -9,6 +9,7 @@ import { toPersianDigits } from "@/lib/format";
 import { describeLiveProviders, searchMode } from "@/modules/providers/registry-live";
 import { dbMode } from "@/modules/db/prisma";
 import { runLiveSearch } from "@/server/live-search";
+import { cn } from "@/lib/cn";
 import { LiveOfferCard } from "./_components/live-offer-card";
 
 export const dynamic = "force-dynamic";
@@ -42,13 +43,7 @@ export default async function LivePage({
   return (
     <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6">
       <header className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-extrabold text-ink-900">قیمت‌های واقعی</h1>
-          <p className="mt-1 text-sm leading-6 text-ink-500">
-            قیمت‌ها از منابع بیرونی خوانده می‌شوند؛ زمان مشاهدهٔ هر قیمت، منبع آن و آنچه دربارهٔ آن نرخ
-            نمی‌دانیم کنارش نوشته شده است.
-          </p>
-        </div>
+        <h1 className="text-lg font-extrabold text-ink-900">دادهٔ واقعی</h1>
         <span
           className={
             mode === "live"
@@ -57,50 +52,50 @@ export default async function LivePage({
           }
         >
           <Radio className="size-3.5" aria-hidden="true" />
-          {mode === "live" ? "حالت واقعی فعال" : "حالت نمونه (دادهٔ ساختگی)"}
+          {mode === "live" ? "زنده" : "نمونه"}
         </span>
       </header>
 
       <section className="mt-5 grid gap-3 sm:grid-cols-2">
         {providers.map((provider) => (
           <div key={provider.id} className="card p-4">
-            <div className="flex items-center justify-between gap-2">
-              <h2 className="text-sm font-bold text-ink-900">{provider.name}</h2>
+            <div className="flex items-center gap-2">
               <span
-                className={
-                  provider.configured
-                    ? "rounded-md bg-teal-50 px-1.5 py-0.5 text-[0.62rem] font-medium text-teal-700"
-                    : "rounded-md bg-ink-100 px-1.5 py-0.5 text-[0.62rem] font-medium text-ink-500"
-                }
-              >
-                {provider.configured ? "پیکربندی‌شده" : "پیکربندی نشده"}
+                className={cn("dot", provider.configured ? "text-teal-500" : "text-ink-300")}
+                aria-hidden="true"
+              />
+              <h2 className="text-sm font-bold text-ink-900">{provider.name}</h2>
+              <span className="mr-auto inline-flex items-center gap-1 text-[0.62rem] text-ink-400">
+                <ShieldCheck className="size-3" aria-hidden="true" />
+                {provider.configured ? "آماده" : "بدون کلید"}
+                <span className="sr-only">{provider.complianceNoteFa}</span>
               </span>
             </div>
-            <p className="mt-1 text-[0.7rem] leading-5 text-ink-500">{provider.description}</p>
-            <p className="mt-2 text-[0.62rem] leading-5 text-ink-400">
-              <span className="font-medium text-ink-500">آنچه اعلام نمی‌شود: </span>
-              {provider.missingFactsFa.join(" · ")}
-            </p>
-            <p className="mt-1.5 flex items-start gap-1 text-[0.62rem] leading-5 text-ink-400">
-              <ShieldCheck className="mt-0.5 size-3 shrink-0" aria-hidden="true" />
-              {provider.complianceNoteFa}
-            </p>
+            <p className="mt-1.5 text-[0.7rem] leading-5 text-ink-500">{provider.description}</p>
+            <div className="mt-2 flex flex-wrap items-center gap-1">
+              <span className="text-[0.6rem] text-ink-400">نامعلوم:</span>
+              {provider.missingFactsFa.map((fact) => (
+                <span key={fact} className="rounded-md bg-ink-100 px-1.5 py-0.5 text-[0.6rem] text-ink-500">
+                  {fact}
+                </span>
+              ))}
+            </div>
           </div>
         ))}
       </section>
 
-      <div className="mt-3 grid gap-2 text-[0.68rem] text-ink-500 sm:grid-cols-2">
-        <p className="flex items-start gap-1.5 rounded-xl border border-ink-200 bg-white px-3 py-2">
-          <Database className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
-          {dbMode() === "postgres"
-            ? "تاریخچهٔ قیمت روی PostgreSQL ثبت می‌شود."
-            : "بدون DATABASE_URL تاریخچهٔ قیمت ثبت نمی‌شود؛ قیمت‌ها همچنان نمایش داده می‌شوند."}
-        </p>
-        <p className="flex items-start gap-1.5 rounded-xl border border-ink-200 bg-white px-3 py-2">
-          <PlugZap className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
-          برای اجرای واقعی: <code className="font-mono">TOROB_SEARCH_MODE=live</code> و
-          <code className="font-mono"> npm run search:live</code>
-        </p>
+      <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[0.62rem] text-ink-400">
+        <span className="inline-flex items-center gap-1">
+          <Database className="size-3" aria-hidden="true" />
+          {dbMode() === "postgres" ? "PostgreSQL" : "بدون دیتابیس"}
+        </span>
+        <span aria-hidden="true">·</span>
+        <span className="inline-flex items-center gap-1">
+          <PlugZap className="size-3" aria-hidden="true" />
+          <code className="font-mono" title="برای دادهٔ واقعی، این متغیر را روی live بگذارید">
+            TOROB_SEARCH_MODE=live
+          </code>
+        </span>
       </div>
 
       <form className="card mt-5 grid gap-3 p-4 sm:grid-cols-[1fr_1fr_1fr_auto]" action="/live">
@@ -143,8 +138,8 @@ export default async function LivePage({
       </form>
 
       {!hasQuery ? (
-        <p className="mt-6 rounded-xl border border-dashed border-ink-200 px-4 py-8 text-center text-sm text-ink-500">
-          مسیر و تاریخ را انتخاب کنید تا قیمت‌های واقعی و وضعیت هر منبع را ببینید.
+        <p className="mt-5 rounded-xl border border-dashed border-ink-200 px-4 py-7 text-center text-[0.75rem] text-ink-400">
+          مسیر و تاریخ را انتخاب کنید
         </p>
       ) : !parsed || !parsed.ok ? (
         <div className="card mt-6 p-6 text-center">
@@ -155,14 +150,16 @@ export default async function LivePage({
         <LiveResults parsedQuery={parsed.query} mode={mode} />
       )}
 
-      <p className="mt-8 text-[0.65rem] leading-5 text-ink-400">
-        این صفحه یک نمونهٔ مهندسی است و رزرو انجام نمی‌دهد. برای خرید، از لینک منبع استفاده کنید. قیمت‌ها ممکن
-        است تا چند دقیقه پس از مشاهده تغییر کنند.
+      <p className="mt-6 flex flex-wrap items-center gap-x-3 gap-y-1 text-[0.62rem] text-ink-400">
+        <span>بدون رزرو</span>
+        <span aria-hidden="true">·</span>
+        <span>خرید در منبع</span>
+        <span aria-hidden="true">·</span>
+        <Link href="/" className="inline-flex items-center gap-1 font-medium text-teal-700 hover:underline">
+          نسخهٔ نمایشی
+          <ArrowLeft className="size-3" aria-hidden="true" />
+        </Link>
       </p>
-      <Link href="/" className="mt-3 inline-flex items-center gap-1 text-xs text-teal-700 hover:underline">
-        <ArrowLeft className="size-3.5" aria-hidden="true" />
-        بازگشت به نسخهٔ نمایشی
-      </Link>
     </div>
   );
 }
@@ -202,25 +199,26 @@ async function LiveResults({
               }
               title={report.error?.summaryFa ?? `${report.accepted} نرخ پذیرفته‌شده`}
             >
-              {report.providerName}: {report.ok ? `${toPersianDigits(report.accepted)} نرخ` : report.error?.summaryFa ?? "خطا"}
+              <span className="font-medium">{report.providerName}</span>
+              <span className="mx-1 opacity-40">·</span>
+              {report.ok ? toPersianDigits(report.accepted) : report.error?.summaryFa ?? "خطا"}
             </li>
           ))}
         </ul>
       ) : null}
 
       {payload.persistence.reasonFa ? (
-        <p className="mt-2 rounded-lg border border-ink-200 bg-white px-3 py-2 text-[0.65rem] text-ink-500">
-          تاریخچه: {payload.persistence.reasonFa}
+        <p className="mt-2 inline-flex items-center gap-1.5 text-[0.62rem] text-ink-400">
+          <Database className="size-3" aria-hidden="true" />
+          تاریخچه ثبت نشد
         </p>
       ) : null}
 
       {payload.offers.length === 0 ? (
         <div className="card mt-4 p-8 text-center">
-          <h3 className="text-sm font-bold">نرخی برای این مسیر پیدا نشد</h3>
-          <p className="mx-auto mt-2 max-w-md text-xs leading-6 text-ink-500">
-            {payload.mode === "demo"
-              ? "در حالت نمونه فقط مسیرهای موجود در دادهٔ نمایشی نتیجه دارند. برای دادهٔ واقعی، حالت را به live تغییر دهید."
-              : "هیچ منبعی برای این مسیر و تاریخ نرخی برنگرداند. این یعنی «موجود نیست»، نه اینکه خطایی رخ داده باشد."}
+          <h3 className="text-sm font-bold">نرخی پیدا نشد</h3>
+          <p className="mx-auto mt-1.5 max-w-sm text-[0.7rem] leading-6 text-ink-400">
+            {payload.mode === "demo" ? "مسیر در دادهٔ نمونه نیست" : "هیچ منبعی نرخ برنگرداند"}
           </p>
         </div>
       ) : (

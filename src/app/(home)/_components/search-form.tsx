@@ -101,18 +101,20 @@ export function SearchForm({ initialOrigin = "THR", initialDestination = "IST" }
   const busy = pending || intentPending;
 
   return (
-    <div className="card relative overflow-hidden p-4 shadow-[var(--shadow-float)] sm:p-6">
+    <div className="card relative overflow-hidden p-4 sm:p-5">
       <div aria-hidden="true" className="absolute inset-x-0 top-0 h-px bg-gradient-to-l from-transparent via-teal-400/60 to-transparent" />
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <div className="inline-flex rounded-2xl bg-ink-100/90 p-1" role="tablist" aria-label="نوع جستجو">
+        <div className="segmented" role="tablist" aria-label="نوع جستجو">
           <button
             type="button"
             role="tab"
             aria-selected={mode === "form"}
             onClick={() => setMode("form")}
             className={cn(
-              "rounded-xl px-3.5 py-1.5 text-xs font-bold transition-all",
-              mode === "form" ? "bg-white text-ink-900 shadow-sm" : "text-ink-500 hover:text-ink-700",
+              "rounded-full px-3.5 py-1.5 text-xs font-bold transition-all",
+              mode === "form"
+                ? "bg-white text-ink-900 shadow-[0_1px_2px_rgba(15,23,42,0.10)]"
+                : "text-ink-500 hover:text-ink-700",
             )}
           >
             جستجوی فرمی
@@ -123,9 +125,9 @@ export function SearchForm({ initialOrigin = "THR", initialDestination = "IST" }
             aria-selected={mode === "nl"}
             onClick={() => setMode("nl")}
             className={cn(
-              "inline-flex items-center gap-1.5 rounded-xl px-3.5 py-1.5 text-xs font-bold transition-all",
+              "inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-bold transition-all",
               mode === "nl"
-                ? "bg-gradient-to-l from-teal-600 to-teal-500 text-white shadow-sm"
+                ? "bg-teal-600 text-white shadow-[0_1px_2px_rgba(15,23,42,0.12)]"
                 : "text-ink-500 hover:text-ink-700",
             )}
           >
@@ -134,13 +136,13 @@ export function SearchForm({ initialOrigin = "THR", initialDestination = "IST" }
           </button>
         </div>
 
-        <div className="inline-flex rounded-2xl border border-ink-200 bg-white p-0.5 text-xs" role="group" aria-label="نوع سفر">
+        <div className="inline-flex items-center gap-0.5 rounded-full border border-ink-200 bg-white p-0.5 text-xs" role="group" aria-label="نوع سفر">
           <button
             type="button"
             onClick={() => setTripType("oneway")}
             aria-pressed={tripType === "oneway"}
             className={cn(
-              "rounded-xl px-3.5 py-1.5 font-semibold transition-colors",
+              "rounded-full px-3.5 py-1.5 font-semibold transition-colors",
               tripType === "oneway" ? "bg-ink-900 text-white" : "text-ink-500 hover:text-ink-800",
             )}
           >
@@ -151,7 +153,7 @@ export function SearchForm({ initialOrigin = "THR", initialDestination = "IST" }
             onClick={() => setTripType("roundtrip")}
             aria-pressed={tripType === "roundtrip"}
             className={cn(
-              "rounded-xl px-3.5 py-1.5 font-semibold transition-colors",
+              "rounded-full px-3.5 py-1.5 font-semibold transition-colors",
               tripType === "roundtrip" ? "bg-ink-900 text-white" : "text-ink-500 hover:text-ink-800",
             )}
           >
@@ -176,9 +178,7 @@ export function SearchForm({ initialOrigin = "THR", initialDestination = "IST" }
             className="field resize-none text-[0.95rem] leading-8 placeholder:text-ink-400"
           />
           <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-            <p className="text-[0.7rem] leading-5 text-ink-400">
-              مبدأ، مقصد، تاریخ، تعداد مسافر و ترجیحات (بار، توقف، ساعت، بودجه، ایرلاین) استخراج می‌شود.
-            </p>
+            <p className="text-[0.7rem] leading-5 text-ink-400">مسیر، تاریخ و ترجیحات از متن خوانده می‌شود.</p>
             <button type="submit" disabled={busy} className="btn-primary text-sm">
               {intentPending ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />}
               {intentPending ? "در حال درک درخواست…" : "جستجو با هوش مصنوعی"}
@@ -238,7 +238,7 @@ export function SearchForm({ initialOrigin = "THR", initialDestination = "IST" }
 
           <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
             <p className="text-[0.7rem] leading-5 text-ink-400">
-              قیمت‌ها از ارائه‌دهندگان نمونه جمع‌آوری می‌شوند و قیمت لحظه‌ای واقعی نیستند.
+              قیمت‌ها نمونه‌اند، نه لحظه‌ای.
             </p>
             <button type="button" onClick={submitForm} disabled={busy} className="btn-primary min-w-[11rem] text-sm">
               {pending ? <Loader2 className="size-4 animate-spin" /> : <ArrowLeft className="size-4" />}

@@ -143,7 +143,7 @@ export function OfferCard({
               {offer.refundable === true ? "قابل استرداد" : offer.refundable === false ? "غیرقابل استرداد" : "استرداد نامشخص"}
             </Feature>
             <Feature icon={<Timer className="size-3" aria-hidden="true" />}>
-              {formatRelative(offer.providerUpdatedAt)} به‌روزرسانی
+              {formatRelative(offer.providerUpdatedAt)}
             </Feature>
             {offer.warnings.includes("price-converted") && (
               <span className="chip border-saffron-300/60 bg-saffron-50 text-[0.6rem] text-saffron-600" title={WARNING_LABELS["price-converted"]}>
@@ -163,7 +163,7 @@ export function OfferCard({
         <div className="flex shrink-0 flex-row items-end justify-between gap-3 border-t border-ink-100 pt-3 sm:w-[13.5rem] sm:flex-col sm:items-stretch sm:border-r sm:border-t-0 sm:pr-4 sm:pt-0">
           <div className="text-left sm:text-right">
             {group.providers.length > 1 && (
-              <p className="text-[0.6rem] text-ink-400">ارزان‌ترین از {toPersianDigits(group.providers.length)} ارائه‌دهنده</p>
+              <p className="text-[0.6rem] text-ink-400">ارزان‌ترین · {toPersianDigits(group.providers.length)} منبع</p>
             )}
             <p className="text-[1.15rem] font-black tracking-tight text-ink-900 nums" data-testid="offer-price">
               {formatToman(group.cheapestToman)}
@@ -188,8 +188,8 @@ export function OfferCard({
               className="text-center text-[0.6rem] text-ink-400 hover:text-teal-700 hover:underline"
             >
               {group.providers.length > 1
-                ? `مقایسهٔ نرخ ${toPersianDigits(group.providers.length)} ارائه‌دهنده`
-                : "جزئیات این پیشنهاد"}
+                ? `مقایسهٔ ${toPersianDigits(group.providers.length)} نرخ`
+                : "جزئیات نرخ"}
             </Link>
 
             <a

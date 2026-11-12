@@ -41,12 +41,17 @@
 
   --font-sans: "Vazirmatn Variable", "Vazirmatn", system-ui, sans-serif;
 
-  --radius-card: 1.5rem;
-  --radius-field: 0.9rem;
+  --radius-card: 1.25rem;
+  --radius-field: 0.8rem;
 
-  --shadow-soft: 0 1px 2px rgb(11 20 36 / 0.04), 0 10px 30px -16px rgb(11 20 36 / 0.18);
-  --shadow-lifted: 0 2px 6px rgb(11 20 36 / 0.06), 0 26px 50px -28px rgb(11 20 36 / 0.35);
+  /* Two-layer shadows: a tight contact shadow plus a wide, low-opacity ambient one.
+     This reads as "lifted surface" instead of "bordered box with a blur". */
+  --shadow-soft: 0 1px 1px rgb(11 20 36 / 0.03), 0 1px 3px rgb(11 20 36 / 0.04), 0 12px 28px -18px rgb(11 20 36 / 0.22);
+  --shadow-lifted: 0 1px 2px rgb(11 20 36 / 0.04), 0 10px 24px -12px rgb(11 20 36 / 0.16), 0 28px 56px -32px rgb(11 20 36 / 0.28);
   --shadow-float: 0 1px 1px rgb(11 20 36 / 0.04), 0 30px 60px -30px rgb(13 107 96 / 0.35);
+
+  --surface: #ffffff;
+  --surface-muted: color-mix(in oklab, var(--color-ink-50) 70%, #fff);
 }
 
 @layer base {
@@ -62,6 +67,7 @@
 
   body {
     background-color: var(--color-ink-50);
+    background-image: linear-gradient(180deg, #fff 0rem, var(--color-ink-50) 42rem);
     color: var(--color-ink-900);
     font-family: var(--font-sans);
     font-synthesis-weight: none;
@@ -96,48 +102,65 @@
 @layer components {
   /* ——— Surfaces ——— */
   .card {
-    background-color: #fff;
-    border: 1px solid color-mix(in oklab, var(--color-ink-200) 80%, transparent);
+    background-color: var(--surface);
+    border: 1px solid color-mix(in oklab, var(--color-ink-200) 70%, transparent);
     border-radius: var(--radius-card);
     box-shadow: var(--shadow-soft);
   }
 
   .card-hover {
-    transition: transform 220ms cubic-bezier(0.22, 1, 0.36, 1), box-shadow 220ms ease, border-color 220ms ease;
+    transition: transform 240ms cubic-bezier(0.22, 1, 0.36, 1), box-shadow 240ms ease, border-color 240ms ease;
   }
 
   .card-hover:hover {
-    transform: translateY(-2px);
+    transform: translateY(-3px);
     box-shadow: var(--shadow-lifted);
-    border-color: color-mix(in oklab, var(--color-teal-500) 35%, var(--color-ink-200));
+    border-color: color-mix(in oklab, var(--color-teal-500) 28%, var(--color-ink-200));
   }
 
-  /* Frosted panel used by the sticky header and the compare tray. */
+  /* Glass panel with a hairline top highlight — reads as glass, not as a grey overlay. */
   .glass {
-    background-color: color-mix(in oklab, #fff 82%, transparent);
-    backdrop-filter: saturate(180%) blur(14px);
+    background-color: color-mix(in oklab, #fff 76%, transparent);
+    backdrop-filter: saturate(180%) blur(16px);
+    box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.6);
+  }
+
+  /* Sticky bars that sit over content need an edge that appears only when scrolled. */
+  .edge-fade {
+    box-shadow: 0 1px 0 color-mix(in oklab, var(--color-ink-200) 70%, transparent),
+      0 10px 30px -24px rgb(11 20 36 / 0.5);
   }
 
   /* ——— Fields ——— */
-  .field {
+  .field,
+  .input {
     width: 100%;
     border-radius: var(--radius-field);
-    border: 1px solid var(--color-ink-200);
+    border: 1px solid color-mix(in oklab, var(--color-ink-200) 90%, transparent);
     background-color: #fff;
-    padding: 0.72rem 0.95rem;
-    font-size: 0.925rem;
+    padding: 0.68rem 0.9rem;
+    font-size: 0.9rem;
     color: var(--color-ink-900);
     transition: border-color 160ms ease, box-shadow 160ms ease, background-color 160ms ease;
+    box-shadow: inset 0 1px 2px rgb(11 20 36 / 0.03);
   }
 
-  .field:hover {
+  .field::placeholder,
+  .input::placeholder {
+    color: var(--color-ink-400);
+  }
+
+  .field:hover,
+  .input:hover {
     border-color: var(--color-ink-300);
   }
 
-  .field:focus {
+  .field:focus,
+  .input:focus {
     outline: none;
     border-color: var(--color-teal-500);
-    box-shadow: 0 0 0 4px color-mix(in oklab, var(--color-teal-500) 16%, transparent);
+    background-color: #fff;
+    box-shadow: 0 0 0 4px color-mix(in oklab, var(--color-teal-500) 14%, transparent);
   }
 
   .label {
@@ -155,17 +178,17 @@
     justify-content: center;
     gap: 0.5rem;
     border-radius: var(--radius-field);
-    background-image: linear-gradient(135deg, var(--color-teal-500), var(--color-teal-700) 70%);
+    background-image: linear-gradient(180deg, var(--color-teal-600), var(--color-teal-700));
     color: #fff;
     font-weight: 700;
-    padding: 0.85rem 1.3rem;
+    padding: 0.78rem 1.25rem;
     transition: filter 160ms ease, transform 160ms ease, box-shadow 200ms ease;
-    box-shadow: 0 10px 24px -12px rgb(13 107 96 / 0.75);
+    box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.18), 0 8px 20px -12px rgb(13 107 96 / 0.7);
   }
 
   .btn-primary:hover {
-    filter: brightness(1.05);
-    box-shadow: 0 14px 30px -14px rgb(13 107 96 / 0.85);
+    filter: brightness(1.06);
+    box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.22), 0 12px 26px -12px rgb(13 107 96 / 0.8);
   }
 
   .btn-primary:active {
@@ -241,6 +264,53 @@
       radial-gradient(38rem 24rem at 78% -8%, color-mix(in oklab, var(--color-teal-400) 26%, transparent), transparent 70%),
       radial-gradient(30rem 20rem at 12% 0%, color-mix(in oklab, var(--color-saffron-300) 22%, transparent), transparent 72%),
       radial-gradient(34rem 26rem at 50% 120%, color-mix(in oklab, var(--color-teal-600) 14%, transparent), transparent 70%);
+  }
+
+  /* ——— Modern primitives ——— */
+
+  /* Metric tile: big tabular number, quiet label. Used instead of prose summaries. */
+  .metric {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+  }
+
+  .metric-value {
+    font-size: 1.35rem;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    color: var(--color-ink-900);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .metric-label {
+    font-size: 0.68rem;
+    color: var(--color-ink-400);
+  }
+
+  /* Segmented control look for tabs / range switchers. */
+  .segmented {
+    display: inline-flex;
+    gap: 0.15rem;
+    padding: 0.2rem;
+    border-radius: 999px;
+    background-color: color-mix(in oklab, var(--color-ink-100) 80%, transparent);
+    border: 1px solid color-mix(in oklab, var(--color-ink-200) 70%, transparent);
+  }
+
+  /* Status dot with a soft halo — replaces icon+text status sentences. */
+  .dot {
+    display: inline-block;
+    inline-size: 0.4rem;
+    block-size: 0.4rem;
+    border-radius: 999px;
+    background-color: currentColor;
+    box-shadow: 0 0 0 3px color-mix(in oklab, currentColor 18%, transparent);
+  }
+
+  /* Zebra-free divider rhythm for dense lists. */
+  .divide-hairline > * + * {
+    border-top: 1px solid color-mix(in oklab, var(--color-ink-200) 60%, transparent);
   }
 
   .grid-lines {

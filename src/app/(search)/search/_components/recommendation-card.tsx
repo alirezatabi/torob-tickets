@@ -48,7 +48,7 @@ export async function RecommendationCard({
         <div className="min-w-0 flex-1">
           <h2 id="recommendation-heading" className="inline-flex items-center gap-1.5 text-xs font-bold text-teal-700">
             <Sparkles className="size-4" aria-hidden="true" />
-            بهترین تطابق برای سفر شما
+            بهترین تطابق
           </h2>
 
           <p className="mt-2 max-w-2xl text-[0.86rem] leading-8 text-ink-700" data-testid="recommendation-text">
@@ -69,29 +69,35 @@ export async function RecommendationCard({
                 امتیاز {toPersianDigits(Math.round(best.score))} از ۱۰۰
               </span>
             )}
-            <span className="inline-flex items-center gap-1 text-ink-400" title={source === "llm" ? "توضیح با هوش مصنوعی و بررسی انطباق با داده‌ها تولید شده است" : "توضیح به‌صورت قطعی از داده‌های همین جستجو ساخته شده است"}>
+            <span
+              className="inline-flex items-center gap-1 text-ink-400"
+              title={
+                source === "llm"
+                  ? "بازنویسی هوش مصنوعی، پس از بررسی انطباق با داده‌ها"
+                  : "ساخته‌شده از داده‌های همین جستجو، بدون مدل زبانی"
+              }
+            >
               <Info className="size-3" aria-hidden="true" />
-              {source === "llm" ? "توضیح کنترل‌شده با هوش مصنوعی" : "توضیح قطعی از داده‌های همین جستجو"}
+              {source === "llm" ? "بازنویسی هوش مصنوعی" : "توضیح قطعی"}
             </span>
           </div>
         </div>
 
         <div className="shrink-0 text-left">
-          <p className="text-[0.65rem] text-ink-400">قیمت این گزینه</p>
+          <p className="text-[0.65rem] text-ink-400">قیمت</p>
           <p className="mt-0.5 text-xl font-black text-ink-900 nums">{formatToman(offer.price.toman)}</p>
           <Link
             href={`/compare?${compareParams.toString()}`}
             className="btn-ghost mt-2 text-[0.7rem]"
           >
-            مقایسه با گزینه‌های دیگر
+            مقایسه
             <ArrowLeft className="size-3" aria-hidden="true" />
           </Link>
         </div>
       </div>
 
       <p className="relative mt-3 border-t border-teal-600/10 pt-2 text-[0.65rem] text-ink-400">
-        از میان {toPersianDigits(totalCount)} پرواز یکتا، بر اساس ترجیحات شما (قیمت، مدت سفر، توقف، بار و استرداد)
-        رتبه‌بندی شده است.
+        از {toPersianDigits(totalCount)} پرواز یکتا · قیمت، مدت، توقف، بار، استرداد
       </p>
     </section>
   );

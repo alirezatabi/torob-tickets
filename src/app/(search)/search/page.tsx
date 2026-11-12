@@ -45,7 +45,7 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
           <p className="mt-2 text-sm leading-6 text-ink-500">
             {parsed.missing.length > 0
               ? "برای شروع، مبدأ، مقصد و تاریخ پرواز را انتخاب کنید."
-              : "لطفاً یک جستجوی دیگر انجام دهید."}
+              : "جستجو را دوباره پر کنید."}
           </p>
           <Link href="/" className="btn-primary mt-5 inline-flex text-sm">
             <ArrowRight className="size-4" aria-hidden="true" />
@@ -102,8 +102,7 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
 
                 {outcome.issues.length > 0 && (
                   <p className="rounded-xl border border-ink-200 bg-white px-4 py-3 text-[0.7rem] leading-5 text-ink-500">
-                    {toPersianDigits(outcome.issues.length)} رکورد از ارائه‌دهندگان به‌دلیل دادهٔ ناقص یا نامعتبر
-                    (مثلاً قیمت یا زمان نامعتبر) کنار گذاشته شد و نمایش داده نمی‌شود.
+                    {toPersianDigits(outcome.issues.length)} رکورد به‌دلیل دادهٔ ناقص یا نامعتبر نمایش داده نشد.
                   </p>
                 )}
               </>
@@ -124,9 +123,8 @@ function EmptyState({ query }: { query: Parameters<typeof searchTrips>[0] }) {
         <SearchX className="size-5" aria-hidden="true" />
       </span>
       <h2 className="mt-4 text-base font-bold">برای این مسیر و تاریخ پروازی پیدا نشد</h2>
-      <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-ink-500">
-        داده‌های نمونه فقط برای چند مسیر مشخص آماده شده‌اند و بعضی پروازها در همهٔ روزهای هفته برقرار
-        نیستند. یک روز دیگر را امتحان کنید یا به صفحهٔ اصلی برگردید.
+      <p className="mx-auto mt-2 max-w-sm text-sm leading-6 text-ink-500">
+        دادهٔ نمونه فقط چند مسیر را پوشش می‌دهد. یک روز دیگر را امتحان کنید.
       </p>
       <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
         <Link

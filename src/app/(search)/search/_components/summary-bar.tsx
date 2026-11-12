@@ -36,19 +36,16 @@ export function SummaryBar({
           <Users className="size-3.5" aria-hidden="true" />
           {toPersianDigits(query.passengers)} مسافر · {CABIN_LABELS[query.cabin]}
         </span>
-        <span className="text-[0.7rem] text-ink-400">
-          {toPersianDigits(groupsCount)} گزینه · به‌روزرسانی {formatRelative(fetchedAt)}
+        <span className="nums text-[0.7rem] text-ink-400">
+          {toPersianDigits(groupsCount)} گزینه
+          <span className="mx-1.5 text-ink-300">·</span>
+          {formatRelative(fetchedAt)}
         </span>
       </div>
 
-      <Link
-        href="/"
-        className="btn-ghost text-[0.72rem]"
-        aria-label="ویرایش جستجو"
-        title="ویرایش جستجو"
-      >
+      <Link href="/" className="btn-ghost text-[0.72rem]" aria-label="ویرایش جستجو" title="ویرایش جستجو">
         <Pencil className="size-3.5" aria-hidden="true" />
-        ویرایش جستجو
+        ویرایش
       </Link>
     </div>
   );

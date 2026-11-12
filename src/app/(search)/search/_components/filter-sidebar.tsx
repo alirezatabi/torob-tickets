@@ -9,6 +9,10 @@ import { airlineOptions, priceBounds, type DisplayFilters } from "@/lib/filter";
 import { formatTomanCompact, toPersianDigits } from "@/lib/format";
 import { cn } from "@/lib/cn";
 
+const CHIP = "rounded-full px-2.5 py-1 text-[0.7rem] transition-colors";
+const CHIP_ON = "bg-ink-900 font-semibold text-white";
+const CHIP_OFF = "bg-ink-100 text-ink-600 hover:bg-ink-200/70";
+
 const DAY_PARTS = [
   { key: "early-morning", label: "بامداد (۰۰–۰۶)" },
   { key: "morning", label: "صبح (۰۶–۱۲)" },
@@ -114,11 +118,11 @@ export function FilterPanel({ query, groups, totalOffers }: FilterPanelProps) {
           aria-label="بیشترین قیمت"
           className="w-full accent-teal-600"
         />
-        <div className="mt-1 flex items-center justify-between text-[0.65rem] text-ink-400">
+        <div className="nums mt-1 flex items-center justify-between text-[0.65rem] text-ink-400">
           <span>{formatTomanCompact(bounds.min)}</span>
           <span className="font-semibold text-ink-700">{formatTomanCompact(priceCap)}</span>
         </div>
-        <p className="mt-1 text-[0.62rem] leading-4 text-ink-400">قیمت‌ها به تومان و برای هر نفر است.</p>
+        <p className="mt-1 text-[0.62rem] text-ink-400">تومان · هر نفر</p>
       </FilterSection>
 
       <FilterSection title="تعداد توقف">
@@ -134,10 +138,8 @@ export function FilterPanel({ query, groups, totalOffers }: FilterPanelProps) {
               onClick={() => apply({ stops: option.value })}
               aria-pressed={String(activeStops ?? "") === (option.value ?? "")}
               className={cn(
-                "rounded-full border px-2.5 py-1 text-[0.7rem] transition-colors",
-                String(activeStops ?? "") === (option.value ?? "")
-                  ? "border-teal-600 bg-teal-50 font-semibold text-teal-700"
-                  : "border-ink-200 text-ink-600 hover:border-ink-300",
+                CHIP,
+                String(activeStops ?? "") === (option.value ?? "") ? CHIP_ON : CHIP_OFF,
               )}
             >
               {option.label}
@@ -176,10 +178,8 @@ export function FilterPanel({ query, groups, totalOffers }: FilterPanelProps) {
               onClick={() => apply({ time: activeTime === part.key ? null : part.key })}
               aria-pressed={activeTime === part.key}
               className={cn(
-                "rounded-full border px-2.5 py-1 text-[0.68rem] transition-colors",
-                activeTime === part.key
-                  ? "border-teal-600 bg-teal-50 font-semibold text-teal-700"
-                  : "border-ink-200 text-ink-600 hover:border-ink-300",
+                CHIP,
+                activeTime === part.key ? CHIP_ON : CHIP_OFF,
               )}
             >
               {part.label}

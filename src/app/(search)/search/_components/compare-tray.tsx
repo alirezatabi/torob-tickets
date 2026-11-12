@@ -41,7 +41,10 @@ export function CompareTray({
     <div data-compare-tray className="glass animate-rise fixed inset-x-0 bottom-0 z-40 border-t border-ink-200 shadow-[0_-8px_30px_-20px_rgb(11_20_36/0.45)]">
       <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-3 px-4 py-3 sm:px-6">
         <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
-          <span className="text-[0.7rem] font-semibold text-ink-600">مقایسه ({toPersianDigits(items.length)} از ۳)</span>
+          <span className="text-[0.7rem] font-semibold text-ink-600">
+            مقایسه
+            <span className="nums mr-1 text-ink-400">{toPersianDigits(items.length)}/۳</span>
+          </span>
           {items.map(({ group, offer }) => (
             <span
               key={offer.id}
@@ -64,7 +67,7 @@ export function CompareTray({
 
         <div className="flex items-center gap-2">
           {items.length === 1 && (
-            <span className="hidden text-[0.65rem] text-ink-400 sm:inline">یک گزینهٔ دیگر اضافه کنید تا مقایسه کنیم.</span>
+            <span className="hidden text-[0.65rem] text-ink-400 sm:inline">یک گزینهٔ دیگر اضافه کنید.</span>
           )}
           <Link
             href={`/compare?${params.toString()}`}

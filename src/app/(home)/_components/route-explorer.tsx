@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowLeft, Plane } from "lucide-react";
+import { Plane } from "lucide-react";
 import { CITIES, getCity, type City } from "@/lib/cities";
 import { destinationsWithCounts } from "@/lib/schedules";
 import { addDays, isoToday } from "@/lib/jalali";
@@ -18,47 +18,29 @@ export function RouteExplorer({ limit = 6 }: { limit?: number }) {
     .sort((a, b) => b.destinations.length - a.destinations.length)
     .slice(0, limit);
 
-  const cities = CITIES.length;
-  const routes = CITIES.reduce((total, city) => total + destinationsWithCounts(city.code).length, 0);
-
   return (
     <section id="routes" aria-labelledby="routes-heading" className="mt-14 scroll-mt-24">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <span className="eyebrow">
-            <Plane className="size-3.5" aria-hidden="true" />
-            پوشش مسیرها
-          </span>
-          <h2 id="routes-heading" className="mt-2 text-lg font-extrabold text-ink-900 sm:text-xl">
-            {toPersianDigits(cities)} شهر، {toPersianDigits(routes)} مسیر پروازی
-          </h2>
-          <p className="mt-1.5 max-w-xl text-[0.8rem] leading-6 text-ink-500">
-            از پروازهای داخلی تا اروپا و آسیای میانه؛ روی هر مقصد بزنید تا قیمت‌های همان روز مقایسه
-            شود.
-          </p>
-        </div>
-        <span className="chip border-teal-200 bg-teal-50 text-teal-700">پرواز رفت و برگشت هم پشتیبانی می‌شود</span>
-      </div>
+      <h2 id="routes-heading" className="flex items-center gap-2 text-[0.95rem] font-bold text-ink-900">
+        <Plane className="size-4 text-teal-600" aria-hidden="true" />
+        مسیرهای پرتردد
+      </h2>
 
-      <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {origins.map(({ city, destinations }) => (
-          <article key={city.code} className="card card-hover p-4">
+          <article key={city.code} className="card card-hover p-3.5">
             <header className="flex items-center justify-between gap-2">
               <div className="flex items-center gap-2">
-                <span className="grid size-9 place-items-center rounded-xl bg-ink-900 text-[0.62rem] font-bold text-white">
+                <span className="grid size-8 place-items-center rounded-lg bg-ink-900 text-[0.58rem] font-bold text-white">
                   {city.code}
                 </span>
-                <div>
-                  <h3 className="text-[0.85rem] font-bold text-ink-900">{city.fa}</h3>
-                  <p className="text-[0.65rem] text-ink-400">{city.countryFa}</p>
-                </div>
+                <h3 className="text-[0.82rem] font-bold text-ink-900">{city.fa}</h3>
               </div>
-              <span className="nums text-[0.65rem] font-medium text-teal-700">
-                {toPersianDigits(destinations.length)} مقصد
+              <span className="nums text-[0.62rem] font-medium text-ink-400">
+                {toPersianDigits(destinations.length)}
               </span>
             </header>
 
-            <ul className="mt-3 flex flex-wrap gap-1.5">
+            <ul className="mt-2.5 flex flex-wrap gap-1">
               {destinations.slice(0, 6).map((destination) => {
                 const target = getCity(destination.code);
                 if (!target) return null;
@@ -66,14 +48,10 @@ export function RouteExplorer({ limit = 6 }: { limit?: number }) {
                   <li key={destination.code}>
                     <Link
                       href={`/search?origin=${city.code}&destination=${destination.code}&date=${date}`}
-                      className="group inline-flex items-center gap-1 rounded-full border border-ink-200 bg-white px-2.5 py-1 text-[0.7rem] text-ink-600 transition-colors hover:border-teal-400 hover:bg-teal-50 hover:text-teal-800"
-                      title={`${city.fa} به ${target.fa} — ${toPersianDigits(destination.patterns)} پرواز در هفته`}
+                      className="inline-flex rounded-md bg-ink-50 px-2 py-1 text-[0.68rem] text-ink-600 transition-colors hover:bg-teal-50 hover:text-teal-800"
+                      title={`${city.fa} ← ${target.fa} · ${toPersianDigits(destination.patterns)} پرواز در هفته`}
                     >
                       {target.fa}
-                      <ArrowLeft
-                        className="size-2.5 opacity-0 transition-opacity group-hover:opacity-100"
-                        aria-hidden="true"
-                      />
                     </Link>
                   </li>
                 );
@@ -82,10 +60,10 @@ export function RouteExplorer({ limit = 6 }: { limit?: number }) {
                 <li>
                   <a
                     href="#city-index"
-                    className="inline-flex items-center rounded-full bg-ink-100 px-2.5 py-1 text-[0.7rem] font-semibold text-ink-600 hover:bg-ink-200"
-                    title="همهٔ مقصدها در فهرست کامل شهرها"
+                    className="inline-flex rounded-md px-2 py-1 text-[0.68rem] font-semibold text-teal-700 hover:bg-teal-50"
+                    title="فهرست کامل شهرها"
                   >
-                    و {toPersianDigits(destinations.length - 6)} مقصد دیگر
+                    +{toPersianDigits(destinations.length - 6)}
                   </a>
                 </li>
               )}
@@ -108,8 +86,10 @@ export function CityIndex() {
 
   return (
     <details id="city-index" className="card mt-3 scroll-mt-24 px-4 py-3">
-      <summary className="cursor-pointer text-[0.78rem] font-semibold text-ink-700 marker:text-teal-600">
-        فهرست کامل {toPersianDigits(CITIES.length)} شهر تحت پوشش
+      <summary className="cursor-pointer text-[0.72rem] font-medium text-ink-500 marker:text-teal-600">
+        {toPersianDigits(CITIES.length)} شهر
+        <span className="mx-1 text-ink-300">·</span>
+        <span className="text-ink-400">فهرست کامل</span>
       </summary>
       <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {[...grouped.entries()].map(([country, cities]) => (

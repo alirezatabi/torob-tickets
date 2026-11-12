@@ -42,6 +42,8 @@ const FRESHNESS_LABELS: Record<string, { label: string; className: string; hint:
   },
 };
 
+const CABIN_SHORT: Record<string, string> = { economy: "اکونومی", premium: "پرمیوم", business: "بیزنس", first: "فرست" };
+
 const FALLBACK_FRESHNESS = { label: "تأییدنشده", className: "bg-ink-100 text-ink-600 border-ink-200", hint: "وضعیت تازگی نامشخص است." };
 
 /**
@@ -73,9 +75,9 @@ export function LiveOfferCard({ offer, index }: { offer: LiveOfferView; index: n
             </span>
             <div className="min-w-0">
               <p className="truncate text-sm font-bold text-ink-900">{offer.airlineName}</p>
-              <p className="text-[0.65rem] text-ink-400">
-                {offer.flightNumber ? `پرواز ${offer.flightNumber}` : "شماره پرواز اعلام نشده"}
-                {" · "}
+              <p className="nums text-[0.64rem] text-ink-400">
+                {offer.flightNumber ?? "بدون شماره"}
+                <span className="mx-1 text-ink-300">·</span>
                 {offer.providerName}
               </p>
             </div>
@@ -86,9 +88,11 @@ export function LiveOfferCard({ offer, index }: { offer: LiveOfferView; index: n
 
           <div className="mt-3 flex items-center gap-3 text-sm">
             <div className="text-center">
-              <p className="font-bold text-ink-900">{offer.departAt.slice(11, 16)}</p>
-              <p className="mt-0.5 text-[0.62rem] text-ink-400">
-                {offer.originAirport ?? offer.originCity} · {origin?.fa ?? offer.originCity}
+              <p className="nums font-bold text-ink-900">{offer.departAt.slice(11, 16)}</p>
+              <p className="mt-0.5 text-[0.6rem] text-ink-400">
+                {offer.originAirport && offer.originAirport !== offer.originCity
+                  ? `${offer.originAirport} · ${origin?.fa ?? offer.originCity}`
+                  : (origin?.fa ?? offer.originCity)}
               </p>
             </div>
             <div className="flex flex-1 flex-col items-center gap-1">
@@ -102,17 +106,19 @@ export function LiveOfferCard({ offer, index }: { offer: LiveOfferView; index: n
               </span>
             </div>
             <div className="text-center">
-              <p className="font-bold text-ink-900">{offer.arriveAt.slice(11, 16)}</p>
-              <p className="mt-0.5 text-[0.62rem] text-ink-400">
-                {offer.destinationAirport ?? offer.destinationCity} · {destination?.fa ?? offer.destinationCity}
+              <p className="nums font-bold text-ink-900">{offer.arriveAt.slice(11, 16)}</p>
+              <p className="mt-0.5 text-[0.6rem] text-ink-400">
+                {offer.destinationAirport && offer.destinationAirport !== offer.destinationCity
+                  ? `${offer.destinationAirport} · ${destination?.fa ?? offer.destinationCity}`
+                  : (destination?.fa ?? offer.destinationCity)}
               </p>
             </div>
           </div>
 
-          <div className="mt-3 flex flex-wrap items-center gap-1.5 text-[0.62rem]">
+          <div className="mt-2.5 flex flex-wrap items-center gap-1 text-[0.62rem]">
             <span className="rounded-md bg-ink-100 px-1.5 py-0.5 text-ink-600">{formatJalaliFull(offer.departAt.slice(0, 10))}</span>
-            <span className="rounded-md bg-ink-100 px-1.5 py-0.5 text-ink-600">کابین: {offer.cabin}</span>
-            {offer.fareClass ? <span className="rounded-md bg-ink-100 px-1.5 py-0.5 text-ink-600">کلاس نرخ: {offer.fareClass}</span> : null}
+            <span className="rounded-md bg-ink-100 px-1.5 py-0.5 text-ink-600">{CABIN_SHORT[offer.cabin] ?? offer.cabin}</span>
+            {offer.fareClass ? <span className="rounded-md bg-ink-100 px-1.5 py-0.5 text-ink-600">{offer.fareClass}</span> : null}
             <span
               className={cn(
                 "rounded-md px-1.5 py-0.5",
@@ -166,24 +172,30 @@ export function LiveOfferCard({ offer, index }: { offer: LiveOfferView; index: n
             </div>
           )}
 
-          <dl className="w-full space-y-1 text-[0.62rem] text-ink-500">
-            <div className="flex items-center justify-between gap-2">
-              <dt className="inline-flex items-center gap-1">
-                <Clock className="size-3" aria-hidden="true" />
+          <dl className="grid w-full grid-cols-3 gap-1 rounded-lg bg-ink-50/80 px-1.5 py-1.5 text-center text-[0.58rem] text-ink-400">
+            <div>
+              <dt className="inline-flex items-center gap-0.5">
+                <Clock className="size-2.5" aria-hidden="true" />
                 مشاهدهٔ قیمت
               </dt>
-              <dd>{offer.priceObservedAt ? formatRelative(offer.priceObservedAt) : "نامشخص"}</dd>
+              <dd className="mt-0.5 font-medium text-ink-600">
+                {offer.priceObservedAt ? formatRelative(offer.priceObservedAt) : "—"}
+              </dd>
             </div>
-            <div className="flex items-center justify-between gap-2">
-              <dt className="inline-flex items-center gap-1">
-                <ShieldQuestion className="size-3" aria-hidden="true" />
+            <div className="border-x border-ink-200/70">
+              <dt className="inline-flex items-center gap-0.5">
+                <ShieldQuestion className="size-2.5" aria-hidden="true" />
                 تأیید مجدد
               </dt>
-              <dd>{offer.lastVerifiedAt ? formatRelative(offer.lastVerifiedAt) : "انجام نشده"}</dd>
+              <dd className="mt-0.5 font-medium text-ink-600">
+                {offer.lastVerifiedAt ? formatRelative(offer.lastVerifiedAt) : "انجام نشده"}
+              </dd>
             </div>
-            <div className="flex items-center justify-between gap-2">
-              <dt>کامل بودن داده</dt>
-              <dd>{toPersianDigits(Math.round(offer.completeness * 100))}٪</dd>
+            <div>
+              <dt>کامل بودن</dt>
+              <dd className="mt-0.5 font-medium text-ink-600 nums">
+                {toPersianDigits(Math.round(offer.completeness * 100))}٪
+              </dd>
             </div>
           </dl>
 
@@ -191,39 +203,35 @@ export function LiveOfferCard({ offer, index }: { offer: LiveOfferView; index: n
             href={isExternal ? offer.offerUrl : "#"}
             target={isExternal ? "_blank" : undefined}
             rel={isExternal ? "noopener noreferrer nofollow" : undefined}
-            className="btn-ghost w-full justify-center text-xs"
-            title={
-              isAmadeus
-                ? "Amadeus یک API سازمانی است و صفحهٔ عمومی برای این نرخ ندارد؛ شناسهٔ نرخ در داده‌های منبع موجود است."
-                : "صفحهٔ جست‌وجوی منبع با همین مسیر و تاریخ"
-            }
+            className="btn-ghost w-full justify-center text-[0.72rem]"
+            title={isAmadeus ? "API سازمانی؛ صفحهٔ عمومی نرخ ندارد" : "صفحهٔ جست‌وجوی منبع، نه لینک اختصاصی نرخ"}
           >
             {isExternal ? (
               <>
-                <ExternalLink className="size-3.5" aria-hidden="true" />
-                مشاهده در منبع
+                <ExternalLink className="size-3" aria-hidden="true" />
+                منبع
               </>
             ) : (
               <>
-                <ArrowUpLeft className="size-3.5" aria-hidden="true" />
+                <ArrowUpLeft className="size-3" aria-hidden="true" />
                 {offer.providerName}
               </>
             )}
           </Link>
 
-          <p className="w-full text-[0.58rem] leading-4 text-ink-400">
+          <p className="w-full text-[0.56rem] leading-4 text-ink-400">
             {isExternal
-              ? "لینک، صفحهٔ جست‌وجوی منبع است (نه لینک اختصاصی همین نرخ)."
+              ? "لینک، صفحهٔ جست‌وجوی منبع است، نه همین نرخ."
               : "این منبع لینک عمومی نرخ ندارد."}
           </p>
         </div>
       </div>
 
       {offer.warnings.length > 0 ? (
-        <div className="flex flex-wrap items-center gap-1 border-t border-ink-200/70 bg-ink-50/60 px-4 py-2">
-          <Info className="size-3 text-ink-400" aria-hidden="true" />
+        <div className="flex flex-wrap items-center gap-1 border-t border-ink-200/60 px-4 py-1.5">
+          <Info className="size-2.5 text-ink-300" aria-hidden="true" />
           {offer.warnings.map((warning) => (
-            <span key={warning} className="rounded bg-white px-1.5 py-0.5 text-[0.58rem] text-ink-500">
+            <span key={warning} className="text-[0.56rem] text-ink-400">
               {WARNING_LABELS[warning as keyof typeof WARNING_LABELS] ?? warning}
             </span>
           ))}

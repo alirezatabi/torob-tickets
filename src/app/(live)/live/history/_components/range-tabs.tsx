@@ -27,7 +27,7 @@ export function RangeTabs({
   };
 
   return (
-    <nav className="flex flex-wrap gap-1" aria-label="بازهٔ زمانی">
+    <nav className="segmented" aria-label="بازهٔ زمانی">
       {ranges.map((range) => (
         <Link
           key={range}
@@ -35,7 +35,9 @@ export function RangeTabs({
           aria-current={range === current ? "page" : undefined}
           className={cn(
             "rounded-full px-2.5 py-1 text-[0.68rem] font-medium transition-colors",
-            range === current ? "bg-ink-900 text-white" : "text-ink-500 hover:bg-ink-100 hover:text-ink-900",
+            range === current
+              ? "bg-white text-ink-900 shadow-[0_1px_2px_rgba(15,23,42,0.10)]"
+              : "text-ink-500 hover:text-ink-800",
           )}
         >
           {HISTORY_RANGE_LABELS_FA[range]}

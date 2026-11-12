@@ -13,15 +13,16 @@ export function SiteFooter() {
             <BrandMark size={26} />
             <span className="font-bold text-ink-900">ترب بلیت</span>
           </div>
-          <p className="mt-3 max-w-sm text-sm leading-6 text-ink-500">
-            قیمت بلیت هواپیما را از چند ارائه‌دهنده جمع می‌کنیم، به یک قالب یکسان تبدیل می‌کنیم و
-            بر اساس خواستهٔ شما رتبه‌بندی می‌کنیم. خرید بلیت در سایت ارائه‌دهنده انجام می‌شود.
+          <p className="mt-3 max-w-xs text-xs leading-6 text-ink-500">
+            مقایسهٔ قیمت پرواز از چند منبع.
+            <br />
+            خرید در سایت ارائه‌دهنده انجام می‌شود.
           </p>
         </div>
 
         <div>
-          <h2 className="text-xs font-semibold text-ink-700">ارائه‌دهندگان نمونه</h2>
-          <ul className="mt-3 space-y-2 text-xs text-ink-500">
+          <h2 className="text-[0.7rem] font-semibold text-ink-700">منابع</h2>
+          <ul className="mt-3 space-y-1.5 text-[0.72rem] text-ink-500">
             {providers.map((provider) => (
               <li key={provider.id} className="flex items-center gap-1.5">
                 <span className="size-1.5 rounded-full bg-teal-500" aria-hidden="true" />
@@ -33,21 +34,22 @@ export function SiteFooter() {
         </div>
 
         <div>
-          <h2 className="text-xs font-semibold text-ink-700">دربارهٔ داده‌ها</h2>
-          <ul className="mt-3 space-y-2 text-xs leading-5 text-ink-500">
-            <li>تمامی قیمت‌ها و پروازها نمونهٔ ساختگی هستند.</li>
-            <li>هیچ اتصالی به API واقعی ارائه‌دهندگان وجود ندارد.</li>
-            <li>نرخ تبدیل ارز یک جدول نمونه است، نه نرخ لحظه‌ای.</li>
+          <h2 className="text-[0.7rem] font-semibold text-ink-700">داده‌ها</h2>
+          <ul className="mt-3 space-y-1.5 text-[0.72rem] leading-5 text-ink-500">
+            <li>قیمت‌ها نمونهٔ ساختگی</li>
+            <li>نرخ ارز ثابت، نه لحظه‌ای</li>
+            <li>
+              <Link href="/live" className="font-medium text-teal-700 hover:underline">
+                دادهٔ واقعی
+              </Link>
+            </li>
           </ul>
-          <Link href="/" className="mt-3 inline-block text-xs font-medium text-teal-600 hover:underline">
-            بازگشت به جستجو
-          </Link>
         </div>
       </div>
 
       <div className="border-t border-ink-100">
-        <p className="mx-auto max-w-6xl px-4 py-4 text-[0.7rem] text-ink-400 sm:px-6">
-          ساخته‌شده برای چالش مهندسی محصول هوش مصنوعی ترب — نمونهٔ محصول، نه سرویس تجاری.
+        <p className="mx-auto max-w-6xl px-4 py-4 text-[0.65rem] text-ink-400 sm:px-6">
+          نمونهٔ محصول برای چالش مهندسی محصول ترب
         </p>
       </div>
     </footer>

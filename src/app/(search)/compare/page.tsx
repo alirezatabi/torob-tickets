@@ -15,7 +15,7 @@ import { cn } from "@/lib/cn";
 
 export const metadata: Metadata = {
   title: "مقایسهٔ گزینه‌ها",
-  description: "مقایسهٔ رو‌به‌روی قیمت، مدت سفر، توقف، بار و شرایط استرداد چند پرواز.",
+  description: "قیمت، مدت، توقف، بار و استرداد چند پرواز کنار هم.",
 };
 
 interface ComparePageProps {
@@ -85,8 +85,8 @@ export default async function ComparePage({ searchParams }: ComparePageProps) {
   if (rows.length === 0) {
     return (
       <CompareError
-        message="گزینه‌ای برای مقایسه انتخاب نشده است."
-        hint="از فهرست نتایج، دو یا سه پرواز را با دکمهٔ «افزودن به مقایسه» انتخاب کنید."
+        message="گزینه‌ای انتخاب نشده"
+        hint="از فهرست نتایج، دو یا سه پرواز را به مقایسه اضافه کنید."
         backHref={`/search?origin=${query.originCode}&destination=${query.destinationCode}&date=${query.departDate}`}
       />
     );
@@ -122,11 +122,11 @@ export default async function ComparePage({ searchParams }: ComparePageProps) {
         <div className="mb-4 flex items-start gap-2 rounded-2xl border border-teal-600/20 bg-gradient-to-l from-teal-50 to-white px-4 py-3 shadow-sm">
         <GitCompareArrows className="mt-0.5 size-4 shrink-0 text-teal-700" aria-hidden="true" />
         <p className="text-[0.74rem] leading-6 text-teal-900">
-          <span className="font-semibold">تفاوت اصلی: </span>
+          <span className="font-semibold">تفاوت: </span>
           {tradeoff}
           {best && (
             <span className="block text-teal-700">
-              بر اساس ترجیحات شما، «{best.offer.airlineName}» بالاترین امتیاز تطابق ({toPersianDigits(Math.round(best.scored.score))}) را دارد.
+              بالاترین تطابق: {best.offer.airlineName} ({toPersianDigits(Math.round(best.scored.score))})
             </span>
           )}
         </p>
@@ -135,8 +135,7 @@ export default async function ComparePage({ searchParams }: ComparePageProps) {
         <div className="mb-4 flex items-start gap-2 rounded-xl border border-ink-200 bg-white px-3 py-2.5">
           <GitCompareArrows className="mt-0.5 size-4 shrink-0 text-ink-500" aria-hidden="true" />
           <p className="text-[0.74rem] leading-6 text-ink-600">
-            یک گزینه انتخاب شده است؛ پایین‌تر نرخ همهٔ ارائه‌دهندگان برای همین پرواز و جزئیات آن نمایش داده می‌شود.
-            برای مقایسهٔ رو‌به‌رو، گزینهٔ دومی هم به مقایسه اضافه کنید.
+            یک گزینه انتخاب شده است. برای مقایسهٔ رو‌به‌رو، گزینهٔ دومی هم اضافه کنید.
           </p>
         </div>
       )}
@@ -234,7 +233,7 @@ export default async function ComparePage({ searchParams }: ComparePageProps) {
             <div key={`providers-${offer.id}`} className="card p-3">
               <h2 className="text-[0.72rem] font-bold text-ink-800">
                 نرخ {offer.airlineName}
-                {providers.length > 0 && ` — ${toPersianDigits(countProviders(view.outcome.offers, offer.groupKey))} ارائه‌دهنده`}
+                {providers.length > 0 && ` · ${toPersianDigits(countProviders(view.outcome.offers, offer.groupKey))} منبع`}
               </h2>
               <ul className="mt-2 space-y-1">
                 {view.outcome.offers
@@ -253,8 +252,7 @@ export default async function ComparePage({ searchParams }: ComparePageProps) {
       </section>
 
       <p className="mt-6 text-[0.65rem] leading-5 text-ink-400">
-        «نامشخص» یعنی ارائه‌دهنده این اطلاعات را اعلام نکرده است؛ ما آن را حدس نمی‌زنیم. قیمت‌ها دادهٔ نمونه
-        هستند و قیمت لحظه‌ای نیستند.
+        «نامشخص» یعنی منبع آن را اعلام نکرده؛ حدس نمی‌زنیم. قیمت‌ها نمونه‌اند، نه لحظه‌ای.
       </p>
     </div>
   );
