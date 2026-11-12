@@ -422,7 +422,7 @@ const REGIONAL: RouteSpec[] = [
   },
   {
     from: "IST",
-    to: "IKA",
+    to: "THR",
     legs: daily({ airlineCode: "PC", number: 512, depart: "05:40", minutes: 195, aircraft: "Airbus A320neo", price: 4_850_000, checkedKg: 20, cabinKg: 8, refundable: false }),
   },
   {
@@ -451,12 +451,12 @@ const REGIONAL: RouteSpec[] = [
     legs: daily({ airlineCode: "QR", number: 1013, depart: "11:00", minutes: 65, aircraft: "Airbus A350-900", price: 4_300_000, checkedKg: 25, cabinKg: 7, refundable: true }),
   },
   {
-    from: "IKA",
+    from: "THR",
     to: "DXB",
     legs: daily({ airlineCode: "FZ", number: 44, depart: "09:55", minutes: 130, aircraft: "Boeing 737-800", price: 5_100_000, checkedKg: 20, cabinKg: 7, refundable: false }),
   },
   {
-    from: "IKA",
+    from: "THR",
     to: "IST",
     legs: daily({ airlineCode: "TK", number: 879, depart: "12:30", minutes: 190, aircraft: "Airbus A321", price: 5_400_000, checkedKg: 25, cabinKg: 8, refundable: true }),
   },

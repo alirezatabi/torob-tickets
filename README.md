@@ -20,7 +20,7 @@ npm run dev          # http://localhost:3000
 ```bash
 npm run typecheck    # tsc --noEmit (strict)
 npm run lint         # eslint
-npm test             # vitest — ۹۹ تست واحد/یکپارچه
+npm test             # vitest — ۱۰۲ تست واحد/یکپارچه
 npm run test:e2e     # playwright (جدول جریان اصلی)
 npm run build && npm start
 ```
@@ -44,7 +44,7 @@ npm run build && npm start
 | حالت‌های بارگذاری/خالی/خطا | ✅ | skeleton، empty state، پیام خطای قابل‌فهم |
 | پوشش مسیرها | ✅ | ۴۷ شهر (داخلی، خلیج فارس، ترکیه، آسیای میانه، اروپا) و ۱۱۰ مسیر رفت/برگشت در تقویم نمونه |
 | کاوش مسیر در صفحهٔ اصلی | ✅ | کارت‌های «از کجا به کجا» که مستقیماً از دادهٔ همان تقویم ساخته می‌شوند |
-| تست‌ها | ✅ | ۹۹ تست واحد + ۱ test suite Playwright |
+| تست‌ها | ✅ | ۱۰۲ تست واحد + ۱ test suite Playwright |
 
 ---
 
