@@ -157,10 +157,13 @@ export function LiveOfferCard({ offer, index }: { offer: LiveOfferView; index: n
           {offer.price.comparable ? (
             <p className="text-left text-lg font-extrabold text-teal-700">{formatToman(offer.price.toman)}</p>
           ) : (
-            <p className="text-left text-sm font-bold text-ink-700">
-              {toPersianDigits((offer.price.amountMinor / 100).toFixed(2))} {offer.price.currency}
-              <span className="block text-[0.6rem] font-normal text-ink-400">قیمت ارزی؛ قابل مقایسه با تومان نیست</span>
-            </p>
+            <div className="text-left">
+              <p className="text-sm font-bold text-ink-700">
+                <span dir="ltr">{toPersianDigits((offer.price.amountMinor / 100).toFixed(2))}</span>{" "}
+                {offer.price.currency}
+              </p>
+              <p className="text-[0.6rem] font-normal text-ink-400">قیمت ارزی؛ قابل مقایسه با تومان نیست</p>
+            </div>
           )}
 
           <dl className="w-full space-y-1 text-[0.62rem] text-ink-500">

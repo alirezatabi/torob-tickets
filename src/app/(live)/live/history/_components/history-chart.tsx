@@ -39,7 +39,7 @@ export function HistoryChart({ points, height = 84 }: { points: HistoryPoint[]; 
     .join(" ");
 
   const summary = [
-    `${points.length} مشاهده`,
+    `${toPersianDigits(points.length)} مشاهده`,
     `کمینه ${formatToman(min)}`,
     `بیشینه ${formatToman(max)}`,
   ].join(" · ");
