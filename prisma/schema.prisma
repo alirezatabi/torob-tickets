@@ -1,0 +1,107 @@
+// Persistence layer (optional).
+//
+// The demo runs with zero configuration from curated in-memory data. This schema
+// exists so the aggregation output can be *stored* — offer provenance, search logs
+// — without changing the search/ranking code, which only knows the in-memory
+// repository interface.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+/// A data source. `mode` keeps demo data explicitly separated from live data.
+model Provider {
+  id             String   @id
+  name           String
+  mode           ProviderMode
+  quotedCurrency String
+  lastSyncAt     DateTime?
+  offers         OfferSnapshot[]
+
+  @@map("providers")
+}
+
+enum ProviderMode {
+  DEMO
+  LIVE
+}
+
+/// One normalized offer as fetched at a point in time (append-only provenance).
+model OfferSnapshot {
+  id                 String   @id @default(cuid())
+  providerId         String
+  provider           Provider @relation(fields: [providerId], references: [id])
+  rawOfferId         String?
+
+  /// Dedupe identity: airline + flight number + local departure day + route.
+  groupKey           String
+  airlineCode        String
+  flightNumber       String?
+  originCode         String
+  destinationCode    String
+  departAt           DateTime
+  arriveAt           DateTime
+  durationMinutes    Int
+  stops              Int
+
+  /// Normalized price in toman, plus the provider's original quote.
+  priceToman         Int
+  originalAmount     Decimal @db.Decimal(12, 2)
+  originalCurrency   String
+
+  baggageChecked     BaggageState
+  baggageCheckedKg   Int?
+  refundable         Boolean?
+  cabin              String
+  offerUrl           String
+  providerUpdatedAt  DateTime
+  fetchedAt          DateTime @default(now())
+  warnings           String[]
+
+  @@index([groupKey, fetchedAt])
+  @@index([originCode, destinationCode, departAt])
+  @@index([providerId, fetchedAt])
+  @@map("offer_snapshots")
+}
+
+enum BaggageState {
+  INCLUDED
+  NOT_INCLUDED
+  UNKNOWN
+}
+
+/// What users searched for, and what the intent layer understood.
+model SearchLog {
+  id            String   @id @default(cuid())
+  createdAt     DateTime @default(now())
+  rawText       String?
+  originCode    String
+  destinationCode String
+  departDate    DateTime @db.Date
+  passengers    Int      @default(1)
+  intent        Json?
+  source        String   @default("parser")
+  resultCount   Int      @default(0)
+  bestOfferId   String?
+
+  @@index([createdAt])
+  @@map("search_logs")
+}
+
+/// Demo aggregate used to show "this route usually costs X" without a live feed.
+model RoutePriceStat {
+  id              String   @id @default(cuid())
+  originCode      String
+  destinationCode String
+  monthIso        String
+  medianToman     Int
+  sampleCount     Int
+
+  @@unique([originCode, destinationCode, monthIso])
+  @@map("route_price_stats")
+}

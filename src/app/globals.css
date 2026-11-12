@@ -1,0 +1,238 @@
+@import "tailwindcss";
+
+/* ————————————————————————————————————————————————
+   Design tokens — a travel product identity of its own:
+   deep Persian-ink neutrals, saffron accent, teal for trust.
+   ———————————————————————————————————————————————— */
+@theme {
+  --color-ink-950: #070d18;
+  --color-ink-900: #0d1729;
+  --color-ink-800: #16233a;
+  --color-ink-700: #24344f;
+  --color-ink-600: #3a4a66;
+  --color-ink-500: #5a6880;
+  --color-ink-400: #8592a8;
+  --color-ink-300: #b3bdcc;
+  --color-ink-200: #d8dfe9;
+  --color-ink-100: #ecf0f6;
+  --color-ink-50: #f6f8fb;
+
+  --color-saffron-600: #b45309;
+  --color-saffron-500: #d97706;
+  --color-saffron-400: #f59e0b;
+  --color-saffron-300: #fbbf24;
+  --color-saffron-100: #fef3c7;
+  --color-saffron-50: #fffbeb;
+
+  --color-teal-700: #0f5f57;
+  --color-teal-600: #0d7a6c;
+  --color-teal-500: #109c88;
+  --color-teal-100: #d3f0ea;
+  --color-teal-50: #ecf9f6;
+
+  --color-berry-600: #b02a4a;
+  --color-berry-50: #fdf2f5;
+
+  --font-sans: "Vazirmatn Variable", "Vazirmatn", system-ui, sans-serif;
+
+  --radius-card: 1.25rem;
+
+  --shadow-soft: 0 1px 2px rgb(13 23 41 / 0.04), 0 8px 24px -12px rgb(13 23 41 / 0.16);
+  --shadow-lifted: 0 2px 4px rgb(13 23 41 / 0.05), 0 18px 40px -20px rgb(13 23 41 / 0.28);
+}
+
+@layer base {
+  * {
+    border-color: var(--color-ink-200);
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+    font-feature-settings: "ss01";
+  }
+
+  body {
+    background-color: var(--color-ink-50);
+    color: var(--color-ink-900);
+    font-family: var(--font-sans);
+    font-synthesis-weight: none;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  ::selection {
+    background-color: var(--color-saffron-100);
+    color: var(--color-ink-900);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-teal-500);
+    outline-offset: 2px;
+  }
+
+  h1,
+  h2,
+  h3 {
+    letter-spacing: -0.01em;
+  }
+}
+
+@layer components {
+  .card {
+    background-color: #fff;
+    border: 1px solid var(--color-ink-200);
+    border-radius: var(--radius-card);
+    box-shadow: var(--shadow-soft);
+  }
+
+  .field {
+    width: 100%;
+    border-radius: 0.85rem;
+    border: 1px solid var(--color-ink-200);
+    background-color: #fff;
+    padding: 0.7rem 0.9rem;
+    font-size: 0.925rem;
+    color: var(--color-ink-900);
+    transition: border-color 150ms ease, box-shadow 150ms ease;
+  }
+
+  .field:hover {
+    border-color: var(--color-ink-300);
+  }
+
+  .field:focus {
+    outline: none;
+    border-color: var(--color-teal-500);
+    box-shadow: 0 0 0 3px var(--color-teal-100);
+  }
+
+  .label {
+    display: block;
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: var(--color-ink-500);
+    margin-bottom: 0.4rem;
+  }
+
+  .btn-primary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    border-radius: 0.85rem;
+    background-color: var(--color-teal-600);
+    color: #fff;
+    font-weight: 600;
+    padding: 0.85rem 1.25rem;
+    transition: background-color 150ms ease, transform 150ms ease, box-shadow 150ms ease;
+    box-shadow: 0 6px 16px -8px rgb(13 122 108 / 0.6);
+  }
+
+  .btn-primary:hover {
+    background-color: var(--color-teal-700);
+  }
+
+  .btn-primary:active {
+    transform: translateY(1px);
+  }
+
+  .btn-ghost {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+    border-radius: 0.7rem;
+    border: 1px solid var(--color-ink-200);
+    background-color: #fff;
+    color: var(--color-ink-700);
+    font-size: 0.85rem;
+    font-weight: 500;
+    padding: 0.45rem 0.8rem;
+    transition: background-color 150ms ease, border-color 150ms ease;
+  }
+
+  .btn-ghost:hover {
+    background-color: var(--color-ink-50);
+    border-color: var(--color-ink-300);
+  }
+
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    border-radius: 999px;
+    border: 1px solid var(--color-ink-200);
+    background-color: #fff;
+    padding: 0.3rem 0.65rem;
+    font-size: 0.75rem;
+    color: var(--color-ink-600);
+  }
+
+  .skeleton {
+    background: linear-gradient(
+      90deg,
+      var(--color-ink-100) 25%,
+      var(--color-ink-50) 37%,
+      var(--color-ink-100) 63%
+    );
+    background-size: 400% 100%;
+    animation: shimmer 1.4s ease infinite;
+    border-radius: 0.6rem;
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0 50%;
+  }
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-rise {
+  animation: rise 320ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* Persian digits should never be broken across lines. */
+.nums {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
+/* Reserve space for the compare tray so it never covers the last card. */
+body:has([data-compare-tray]) main {
+  padding-bottom: 5rem;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
