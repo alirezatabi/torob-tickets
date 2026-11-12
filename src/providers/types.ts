@@ -19,7 +19,12 @@ export interface ProviderAdapter<TRaw> {
   readonly description: string;
   /** Currency the provider quotes in, for transparency. */
   readonly quotedCurrency: "IRR" | "IRT" | "USD" | "EUR";
-  search(query: TripQuery): Promise<TRaw[]>;
+  /**
+   * `now` is injectable so a demo run is reproducible: lead-time pricing, "updated at" and
+   * capacity must all be functions of (query, clock), never of `new Date()` inside an
+   * adapter (B15).
+   */
+  search(query: TripQuery, options?: { now?: Date }): Promise<TRaw[]>;
   normalize(raw: TRaw[], query: TripQuery): NormalizationResult;
 }
 

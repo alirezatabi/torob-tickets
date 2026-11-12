@@ -17,6 +17,7 @@ import type { NormalizationIssue, NormalizationResult, ProviderAdapter } from ".
  *  - lowercase city ids instead of IATA codes
  */
 export interface ParsRawOffer {
+  /** Seats this agency says it has left (0..9 in the demo dataset). */
   offerId: string;
   carrierCode: string;
   flightNo: string;
@@ -31,6 +32,8 @@ export interface ParsRawOffer {
   refundable: boolean | null;
   deepLink: string;
   updatedAt: string;
+  /** Seats left as a plain number; null when the agency does not say. */
+  seatsAvailable?: number | null;
 }
 
 const CURRENCY = "IRR" as const;
@@ -42,18 +45,17 @@ export const parsAdapter: ProviderAdapter<ParsRawOffer> = {
   description: "آژانس آنلاین ایرانی با تمرکز بر پروازهای ترکیه",
   quotedCurrency: CURRENCY,
 
-  async search(query: TripQuery): Promise<ParsRawOffer[]> {
+  async search(query: TripQuery, options?: { now?: Date }): Promise<ParsRawOffer[]> {
     const spec: DemoProviderSpec = {
       id: this.id,
-      coverage: (seed) => seed < 0.82,
       rules: { markup: 1.0, serviceFeeToman: 0, jitter: 0.05 },
       stalenessMinutes: 12,
       latencyMs: 120,
     };
-    const tickets = collectTickets(spec, query, new Date());
+    const tickets = collectTickets(spec, query, options?.now ?? new Date());
     const faDigit = (n: number) => String(n).replace(/[0-9]/g, (d) => "۰۱۲۳۴۵۶۷۸۹"[Number(d)] ?? d);
 
-    return tickets.map(({ quote, fetchedAt }) => {
+    return tickets.map(({ quote, fetchedAt, seatsAvailable }) => {
       const flight = materialize(quote.pattern, quote.dateIso);
       const itinerary = localItinerary(flight);
 
@@ -78,6 +80,7 @@ export const parsAdapter: ProviderAdapter<ParsRawOffer> = {
         refundable: flight.pattern.refundable,
         deepLink: demoOfferUrl(this.id, quote.pattern.id, quote.dateIso),
         updatedAt: providerUpdatedAt(fetchedAt, spec.stalenessMinutes),
+        seatsAvailable,
       };
     });
   },
@@ -135,7 +138,8 @@ export const parsAdapter: ProviderAdapter<ParsRawOffer> = {
                   : "economy",
             offerUrl: record.deepLink,
             providerUpdatedAt: record.updatedAt,
-            fetchedAt: new Date().toISOString(),
+            fetchedAt: record.updatedAt,
+            seatsAvailable: record.seatsAvailable ?? null,
             dataSource: this.mode,
             extraWarnings: ["timezone-assumed"],
           }),

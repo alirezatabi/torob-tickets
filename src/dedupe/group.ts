@@ -48,6 +48,8 @@ export function departDayOf(offer: Pick<FlightOffer, "departAt" | "originCode">)
 
 interface Cluster {
   flightNumber: string | null;
+  /** Local departure day at the origin — part of the flight's identity. */
+  day: string;
   departAtMs: number;
   offers: FlightOffer[];
 }
@@ -76,6 +78,7 @@ export function groupOffers(offers: FlightOffer[]): OfferGroup[] {
         unnumbered.push(offer);
         continue;
       }
+      const day = departDayOf(offer);
       const match = clusters.find((cluster) => cluster.flightNumber === number);
       if (match) {
         match.offers.push(offer);
@@ -84,6 +87,7 @@ export function groupOffers(offers: FlightOffer[]): OfferGroup[] {
       }
       clusters.push({
         flightNumber: number,
+        day,
         departAtMs: new Date(offer.departAt).getTime(),
         offers: [offer],
       });
@@ -101,7 +105,7 @@ export function groupOffers(offers: FlightOffer[]): OfferGroup[] {
         match.offers.push(offer);
         continue;
       }
-      clusters.push({ flightNumber: null, departAtMs, offers: [offer] });
+      clusters.push({ flightNumber: null, day: departDayOf(offer), departAtMs, offers: [offer] });
     }
 
     for (const cluster of clusters) {

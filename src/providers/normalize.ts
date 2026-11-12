@@ -29,6 +29,11 @@ export interface AssembleInput {
   providerUpdatedAt: string;
   fetchedAt: string;
   dataSource: "demo" | "live";
+  /**
+   * Bookable seats, only when the source states them. `null`/absent means *unknown* —
+   * never "some default", because an invented number would gate a real purchase.
+   */
+  seatsAvailable?: number | null;
   /** Extra warnings the adapter knows about but cannot derive (e.g. assumed tz). */
   extraWarnings?: OfferWarning[];
 }
@@ -90,6 +95,7 @@ export function assembleOffer(input: AssembleInput): FlightOffer {
   if (input.baggage.checked === "unknown") warnings.add("baggage-unknown");
   if (input.refundable === null) warnings.add("refund-unknown");
   if (!input.flightNumber) warnings.add("flight-number-missing");
+  if (typeof input.seatsAvailable !== "number") warnings.add("availability-unverified");
 
   // Stops come from the timeline, never from a provider string.
   const stops = input.segments.length - 1;
@@ -129,6 +135,9 @@ export function assembleOffer(input: AssembleInput): FlightOffer {
     providerUpdatedAt: input.providerUpdatedAt,
     fetchedAt: input.fetchedAt,
     dataSource: input.dataSource,
+    ...(typeof input.seatsAvailable === "number" || input.seatsAvailable === null
+      ? { seatsAvailable: input.seatsAvailable }
+      : {}),
     warnings: [...warnings].sort(),
   };
 }

@@ -56,7 +56,9 @@ export async function runSearch(
     providers.map(async (adapter) => {
       const t0 = Date.now();
       try {
-        const raw = await withTimeout(adapter.search(query), PROVIDER_TIMEOUT_MS, adapter.name);
+        // `now` is passed down so demo pricing, freshness and capacity are reproducible
+        // (B15): the pipeline's clock is the only clock.
+        const raw = await withTimeout(adapter.search(query, { now }), PROVIDER_TIMEOUT_MS, adapter.name);
         const normalized = adapter.normalize(raw, query);
         return {
           adapter,

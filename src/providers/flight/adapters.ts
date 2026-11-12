@@ -2,6 +2,7 @@ import type { FlightOffer, FlightSegment } from "@/domain/flight";
 import type { TripQuery } from "@/domain/trip";
 import { getCity } from "@/lib/cities";
 import { materialize } from "@/lib/schedules";
+import { seededUnit } from "@/lib/time";
 import { assembleOffer, baggage, formatFlightNumber, NormalizationError, parseAmount } from "../normalize";
 import { collectTickets, demoOfferUrl, providerUpdatedAt, type DemoProviderSpec } from "../fixtures";
 import { localItinerary, wallClockToInstant } from "../fare";
@@ -28,6 +29,8 @@ export interface AlibabaRawOffer {
   is_refundable: boolean | null;
   link: string;
   last_update: string;
+  /** Seats left as a plain number; null when the agency does not say. */
+  seats_available?: number | null;
   legs: {
     flight_no: string | null;
     from_iata: string;
@@ -45,20 +48,19 @@ export const alibabaAdapter: ProviderAdapter<AlibabaRawOffer> = {
   description: "آژانس آنلاین با پوشش گستردهٔ پروازهای داخلی",
   quotedCurrency: "IRT",
 
-  async search(query: TripQuery): Promise<AlibabaRawOffer[]> {
+  async search(query: TripQuery, options?: { now?: Date }): Promise<AlibabaRawOffer[]> {
     const spec: DemoProviderSpec = {
       id: this.id,
-      coverage: (seed) => seed < 0.75,
       rules: { markup: 1.055, serviceFeeToman: 45_000, jitter: 0.035 },
       stalenessMinutes: 4,
       latencyMs: 90,
     };
-    const tickets = collectTickets(spec, query, new Date());
+    const tickets = collectTickets(spec, query, options?.now ?? new Date());
     // This provider prints everything in Iran time, with an explicit offset.
     const withOffset = (iso: string) =>
       new Date(new Date(iso).getTime() + 3.5 * 3_600_000).toISOString().replace("Z", "+03:30");
 
-    return tickets.map(({ quote, fetchedAt }) => {
+    return tickets.map(({ quote, fetchedAt, seatsAvailable }) => {
       const flight = materialize(quote.pattern, quote.dateIso);
       const typeMap = ["direct", "with_stop", "two_stops"] as const;
 
@@ -78,6 +80,7 @@ export const alibabaAdapter: ProviderAdapter<AlibabaRawOffer> = {
         is_refundable: flight.pattern.refundable,
         link: demoOfferUrl(this.id, quote.pattern.id, quote.dateIso),
         last_update: providerUpdatedAt(fetchedAt, spec.stalenessMinutes),
+        seats_available: seatsAvailable,
         legs: flight.segments.map((segment) => ({
           flight_no: segment.flightNumber,
           from_iata: segment.originCode,
@@ -126,7 +129,8 @@ export const alibabaAdapter: ProviderAdapter<AlibabaRawOffer> = {
               record.class_type === "business" ? "business" : record.class_type === "premium" ? "premium" : "economy",
             offerUrl: record.link,
             providerUpdatedAt: record.last_update,
-            fetchedAt: new Date().toISOString(),
+            fetchedAt: record.last_update,
+            seatsAvailable: record.seats_available ?? null,
             dataSource: this.mode,
           }),
         );
@@ -162,6 +166,7 @@ export interface FlightioRawOffer {
   booking_url: string;
   refreshed_at: string;
   cabin?: string;
+  seats_remaining?: number | null;
 }
 
 const CITY_BY_NAME = new Map<string, string>(
@@ -174,6 +179,9 @@ const CITY_BY_NAME = new Map<string, string>(
     ["muscat", "MCT"],
     ["shiraz", "SYZ"],
     ["isfahan", "IFN"],
+    ["kish", "KIH"],
+    ["ahvaz", "AWZ"],
+    ["bandar abbas", "BND"],
     ["tabriz", "TBZ"],
     ["najaf", "NJF"],
     ["berlin", "BER"],
@@ -190,17 +198,16 @@ export const flightioAdapter: ProviderAdapter<FlightioRawOffer> = {
   description: "آژانس بین‌المللی با قیمت‌گذاری به یورو",
   quotedCurrency: "EUR",
 
-  async search(query: TripQuery): Promise<FlightioRawOffer[]> {
+  async search(query: TripQuery, options?: { now?: Date }): Promise<FlightioRawOffer[]> {
     const spec: DemoProviderSpec = {
       id: this.id,
-      coverage: (seed) => seed < 0.66,
       rules: { markup: 0.985, serviceFeeToman: 0, jitter: 0.06 },
       stalenessMinutes: 26,
       latencyMs: 160,
     };
-    const tickets = collectTickets(spec, query, new Date());
+    const tickets = collectTickets(spec, query, options?.now ?? new Date());
 
-    return tickets.map(({ quote, fetchedAt }) => {
+    return tickets.map(({ quote, fetchedAt, seatsAvailable }) => {
       const flight = materialize(quote.pattern, quote.dateIso);
       const eur = Math.round((quote.priceToman / 100_000) * 100) / 100;
 
@@ -210,6 +217,7 @@ export const flightioAdapter: ProviderAdapter<FlightioRawOffer> = {
         itinerary: {
           legs: localItinerary(flight).map((leg) => ({
             no: leg.no,
+            // The city *names* this agency prints; normalization maps them back to IATA.
             from_city: getCity(leg.fromCode)?.en.toLowerCase() ?? leg.fromCode.toLowerCase(),
             to_city: getCity(leg.toCode)?.en.toLowerCase() ?? leg.toCode.toLowerCase(),
             dep_local: leg.departureLocal,
@@ -225,6 +233,7 @@ export const flightioAdapter: ProviderAdapter<FlightioRawOffer> = {
         booking_url: demoOfferUrl(this.id, quote.pattern.id, quote.dateIso),
         refreshed_at: providerUpdatedAt(fetchedAt, spec.stalenessMinutes),
         cabin: flight.pattern.cabin,
+        seats_remaining: seatsAvailable,
       };
     });
   },
@@ -270,7 +279,8 @@ export const flightioAdapter: ProviderAdapter<FlightioRawOffer> = {
             cabin: record.cabin === "business" ? "business" : record.cabin === "premium" ? "premium" : "economy",
             offerUrl: record.booking_url,
             providerUpdatedAt: record.refreshed_at,
-            fetchedAt: new Date().toISOString(),
+            fetchedAt: record.refreshed_at,
+            seatsAvailable: record.seats_remaining ?? null,
             dataSource: this.mode,
           }),
         );
@@ -305,6 +315,8 @@ export interface MahanRawOffer {
   refund?: boolean | null;
   url: string;
   synced_at: string;
+  /** Seats left, as its own little field (the consolidator is inconsistent about it). */
+  seats_left?: number | null;
   hops: { no: string | null; from: string; to: string; dep_local: string; arr_local: string }[];
 }
 
@@ -315,26 +327,29 @@ export const mahanAdapter: ProviderAdapter<MahanRawOffer> = {
   description: "کنسالیدیتور کوچک با دادهٔ ناقص و تکراری (نمونهٔ واقعی وب)",
   quotedCurrency: "IRT",
 
-  async search(query: TripQuery): Promise<MahanRawOffer[]> {
+  async search(query: TripQuery, options?: { now?: Date }): Promise<MahanRawOffer[]> {
     const spec: DemoProviderSpec = {
       id: this.id,
-      coverage: (seed) => seed < 0.85,
       rules: { markup: 1.02, serviceFeeToman: 20_000, jitter: 0.08 },
       stalenessMinutes: 48,
       latencyMs: 210,
     };
-    const tickets = collectTickets(spec, query, new Date());
+    const tickets = collectTickets(spec, query, options?.now ?? new Date());
     const faNum = (n: number) => String(n).replace(/[0-9]/g, (d) => "۰۱۲۳۴۵۶۷۸۹"[Number(d)] ?? d);
 
     const rows: MahanRawOffer[] = [];
-    for (const [index, { quote, fetchedAt }] of tickets.entries()) {
+    for (const [index, { quote, fetchedAt, seatsAvailable }] of tickets.entries()) {
       const flight = materialize(quote.pattern, quote.dateIso);
       const itinerary = localItinerary(flight);
       const priceText = faNum(quote.priceToman).replace(/\B(?=(\d{3})+(?!\d))/g, "٬");
 
       // Every third flight is listed twice with a different ref (a duplication case).
       const duplicate = index % 3 === 0;
-      const omitFlightNumber = index % 5 === 1;
+      // Flight numbers are sometimes missing — but *deterministically per flight*, not by
+      // position: an offer without a number cannot be merged with the numbered ones, and a
+      // positional rule would silently strip identity from whichever flight happened to be
+      // second in the list.
+      const omitFlightNumber = seededUnit(`mahan:omit:${quote.pattern.id}:${quote.dateIso}`) < 0.2;
 
       const makeRow = (price: string, flightNumber: string | null, suffix: string): MahanRawOffer => ({
         ref: `${quote.pattern.id}-${quote.dateIso}${suffix}`,
@@ -351,6 +366,7 @@ export const mahanAdapter: ProviderAdapter<MahanRawOffer> = {
         refund: flight.pattern.refundable,
         url: demoOfferUrl(this.id, quote.pattern.id, quote.dateIso),
         synced_at: providerUpdatedAt(fetchedAt, spec.stalenessMinutes),
+        seats_left: seatsAvailable,
         hops: itinerary.map((leg) => ({
           no: leg.no,
           from: leg.fromCode,
@@ -418,7 +434,8 @@ export const mahanAdapter: ProviderAdapter<MahanRawOffer> = {
             cabin: "economy",
             offerUrl: record.url,
             providerUpdatedAt: record.synced_at,
-            fetchedAt: new Date().toISOString(),
+            fetchedAt: record.synced_at,
+            seatsAvailable: record.seats_left ?? null,
             dataSource: this.mode,
             extraWarnings: ["timezone-assumed"],
           }),
