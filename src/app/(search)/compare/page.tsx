@@ -11,6 +11,7 @@ import { explainTradeoff, refundLabel, baggageLabel } from "@/ranking/explain";
 import type { FlightOffer, OfferGroup } from "@/domain/flight";
 import type { ScoredOffer } from "@/ranking/score";
 import { DemoBadge } from "@/components/ui/demo-badge";
+import { sourceLinkFor } from "@/modules/live/source-link";
 import { cn } from "@/lib/cn";
 
 export const metadata: Metadata = {
@@ -210,14 +211,20 @@ export default async function ComparePage({ searchParams }: ComparePageProps) {
               <td />
               {rows.map(({ offer }) => (
                 <td key={offer.id} className="pt-3">
-                  <a
-                    href={offer.offerUrl}
-                    target="_blank"
-                    rel="noopener noreferrer nofollow"
-                    className="btn-primary w-full text-[0.72rem]"
-                  >
-                    مشاهده در {offer.providerName}
-                  </a>
+                  {sourceLinkFor(offer).kind === "external" ? (
+                    <a
+                      href={offer.offerUrl}
+                      target="_blank"
+                      rel="noopener noreferrer nofollow"
+                      className="btn-primary w-full text-[0.72rem]"
+                    >
+                      مشاهده در {offer.providerName}
+                    </a>
+                  ) : (
+                    <span className="block w-full rounded-lg bg-ink-100 px-2 py-2 text-center text-[0.7rem] text-ink-500">
+                      دادهٔ نمونه · {offer.providerName}
+                    </span>
+                  )}
                 </td>
               ))}
             </tr>

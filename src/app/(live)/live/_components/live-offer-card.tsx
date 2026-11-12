@@ -7,6 +7,7 @@ import { formatRelative, formatToman, toPersianDigits } from "@/lib/format";
 import { formatJalaliFull } from "@/lib/jalali";
 import { getCity } from "@/lib/cities";
 import { cn } from "@/lib/cn";
+import { demoSearchHref, sourceLinkFor } from "@/modules/live/source-link";
 
 const BADGE_LABELS: Record<string, string> = {
   best: "بهترین تطابق",
@@ -57,8 +58,8 @@ export function LiveOfferCard({ offer, index }: { offer: LiveOfferView; index: n
   const origin = getCity(offer.originCity);
   const destination = getCity(offer.destinationCity);
   const freshness = FRESHNESS_LABELS[offer.freshness] ?? FALLBACK_FRESHNESS;
-  const isExternal = offer.offerUrl.startsWith("http");
-  const isAmadeus = offer.providerId === "amadeus";
+  // Never render a placeholder/relative URL as if it were the source's page.
+  const source = sourceLinkFor(offer);
 
   return (
     <article
@@ -199,31 +200,33 @@ export function LiveOfferCard({ offer, index }: { offer: LiveOfferView; index: n
             </div>
           </dl>
 
-          <Link
-            href={isExternal ? offer.offerUrl : "#"}
-            target={isExternal ? "_blank" : undefined}
-            rel={isExternal ? "noopener noreferrer nofollow" : undefined}
-            className="btn-ghost w-full justify-center text-[0.72rem]"
-            title={isAmadeus ? "API سازمانی؛ صفحهٔ عمومی نرخ ندارد" : "صفحهٔ جست‌وجوی منبع، نه لینک اختصاصی نرخ"}
-          >
-            {isExternal ? (
-              <>
+          {source.kind === "external" ? (
+            <>
+              <a
+                href={source.url}
+                target="_blank"
+                rel="noopener noreferrer nofollow"
+                className="btn-ghost w-full justify-center text-[0.72rem]"
+                title="صفحهٔ جست‌وجوی منبع، نه لینک اختصاصی این نرخ"
+              >
                 <ExternalLink className="size-3" aria-hidden="true" />
                 منبع
-              </>
-            ) : (
-              <>
+              </a>
+              <p className="w-full text-[0.56rem] leading-4 text-ink-400">
+                لینک، صفحهٔ جست‌وجوی منبع است، نه همین نرخ.
+              </p>
+            </>
+          ) : (
+            <>
+              <Link href={demoSearchHref(offer)} className="btn-ghost w-full justify-center text-[0.72rem]">
                 <ArrowUpLeft className="size-3" aria-hidden="true" />
-                {offer.providerName}
-              </>
-            )}
-          </Link>
-
-          <p className="w-full text-[0.56rem] leading-4 text-ink-400">
-            {isExternal
-              ? "لینک، صفحهٔ جست‌وجوی منبع است، نه همین نرخ."
-              : "این منبع لینک عمومی نرخ ندارد."}
-          </p>
+                همین مسیر در مقایسه
+              </Link>
+              <p className="w-full text-[0.56rem] leading-4 text-ink-400" data-testid="source-link-note">
+                {source.reason}
+              </p>
+            </>
+          )}
         </div>
       </div>
 

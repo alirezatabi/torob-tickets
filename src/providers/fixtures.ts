@@ -57,7 +57,16 @@ export function providerUpdatedAt(fetchedAt: string, stalenessMinutes: number): 
   return new Date(new Date(fetchedAt).getTime() - stalenessMinutes * 60_000).toISOString();
 }
 
-/** Deterministic provider URL (demo only — clearly marked in the UI). */
-export function demoOfferUrl(providerId: string, patternId: string, dateIso: string): string {
-  return `https://example.com/${providerId}/flight/${patternId}?date=${dateIso}&ref=torob-tickets-demo`;
+/**
+ * Deterministic in-app link for a demo offer.
+ *
+ * This used to be `https://example.com/<provider>/flight/…&ref=demo`, which the UI rendered
+ * as a live "source" button: a clickable link to a placeholder domain. Demo data has no
+ * external page, so the honest link is back into our own comparison for the same route and
+ * date — never an absolute URL that implies a real provider page.
+ *
+ * `modules/live/source-link.ts` enforces the same rule at render time, for every surface.
+ */
+export function demoOfferUrl(_providerId: string, _patternId: string, dateIso: string): string {
+  return `/search?date=${dateIso}`;
 }

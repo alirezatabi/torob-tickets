@@ -15,6 +15,7 @@ import {
   toPersianDigits,
 } from "@/lib/format";
 import { cn } from "@/lib/cn";
+import { sourceLinkFor } from "@/modules/live/source-link";
 
 /**
  * One physical flight, sold by one or more providers.
@@ -40,6 +41,7 @@ export function OfferCard({
   muted?: boolean;
 }) {
   const offer = group.primary;
+  const source = sourceLinkFor(offer);
   const origin = getCity(offer.originCode);
   const destination = getCity(offer.destinationCode);
   const departTime = formatTimeInZone(offer.departAt, origin?.timezone ?? "Asia/Tehran");
@@ -192,16 +194,27 @@ export function OfferCard({
                 : "جزئیات نرخ"}
             </Link>
 
-            <a
-              href={group.primary.offerUrl}
-              target="_blank"
-              rel="noopener noreferrer nofollow"
-              className="btn-primary w-full py-2 text-[0.72rem]"
-              title="این لینک نمونه است و به سایت ارائه‌دهندهٔ واقعی نمی‌رود"
-            >
-              مشاهده در {group.primary.providerName}
-              <ArrowUpLeft className="size-3.5" aria-hidden="true" />
-            </a>
+            {source.kind === "external" ? (
+              <a
+                href={source.url}
+                target="_blank"
+                rel="noopener noreferrer nofollow"
+                className="btn-primary w-full py-2 text-[0.72rem]"
+                title="صفحهٔ جست‌وجوی منبع، نه لینک اختصاصی این نرخ"
+              >
+                مشاهده در {group.primary.providerName}
+                <ArrowUpLeft className="size-3.5" aria-hidden="true" />
+              </a>
+            ) : (
+              // Demo offers have no external page; a dead link to a placeholder domain is
+              // worse than none, so the primary action stays inside the app.
+              <span
+                className="btn-ghost w-full cursor-default py-2 text-[0.72rem]"
+                title={source.reason}
+              >
+                دادهٔ نمونه · {group.primary.providerName}
+              </span>
+            )}
 
             <button
               type="button"
