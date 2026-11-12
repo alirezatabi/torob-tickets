@@ -1,6 +1,6 @@
 import { findCitiesInOrder, findCityInText } from "@/lib/cities";
 import { findAirlineInText } from "@/lib/airlines";
-import { addDays, isoToJalali, jalaliToIso, isoToday, weekdayIndex } from "@/lib/jalali";
+import { addDays, isValidJalaliDate, isoToJalali, jalaliToIso, isoToday, weekdayIndex } from "@/lib/jalali";
 import { toLatinDigits } from "@/lib/format";
 import type { DayPart, PricePreference } from "@/domain/trip";
 import { parseIntent, type ParsedIntent } from "./schema";
@@ -218,8 +218,12 @@ function extractDate(text: string, today: string): string | null {
     return addDays(today, delta);
   }
 
-  // "هفته بعد" / "next week" → same weekday next week.
-  if (/هفته\s*بعد|next\s*week/.test(text)) return addDays(today, 7);
+  // "هفته بعد" / "next week" → same weekday next week — but only when no weekday was named:
+  // «سه‌شنبه هفته بعد» means *next* Tuesday, not "today + 7" (B12).
+  const nextWeek = /هفته\s*بعد|next\s*week/.test(text);
+  if (nextWeek && !WEEKDAY_TOKENS.some(({ tokens }) => tokens.some((token) => text.includes(token)))) {
+    return addDays(today, 7);
+  }
 
   // "N روز دیگر" / "in N days"
   const inDays =
@@ -230,7 +234,9 @@ function extractDate(text: string, today: string): string | null {
   for (const { tokens, index } of WEEKDAY_TOKENS) {
     for (const token of tokens) {
       if (!text.includes(token)) continue;
-      const isNext = new RegExp(`${token}\\s*(?:آینده|بعد|هفته\\s*بعد)|next\\s*${token}`, "i").test(text);
+      const isNext =
+        new RegExp(`${token}\\s*(?:آینده|بعد|هفته\\s*بعد)|next\\s*${token}`, "i").test(text) ||
+        (nextWeek && new RegExp(`${token}\\s*هفته`, "i").test(text));
       const current = weekdayIndex(today);
       let delta = (index - current + 7) % 7;
       if (delta === 0) delta = 7; // "جمعه" said on a Friday means the next one
@@ -254,17 +260,24 @@ function extractDate(text: string, today: string): string | null {
     "بهمن",
     "اسفند",
   ];
-  const jalaliMatch = /(\d{1,2})\s*(فروردین|اردیبهشت|خرداد|تیر|مرداد|شهریور|مهر|آبان|آذر|دی|بهمن|اسفند)(?:\s*(\d{4}))?/.exec(
-    text,
-  );
+  // The month alternation is wrapped in a negative look-ahead for a following letter, so
+  // «۲ نفر دیگر» is not parsed as «۲ دی» (the month Dey) and «تیرماه» still works.
+  const jalaliMatch =
+    /(\d{1,2})\s*(فروردین|اردیبهشت|خرداد|تیر|مرداد|شهریور|مهر|آبان|آذر|دی|بهمن|اسفند)(?![\u0600-\u06FF])(?:\s*(\d{4}))?/.exec(
+      text,
+    );
   if (jalaliMatch) {
     const day = Number(jalaliMatch[1]);
     const month = jMonthNames.indexOf(jalaliMatch[2] ?? "") + 1;
     const currentJalali = isoToJalali(today);
     let year = jalaliMatch[3] ? Number(jalaliMatch[3]) : currentJalali.year;
+    // An impossible day («۳۱ مهر») has no answer — better to return null and ask than to
+    // silently roll over into the next month (B11).
+    if (!isValidJalaliDate(year, month, day)) return null;
     let iso = jalaliToIso(year, month, day);
     if (!jalaliMatch[3] && iso < today) {
       year += 1;
+      if (!isValidJalaliDate(year, month, day)) return null;
       iso = jalaliToIso(year, month, day);
     }
     return iso;

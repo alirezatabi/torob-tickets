@@ -175,6 +175,18 @@ export function isoToJalali(iso: string): JalaliDate {
   return gregorianToJalali(year, month, day);
 }
 
+/**
+ * Strict Jalali → ISO. A day that does not exist (30 Esfand in a common year, 31 Mehr) is an
+ * error, not a silent roll-over into the next month (B11).
+ */
+export function jalaliToIsoChecked(year: number, month: number, day: number): { ok: true; iso: string } | { ok: false; reason: string } {
+  if (month < 1 || month > 12) return { ok: false, reason: "ماه شمسی باید بین ۱ و ۱۲ باشد." };
+  if (!isValidJalaliDate(year, month, day)) {
+    return { ok: false, reason: `روز ${day} در این ماه وجود ندارد.` };
+  }
+  return { ok: true, iso: jalaliToIso(year, month, day) };
+}
+
 export function jalaliToIso(year: number, month: number, day: number): string {
   const g = jalaliToGregorian(year, month, day);
   return toIsoDate(g.year, g.month, g.day);
@@ -199,15 +211,29 @@ export function persianMonthLabel(jy: number, jm: number): string {
   return `${PERSIAN_MONTHS[jm - 1] ?? ""} ${toPersianDigits(jy)}`;
 }
 
-/** Days in a Jalali month (months 1–6 = 31, 7–11 = 30, 12 = 29 or 30). */
+/**
+ * Days in a Jalali month: 31 for months 1–6, 30 for 7–11, and 29 or 30 for Esfand
+ * (the leap month), measured as the real distance between 1 Esfand and 1 Farvardin.
+ *
+ * The old formula subtracted 334 from a 365/366-day span, which returns 31 or 32 — a
+ * December-like month that does not exist in the Persian calendar (B10).
+ */
 export function jalaliMonthLength(jy: number, jm: number): number {
   if (jm <= 6) return 31;
   if (jm <= 11) return 30;
-  const g = jalaliToGregorian(jy + 1, 1, 1);
-  const nextYearStart = Date.UTC(g.year, g.month - 1, g.day);
-  const thisYearStart = jalaliToGregorian(jy, 1, 1);
-  const start = Date.UTC(thisYearStart.year, thisYearStart.month - 1, thisYearStart.day);
-  return Math.round((nextYearStart - start) / 86_400_000) - 334;
+  if (jm < 1 || jm > 12) return 0;
+  const start = jalaliToGregorian(jy, 12, 1);
+  const next = jalaliToGregorian(jy + 1, 1, 1);
+  const days =
+    (Date.UTC(next.year, next.month - 1, next.day) - Date.UTC(start.year, start.month - 1, start.day)) / 86_400_000;
+  return Math.round(days);
+}
+
+/** True when `(jy, jm, jd)` is a day that exists in the Persian calendar (B11). */
+export function isValidJalaliDate(jy: number, jm: number, jd: number): boolean {
+  if (!Number.isInteger(jy) || !Number.isInteger(jm) || !Number.isInteger(jd)) return false;
+  if (jy < 1179 || jm < 1 || jm > 12 || jd < 1) return false;
+  return jd <= jalaliMonthLength(jy, jm);
 }
 
 /** First day-of-week (0=Sun) of a Jalali month, for building a month grid. */

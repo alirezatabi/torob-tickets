@@ -166,3 +166,33 @@ describe("intent service without an API key", () => {
     if (previous) process.env.OPENAI_API_KEY = previous;
   });
 });
+
+describe("Persian calendar edge cases (B10/B11/B12)", () => {
+  it("knows Esfand has 29 or 30 days, never 31", async () => {
+    const { jalaliMonthLength } = await import("@/lib/jalali");
+    expect(jalaliMonthLength(1405, 12)).toBeLessThanOrEqual(30);
+    expect(jalaliMonthLength(1403, 12)).toBe(30); // leap year
+    expect(jalaliMonthLength(1404, 12)).toBe(29);
+    expect(jalaliMonthLength(1405, 7)).toBe(30);
+    expect(jalaliMonthLength(1405, 1)).toBe(31);
+  });
+
+  it("rejects a day the month does not have instead of rolling over", async () => {
+    const { isValidJalaliDate, jalaliToIsoChecked } = await import("@/lib/jalali");
+    expect(isValidJalaliDate(1405, 7, 31)).toBe(false);
+    const checked = jalaliToIsoChecked(1405, 12, 30);
+    expect(checked.ok).toBe(false);
+  });
+
+  it("reads «سه‌شنبه هفته بعد» as next week's Tuesday, not today + 7", async () => {
+    // 10 Aban 1405 (2026-11-01) is a Sunday; «سه‌شنبه هفته بعد» is Tuesday 19 Aban.
+    const parsed = parseNaturalLanguage("پرواز تهران به مشهد سه‌شنبه هفته بعد", { today: "2026-11-01" });
+    expect(parsed.departDate).toBe("2026-11-10");
+  });
+
+  it("does not read «۲ نفر دیگر» as the month Dey", async () => {
+    const parsed = parseNaturalLanguage("پرواز تهران به مشهد برای ۲ نفر دیگر", { today: "2026-11-01" });
+    expect(parsed.departDate).toBeNull();
+    expect(parsed.passengers).toBe(2);
+  });
+});
