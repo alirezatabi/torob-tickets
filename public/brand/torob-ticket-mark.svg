@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="ترب بلیت">
+  <title>ترب بلیت</title>
+  <!--
+    Identity: Torob's open ring + leaf gesture, re-drawn for Torob Ticket.
+    The ring keeps the "basket full of choices" idea but opens at the top-right;
+    a paper plane lifts out of the opening, and the two leaves stay as the
+    growth/price-watch gesture, recoloured in saffron from the app palette.
+  -->
+  <defs>
+    <linearGradient id="tt-ring" x1="84" y1="48" x2="428" y2="472" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#2EC3AE"/>
+      <stop offset="0.55" stop-color="#0F8A78"/>
+      <stop offset="1" stop-color="#0A4D47"/>
+    </linearGradient>
+  </defs>
+
+  <!-- ring -->
+  <path
+    d="M420.98 146.72 A199 199 0 1 1 168.76 79.14 L197.70 138.46 A133 133 0 1 0 398.90 168.97 Z"
+    fill="url(#tt-ring)"
+  />
+
+  <!-- leaves -->
+  <ellipse cx="248.6" cy="46.1" rx="44" ry="25" fill="#B45309" transform="rotate(-62 248.6 46.1)"/>
+  <ellipse cx="419.9" cy="120.4" rx="58" ry="31" fill="#FBBF24" transform="rotate(-20 419.9 120.4)"/>
+
+  <!-- paper plane lifting out of the opening -->
+  <g transform="translate(252 286) rotate(-44) scale(1.6)">
+    <path d="M66 0 L-58 -38 L-24 -2 Z" fill="#0B1424"/>
+    <path d="M66 0 L-24 -2 L-52 32 Z" fill="#0F8A78"/>
+  </g>
+</svg>

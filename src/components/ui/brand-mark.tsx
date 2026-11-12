@@ -1,29 +1,74 @@
+import { cn } from "@/lib/cn";
+
 /**
- * Identity: a paper-plane folded out of a price tag.
- * Simple enough to read at 20px, distinct from Torob's own mark.
+ * Torob Ticket identity.
+ *
+ * Borrows the Torob gesture — an open ring cradling a pair of leaves — and turns it
+ * into a *travel* mark: the ring opens at the top-right like a departure gate and a
+ * paper plane lifts out of it. Colours come from the app palette (teal ring, saffron
+ * leaves, ink/teal plane), so the mark matches the UI instead of fighting it.
+ *
+ * Drawn as one path per shape, so it stays crisp from 16px (favicon) to 512px.
  */
-export function BrandMark({ size = 32, className = "" }: { size?: number; className?: string }) {
+const RING = "M420.98 146.72A199 199 0 1 1 168.76 79.14L197.7 138.46A133 133 0 1 0 398.9 168.97Z";
+
+export function BrandMark({
+  size = 32,
+  className = "",
+  tile = false,
+}: {
+  size?: number;
+  className?: string;
+  /** Draw a rounded white tile behind the mark (use on coloured or busy backgrounds). */
+  tile?: boolean;
+}) {
+  // Gradient ids must be unique per instance — a page can render the mark twice.
+  const id = `tt-${tile ? "tile" : "bare"}-${size}`;
+
   return (
     <svg
       width={size}
       height={size}
-      viewBox="0 0 40 40"
+      viewBox="0 0 512 512"
       fill="none"
       aria-hidden="true"
-      className={className}
+      className={cn("shrink-0", className)}
     >
-      <rect width="40" height="40" rx="12" fill="url(#brand-gradient)" />
-      <path
-        d="M9.5 20.4 30.2 12.1a1 1 0 0 1 1.32 1.24l-4.3 14.6a1.6 1.6 0 0 1-2.65.76l-4.3-3.96-3.1 3.55c-.6.68-1.72.26-1.72-.65v-4.34l9.06-6.5-11.3 5.1-3.2-1.36a.85.85 0 0 1 .06-1.6l.03-.01Z"
-        fill="#fff"
-      />
-      <circle cx="30.6" cy="9.6" r="3.1" fill="#FBBF24" stroke="#0D1729" strokeOpacity=".18" />
       <defs>
-        <linearGradient id="brand-gradient" x1="0" y1="0" x2="40" y2="40" gradientUnits="userSpaceOnUse">
-          <stop stopColor="#109C88" />
-          <stop offset="1" stopColor="#0D1729" />
+        <linearGradient id={id} x1="84" y1="48" x2="428" y2="472" gradientUnits="userSpaceOnUse">
+          <stop stopColor="#2EC3AE" />
+          <stop offset="0.55" stopColor="#0F8A78" />
+          <stop offset="1" stopColor="#0A4D47" />
         </linearGradient>
+        <clipPath id={`${id}-clip`}>
+          <rect width="512" height="512" rx="116" />
+        </clipPath>
       </defs>
+
+      <g clipPath={tile ? `url(#${id}-clip)` : undefined}>
+        {tile && <rect width="512" height="512" rx="116" fill="#fff" />}
+        <path d={RING} fill={`url(#${id})`} />
+        <ellipse
+          cx="248.6"
+          cy="46.1"
+          rx="44"
+          ry="25"
+          fill="#B45309"
+          transform="rotate(-62 248.6 46.1)"
+        />
+        <ellipse
+          cx="419.9"
+          cy="120.4"
+          rx="58"
+          ry="31"
+          fill="#FBBF24"
+          transform="rotate(-20 419.9 120.4)"
+        />
+        <g transform="translate(252 286) rotate(-44) scale(1.6)">
+          <path d="M66 0-58-38l34 36z" fill="#0B1424" />
+          <path d="M66 0-24-2l-28 34z" fill="#0F8A78" />
+        </g>
+      </g>
     </svg>
   );
 }
@@ -31,12 +76,12 @@ export function BrandMark({ size = 32, className = "" }: { size?: number; classN
 export function Wordmark({ compact = false }: { compact?: boolean }) {
   return (
     <span className="flex items-center gap-2.5">
-      <BrandMark size={34} />
+      <BrandMark size={36} />
       <span className="flex flex-col leading-none">
         <span className="text-[1.05rem] font-extrabold tracking-tight text-ink-900">ترب بلیت</span>
         {!compact && (
           <span className="mt-0.5 text-[0.62rem] font-medium tracking-wide text-ink-400">
-            مقایسهٔ هوشمند بلیت سفر
+            مقایسهٔ قیمت بلیت هواپیما
           </span>
         )}
       </span>

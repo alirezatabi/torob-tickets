@@ -13,6 +13,14 @@ export const metadata: Metadata = {
     "ترب بلیت قیمت بلیت هواپیما را از چند ارائه‌دهنده جمع می‌کند، یکسان‌سازی می‌کند و با توجه به خواستهٔ شما بهترین گزینه را پیشنهاد می‌دهد.",
   applicationName: "ترب بلیت",
   keywords: ["بلیت هواپیما", "مقایسه قیمت", "پرواز", "ارزان‌ترین بلیت", "ترب"],
+  icons: {
+    icon: [
+      { url: "/brand/mark-32.png", sizes: "32x32", type: "image/png" },
+      { url: "/brand/mark-192.png", sizes: "192x192", type: "image/png" },
+      { url: "/brand/torob-ticket-mark.svg", type: "image/svg+xml" },
+    ],
+    apple: [{ url: "/brand/mark-192.png", sizes: "192x192", type: "image/png" }],
+  },
   openGraph: {
     title: "ترب بلیت — مقایسهٔ هوشمند قیمت بلیت",
     description: "قیمت پروازها را از چند ارائه‌دهنده در یک صفحه مقایسه کنید.",
@@ -22,7 +30,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#0d7a6c",
+  themeColor: "#0f8a78",
   width: "device-width",
   initialScale: 1,
 };
