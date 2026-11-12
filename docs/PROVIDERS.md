@@ -20,6 +20,20 @@ Two live sources, deliberately different in kind, plus the original demo dataset
 Sepehr360 aggregates ~300 agencies. **That is one source**, not 300 — the count is never
 inflated in the provider strip or in the docs.
 
+## Which sources can be compared, and why
+
+`docs/SOURCES.md` records, per source, *where* the fares actually are and what blocks them
+(verified by hand). The short version: Sepehr360 is server-rendered and works today;
+mehrabgasht exposes only one cheapest fare per day (no clock, no flight number) and its
+per-flight search is behind a login; pingotrip, alibaba and flytoday are client-rendered
+for a specific search. `npm run source:probe -- <url>` turns any of them into evidence with
+one page fetch plus a few allowlisted follow-ups.
+
+**The comparison rule that follows from this:** offers are grouped into a flight by carrier
++ flight number; only when *no* source published a number may two offers group, and then
+only within 5 minutes of departure (`identity: "same-departure"`, labelled in the card).
+A daily "cheapest price" bar is therefore *never* compared to a flight price.
+
 ## Sepehr360
 
 - Hosts: the publisher's own — `sepehr360.ir`, `www.`, `api.`, `cdn.` (its logos already
