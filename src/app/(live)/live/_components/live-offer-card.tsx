@@ -196,10 +196,11 @@ export function LiveOfferCard({ offer, index }: { offer: LiveOfferView | LiveGro
                   "inline-flex items-center gap-1 rounded-md px-1.5 py-0.5",
                   offer.seatsAvailable <= LOW_SEATS_THRESHOLD ? "bg-saffron-50 text-saffron-700" : "bg-teal-50 text-teal-700",
                 )}
+                title="بیشترین ظرفیتی که یکی از منابع این پرواز اعلام کرده است، نه جمع منابع."
               >
                 <Users className="size-3" aria-hidden="true" />
                 {toPersianDigits(offer.seatsAvailable)} صندلی
-                {offer.seatsAvailable <= LOW_SEATS_THRESHOLD ? " · کم" : ""}
+                {offer.seatsAvailable > 0 && offer.seatsAvailable <= LOW_SEATS_THRESHOLD ? " · کم" : ""}
               </span>
             ) : null}
             {group?.soldOut ? (

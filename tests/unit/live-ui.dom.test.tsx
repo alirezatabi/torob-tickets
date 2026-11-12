@@ -141,6 +141,32 @@ describe("LiveOfferCard honesty", () => {
     expect(screen.getByText(/خارج از خواستهٔ شما: بلیت قابل استرداد نیست/)).toBeTruthy();
   });
 
+  it("tells «low seats» apart from «no seats»", () => {
+    const group = (seatsAvailable: number, soldOut: boolean) =>
+      ({
+        ...view({ seatsAvailable }),
+        groupKey: "IR|IR3301|2026-11-13|THR>MHD",
+        identity: "flight-number" as const,
+        knownSellers: 1,
+        providerCount: 1,
+        prices: [{ id: "sepehr360:key", providerId: "sepehr360", providerName: "سپهر۳۶۰", priceToman: 5_902_000, isCheapest: !soldOut, seatsAvailable }],
+        cheapestOfferId: soldOut ? null : "sepehr360:key",
+        soldOut,
+      });
+
+    // Three seats for a party of one: worth a warning.
+    render(createElement(LiveOfferCard, { offer: group(3, false), index: 0 }));
+    expect(screen.getByTestId("live-offer-card").textContent).toContain("۳ صندلی · کم");
+    cleanup();
+
+    // Zero seats is not "low", it is a completed flight, and it must say why.
+    render(createElement(LiveOfferCard, { offer: group(0, true), index: 0 }));
+    const card = screen.getByTestId("live-offer-card").textContent ?? "";
+    expect(card).toContain("۰ صندلی");
+    expect(card).not.toContain("۰ صندلی · کم");
+    expect(card).toContain("تکمیل ظرفیت برای این تعداد مسافر");
+  });
+
   it("marks a demo-mode offer as sample data", () => {
     render(createElement(LiveOfferCard, { offer: view({ dataSource: "demo", freshness: "demo" }), index: 0 }));
     expect(screen.getByText("نمونه")).toBeTruthy();
