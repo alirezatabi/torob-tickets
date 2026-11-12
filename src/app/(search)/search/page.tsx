@@ -48,10 +48,12 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
   const view = await searchTrips(query, sortParam);
   const { outcome, flights } = view;
 
-  // Best-effort audit trail. No DATABASE_URL → no-op; a DB error never breaks the page.
+  // Audit trail (B22). It is awaited — a floating promise can be cancelled the moment the
+  // response is sent, which silently loses rows on serverless — but it can never break or
+  // meaningfully delay the page: no DATABASE_URL is a no-op, and any error is swallowed.
   if (process.env.DATABASE_URL) {
     try {
-      await recordSearch(outcome, outcome.ranked);
+      await recordSearch(outcome, view.results.rankedView);
     } catch {
       // Auditing is never allowed to take the results down with it.
     }

@@ -97,3 +97,17 @@ sandbox):
 
 Anything in the second list that has not been run must be reported as *unverified*, not
 as "working".
+
+## Secrets (S1)
+
+- **No `.env` is tracked in this repository.** `git ls-files` lists only `.env.example`, and
+  `.gitignore` ignores `.env*` except that example. The README and every doc use placeholders
+  (`PASSWORD`, `sk-...`), never real values.
+- **Action still required by the operator:** the archived copy of this project that circulated
+  earlier contained a real `.env` with an `OPENAI_API_KEY` and a `DATABASE_URL`. Those two
+  credentials must be treated as leaked: revoke the OpenAI key in the dashboard and rotate the
+  Postgres password. Nothing in the code can do that for you, and this repository intentionally
+  contains no copy of the values.
+- API routes that can spend money (`/api/intent`, `/api/explain`) are bounded in input size and
+  rate limited per client in-process (see `src/modules/api/rate-limit.ts`); the limitation of
+  an in-memory limiter on multi-instance deployments is documented in the README.
