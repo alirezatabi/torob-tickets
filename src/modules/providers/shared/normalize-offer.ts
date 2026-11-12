@@ -139,7 +139,14 @@ export function assembleLiveOffer(
   if (!getCity(destinationCity)) {
     throw new LiveNormalizationError("unknown-city", `unknown destination ${input.destinationAirport}`);
   }
-  if (!Number.isSafeInteger(input.price.toman) || input.price.toman <= 0) {
+  const foreign = input.price.declaredUnit === "foreign";
+  // A foreign-currency offer legitimately has no toman value. Anything else with a
+  // non-positive toman price is a broken record and must be rejected.
+  if (foreign) {
+    if (!Number.isSafeInteger(input.price.originalAmount) || input.price.originalAmount <= 0) {
+      throw new LiveNormalizationError("invalid-price", `invalid foreign amount ${input.price.originalAmount}`);
+    }
+  } else if (!Number.isSafeInteger(input.price.toman) || input.price.toman <= 0) {
     throw new LiveNormalizationError("invalid-price", `invalid price ${input.price.toman}`);
   }
   if (Number.isNaN(new Date(input.departAt).getTime()) || Number.isNaN(new Date(input.arriveAt).getTime())) {
@@ -161,6 +168,7 @@ export function assembleLiveOffer(
   }
   if (input.seatsAvailable === null) warnings.add("availability-unverified");
   if (input.sellerLabel) warnings.add("seller-aggregated");
+  if (foreign) warnings.add("price-foreign");
 
   const departDate = localDate(input.departAt, originCity);
   const baggageTokens = baggageFacts(input.baggage);
@@ -212,8 +220,9 @@ export function assembleLiveOffer(
         amount: input.price.originalAmount,
         currency: input.price.currency as FlightOffer["price"]["original"]["currency"],
       },
-      toman: input.price.toman,
+      toman: foreign ? 0 : input.price.toman,
       converted: input.price.converted || input.unitConverted,
+      comparable: !foreign,
     },
     baggage: input.baggage,
     refundable: input.refundable,
@@ -231,6 +240,7 @@ export function assembleLiveOffer(
       fareName: input.fareName,
     },
     freshness,
+    seatsAvailable: input.seatsAvailable,
     priceObservedAt,
     lastVerifiedAt: null,
     completeness: completenessOf({

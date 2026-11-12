@@ -29,9 +29,9 @@ import { networkError, notConfiguredError, ProviderError } from "@/modules/provi
 import { assembleLiveOffer, LiveNormalizationError } from "@/modules/providers/shared/normalize-offer";
 import { buildForeignPrice } from "@/modules/money/price";
 import { wallClockToInstant } from "@/providers/fare";
-import { airportCity, getAirport } from "@/modules/airports";
+import { getAirport } from "@/modules/airports";
 import { resolveAirlineCode } from "@/modules/airlines/registry";
-import type { FlightSegment } from "@/domain/flight";
+import type { FlightSegment, OfferWarning } from "@/domain/flight";
 import type { NormalizationIssue } from "@/providers/types";
 import {
   amadeusBaseUrl,
@@ -79,7 +79,7 @@ export interface AmadeusConfig {
   baseUrl?: string;
 }
 
-export function amadeusConfigFromEnv(env: NodeJS.ProcessEnv = process.env): AmadeusConfig {
+export function amadeusConfigFromEnv(env: Record<string, string | undefined> = process.env): AmadeusConfig {
   const amadeusEnv: AmadeusEnv = env.AMADEUS_ENV === "production" ? "production" : "test";
   const enabled = env.ENABLE_AMADEUS === "true" || Boolean(amadeusCredentialsFromEnv(env));
   return {
@@ -261,9 +261,6 @@ export class AmadeusAdapter implements LiveProviderAdapter<AmadeusRawOffer> {
     const last = segments[segments.length - 1];
     if (!first || !last) throw new LiveNormalizationError("missing-route", "empty segments");
 
-    const originCity = airportCity(first.originCode) ?? first.originCode;
-    const destinationCity = airportCity(last.destinationCode) ?? last.destinationCode;
-
     // Cabin: explicit, else fail over to the requested cabin *with a warning*.
     const cabinRaw = extractCabin(record);
     const cabin = cabinRaw ? (CABIN_MAP[cabinRaw] ?? (request.cabin as "economy")) : (request.cabin as "economy");
@@ -314,11 +311,7 @@ export class AmadeusAdapter implements LiveProviderAdapter<AmadeusRawOffer> {
         fetchedAt: meta.fetchedAt,
         seatsAvailable: seats,
         unitConverted: false,
-        extraWarnings: buildAmadeusWarnings(record, cabinRaw, total, currency, {
-          originCity,
-          destinationCity,
-          request,
-        }),
+        extraWarnings: buildAmadeusWarnings({ record, cabinKnown: cabinRaw !== null, currency }),
       },
       { freshness: FRESHNESS, now: new Date(meta.fetchedAt) },
     );
@@ -367,20 +360,19 @@ function hasAmadeusErrors(payload: unknown): boolean {
  * Every caveat that applies to an Amadeus offer, made explicit so the UI can print it
  * instead of implying more than we know.
  */
-function buildAmadeusWarnings(
-  record: AmadeusRawOffer,
-  cabinRaw: string | null,
-  total: string | null,
-  currency: string,
-  context: { originCity: string; destinationCity: string; request: ProviderSearchRequest },
-): import("@/domain/flight").OfferWarning[] {
-  void context;
-  const warnings: import("@/domain/flight").OfferWarning[] = [];
-  if (record.env === "test") warnings.push("availability-unverified");
-  if (!cabinRaw) warnings.push("baggage-unknown");
-  if (parseAmountString(total) === null) warnings.push("price-converted");
-  if (currency !== "IRR" && currency !== "IRT") warnings.push("price-converted");
-  return warnings;
+function buildAmadeusWarnings(input: {
+  record: AmadeusRawOffer;
+  cabinKnown: boolean;
+  currency: string;
+}): OfferWarning[] {
+  const warnings: OfferWarning[] = [];
+  // Foreign currency is disclosed; no FX conversion is applied — the offer is shown in
+  // its own currency and excluded from toman-price comparisons.
+  if (input.currency !== "IRR" && input.currency !== "IRT") warnings.push("price-converted");
+  if (!input.cabinKnown) warnings.push("airport-unknown");
+  if (input.record.env === "test") warnings.push("availability-unverified");
+  if (input.record.numberOfBookableSeats === null) warnings.push("availability-unverified");
+  return [...new Set(warnings)];
 }
 
 export { parsePricingResponse, type AmadeusRepricingResult };

@@ -1,0 +1,1 @@
+{ "errors": [{ "status": 400, "code": 36845, "title": "NO FARE AVAILABLE", "detail": "Fare for the selected itinerary is no longer available" }] }

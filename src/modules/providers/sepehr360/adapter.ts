@@ -76,7 +76,7 @@ export interface Sepehr360Config {
   unit?: "toman" | "rial";
 }
 
-export function sepehr360ConfigFromEnv(env: NodeJS.ProcessEnv = process.env): Sepehr360Config {
+export function sepehr360ConfigFromEnv(env: Record<string, string | undefined> = process.env): Sepehr360Config {
   return {
     enabled: env.ENABLE_SEPEHR360 !== "false",
     baseUrl: env.SEPEHR360_BASE_URL || undefined,

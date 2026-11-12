@@ -26,7 +26,7 @@ export function amadeusBaseUrl(env: AmadeusEnv): string {
   return env === "production" ? "https://api.amadeus.com" : "https://test.api.amadeus.com";
 }
 
-export function amadeusCredentialsFromEnv(env: NodeJS.ProcessEnv = process.env): AmadeusCredentials | null {
+export function amadeusCredentialsFromEnv(env: Record<string, string | undefined> = process.env): AmadeusCredentials | null {
   // Test and production credentials are strictly separate — no fallback between them.
   const suffix = (env.AMADEUS_ENV ?? "test") === "production" ? "PRODUCTION" : "TEST";
   const clientId = env[`AMADEUS_CLIENT_ID_${suffix}`] ?? (suffix === "TEST" ? env.AMADEUS_CLIENT_ID : undefined);

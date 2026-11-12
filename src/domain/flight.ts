@@ -114,6 +114,12 @@ export interface OfferPrice {
   toman: number;
   /** True when an FX conversion was applied (UI must disclose it). */
   converted: boolean;
+  /**
+   * False when the offer is quoted in a currency we cannot convert to toman without an
+   * FX feed (every Amadeus price). Such an offer is shown in its own currency and is
+   * never mixed into toman rankings or price history lines.
+   */
+  comparable?: boolean;
 }
 
 export interface BaggageInfo {
@@ -133,7 +139,8 @@ export type OfferWarning =
   | "airport-unknown"
   | "availability-unverified"
   | "seller-aggregated"
-  | "stops-partial";
+  | "stops-partial"
+  | "price-foreign";
 
 export const WARNING_LABELS: Record<OfferWarning, string> = {
   "price-converted": "قیمت با نرخ نمونه به تومان تبدیل شده",
@@ -146,6 +153,7 @@ export const WARNING_LABELS: Record<OfferWarning, string> = {
   "availability-unverified": "موجودی این نرخ توسط منبع اعلام نشده است",
   "seller-aggregated": "این نرخ از میان چند فروشندهٔ همان منبع انتخاب شده",
   "stops-partial": "تعداد توقف اعلام شده، اما ایستگاه‌های میانی اعلام نشده‌اند",
+  "price-foreign": "قیمت به ارز خارجی است و بدون نرخ تبدیل، قابل مقایسه با تومان نیست",
 };
 
 /**
