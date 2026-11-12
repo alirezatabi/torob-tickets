@@ -183,6 +183,8 @@ DATABASE_URL="postgresql://postgres:MyPass@localhost:5432/torob_tickets?schema=p
 
 > اگر پورت پیش‌فرض را عوض کرده‌اید (مثلاً نصب با EDB معمولاً 5432 است)، همان پورت را در URL بگذارید. سرویس `postgresql-x64-16` باید در `services.msc` در حال اجرا باشد.
 
+**Prisma 7:** آدرس اتصال دیگر داخل `schema.prisma` نوشته نمی‌شود؛ CLI آن را از `prisma.config.ts` می‌خواند (که خودش `.env` را بار می‌کند) و اپلیکیشن در زمان اجرا با درایور `@prisma/adapter-pg` وصل می‌شود.
+
 ### ۳) ساخت جدول‌ها و دادهٔ نمونه
 
 ```powershell
@@ -213,6 +215,8 @@ FROM search_logs ORDER BY created_at DESC LIMIT 10;
 | `password authentication failed` | رمز یا نام کاربری غلط | با pgAdmin همان رمز را تست کنید؛ کاراکترهای خاص را URL-encode کنید |
 | `database "torob_tickets" does not exist` | دیتابیس ساخته نشده | `CREATE DATABASE torob_tickets;` |
 | `@prisma/client did not initialize yet` | `prisma generate` اجرا نشده | `npm run db:generate` |
+| `Cannot resolve environment variable: DATABASE_URL` | CLI به URL نیاز دارد (v7) | فایل `.env` بسازید یا متغیر را در همان ترمینال ست کنید |
+| `کلاینت دیتابیس ساخته نشده است` | `src/generated/prisma` وجود ندارد | `npm run db:generate` |
 | صفحه با خطای دیتابیس بالا نمی‌آید | نباید رخ دهد — نوشتن best-effort است | `DATABASE_URL` را بردارید؛ اپ بدون دیتابیس هم کامل کار می‌کند |
 
 > **نکته:** بدون `DATABASE_URL` هیچ‌چیز خراب نمی‌شود؛ دمو کاملاً در حافظه اجرا می‌شود. ماندگاری یک قابلیت اضافه است، نه پیش‌نیاز.

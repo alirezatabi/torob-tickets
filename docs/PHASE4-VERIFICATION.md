@@ -137,7 +137,7 @@ Tested against a faithful in-memory model of the schema (no live Postgres availa
 | --- | --- | --- |
 | Live HTTP against Sepehr360 | Code complete; robots gate, allowlist, 1 retry, rate limit, size cap all unit-tested against a stubbed `fetch` | Sandbox egress is allowlisted to npm/PyPI/GitHub. **Not run against the real site.** |
 | Live HTTP against Amadeus (token, search, re-pricing) | Code complete; token exchange, response parsing, price-change and fare-gone paths tested with fixtures | No credentials, and egress blocked. |
-| Postgres schema (`prisma/schema.prisma` v2) | Reviewed field by field against every write in `persistence/live-store.ts` | `prisma generate` needs `binaries.prisma.sh`, unreachable here → client types are a hand-written façade (`src/modules/db/client-types.ts`), real generated types apply after `npm run db:generate`. |
+| Postgres schema (`prisma/schema.prisma` v2) | Reviewed field by field against every write in `persistence/live-store.ts` | Prisma 7: URLs live in `prisma.config.ts`, runtime uses `@prisma/adapter-pg`. `prisma generate` still fetches a schema-engine binary from `binaries.prisma.sh`, which is unreachable in this sandbox → client types are a hand-written façade (`src/modules/db/client-types.ts`); real generated types apply after `npm run db:generate` on a machine with network access. |
 | Price-history chart | Rendered and tested (single point, multi point, empty; no interpolation) | Reads Postgres, which is not available here, so only the "unavailable" branch ran. |
 | Playwright E2E | Config unchanged | Browser binaries cannot be downloaded here (known limitation); the jsdom journey + the new live UI tests cover the same components. |
 

@@ -7,18 +7,27 @@
  *
  * Usage (Windows PowerShell, local Postgres — no Docker):
  *   $env:DATABASE_URL="postgresql://postgres:PASSWORD@localhost:5432/torob_tickets?schema=public"
- *   npm run db:generate
+ *   npm run db:generate   # writes src/generated/prisma (no engine download needed)
  *   npm run db:push
  *   npm run db:seed
+ *
+ * Prisma 7: the URL is never read from the schema — it comes from `prisma.config.ts` for
+ * the CLI, and from a driver adapter for this script.
  */
-import { PrismaClient, BaggageState, ProviderMode } from "@prisma/client";
+import { PrismaClient, BaggageState, ProviderMode } from "../src/generated/prisma/client";
+import { PrismaPg } from "@prisma/adapter-pg";
 import { createQuery } from "../src/domain/trip";
 import { runSearch } from "../src/providers/search";
 import { listProviders } from "../src/providers/registry";
 import { addDays, isoToday } from "../src/lib/jalali";
 import { groupOffers } from "../src/dedupe/group";
 
-const prisma = new PrismaClient();
+const connectionString = process.env.DATABASE_URL?.trim();
+if (!connectionString) {
+  throw new Error("DATABASE_URL تنظیم نشده است؛ برای seed به یک دیتابیس Postgres نیاز است.");
+}
+
+const prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString }) });
 
 const DEMO_ROUTES = [
   { originCode: "THR", destinationCode: "IST" },

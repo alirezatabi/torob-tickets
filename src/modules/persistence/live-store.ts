@@ -234,7 +234,8 @@ export async function persistSearch(input: PersistSearchInput): Promise<PersistS
 
 async function findRecentSearch(input: PersistSearchInput): Promise<{ id: string; status: string } | null> {
   try {
-    return await getDb().flightSearch.findFirst({
+    const db = await getDb();
+    return await db.flightSearch.findFirst({
       where: {
         requestHash: requestHash({ ...input.query, mode: input.mode }),
         startedAt: { gte: new Date(input.startedAt.getTime() - DEDUPE_WINDOW_MS) },
@@ -248,7 +249,7 @@ async function findRecentSearch(input: PersistSearchInput): Promise<{ id: string
 }
 
 async function persistSearchOnce(input: PersistSearchInput): Promise<PersistSearchResult> {
-  const prisma = getDb();
+  const prisma = await getDb();
   const hash = requestHash({ ...input.query, mode: input.mode });
 
   // Collapse a duplicate submit of the exact same request within a short window.

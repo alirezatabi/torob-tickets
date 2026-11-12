@@ -6,12 +6,16 @@
 // repository interface.
 
 generator client {
-  provider = "prisma-client-js"
+  provider            = "prisma-client"
+  output              = "../src/generated/prisma"
+  moduleFormat        = "esm"
+  importFileExtension = "ts"
 }
 
+// Prisma 7: connection URLs live in `prisma.config.ts`, never in the schema.
+// Anything that needs a URL at runtime passes an adapter to PrismaClient instead.
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
 }
 
 /// A data source. `mode` keeps demo data explicitly separated from live data.

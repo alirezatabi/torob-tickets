@@ -58,3 +58,7 @@ pnpm-debug.log*
 .vercel
 .eslintcache
 *.pem
+
+# ————— Prisma 7 —————
+# Generated client (npm run db:generate writes it here)
+/src/generated/

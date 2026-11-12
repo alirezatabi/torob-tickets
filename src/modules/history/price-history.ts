@@ -115,7 +115,8 @@ export async function getPriceHistory(query: HistoryQuery): Promise<HistoryResul
 
   let rows: PriceObservationViewRow[];
   try {
-    rows = await getDb().priceObservation.findMany({
+    const db = await getDb();
+    rows = await db.priceObservation.findMany({
       where: buildWhere(query, range),
       orderBy: { observedAt: "asc" },
       take: 5_000,

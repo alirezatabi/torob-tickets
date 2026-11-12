@@ -10,6 +10,7 @@
  */
 
 import { checkDatabase, dbMode, disconnectPrisma, getDb, isDatabaseConfigured } from "../src/modules/db/prisma";
+import type { TypedDb } from "../src/modules/db/client-types";
 
 const V2_TABLES = [
   "live_providers",
@@ -41,7 +42,7 @@ async function main(): Promise<void> {
     return;
   }
 
-  const db = getDb();
+  const db = await getDb();
   console.log("\nجدول‌ها:");
   for (const table of V2_TABLES) {
     try {
@@ -70,7 +71,7 @@ async function main(): Promise<void> {
   }
 }
 
-async function probe(table: string, db: ReturnType<typeof getDb>): Promise<number | null> {
+async function probe(table: string, db: TypedDb): Promise<number | null> {
   switch (table) {
     case "flight_searches":
       return (await db.flightSearch.findFirst()) === null ? 0 : 1;

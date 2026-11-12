@@ -12,9 +12,25 @@
 
 import type { SearchOutcome } from "@/providers/search";
 import type { RankedResult } from "@/ranking/score";
+import { disconnectPrisma, getPrisma, isDatabaseConfigured } from "@/modules/db/prisma";
 
 export function isPersistenceEnabled(): boolean {
-  return Boolean(process.env.DATABASE_URL?.trim());
+  return isDatabaseConfigured();
+}
+
+/**
+ * One client for the whole process, created by `modules/db/prisma` (which owns the
+ * Prisma 7 driver adapter). Persistence is strictly best-effort: if the generated client
+ * or the database is missing, `getClient()` returns null and every write becomes a no-op.
+ */
+async function getClient(): Promise<PrismaLike | null> {
+  if (!isPersistenceEnabled()) return null;
+  try {
+    return (await getPrisma()) as unknown as PrismaLike;
+  } catch (error) {
+    logOnce(`Prisma client unavailable (${error instanceof Error ? error.message : "unknown"}).`);
+    return null;
+  }
 }
 
 type PrismaLike = {
@@ -26,28 +42,7 @@ type PrismaLike = {
   $disconnect(): Promise<void>;
 };
 
-let clientPromise: Promise<PrismaLike | null> | null = null;
 let warned = false;
-
-async function getClient(): Promise<PrismaLike | null> {
-  if (!isPersistenceEnabled()) return null;
-  if (!clientPromise) {
-    clientPromise = (async () => {
-      try {
-        // Dynamic + external package: safe even when `prisma generate` never ran.
-        const mod = (await import("@prisma/client")) as unknown as {
-          PrismaClient?: new () => PrismaLike;
-        };
-        if (!mod.PrismaClient) return null;
-        return new mod.PrismaClient();
-      } catch (error) {
-        logOnce(`Prisma client unavailable (${error instanceof Error ? error.message : "unknown"}).`);
-        return null;
-      }
-    })();
-  }
-  return clientPromise;
-}
 
 function logOnce(message: string): void {
   if (warned) return;
@@ -133,7 +128,5 @@ export async function recordSearch(outcome: SearchOutcome, ranked: RankedResult)
 
 /** Test/CLI helper. */
 export async function disconnectPersistence(): Promise<void> {
-  const client = await clientPromise;
-  await client?.$disconnect().catch(() => undefined);
-  clientPromise = null;
+  await disconnectPrisma().catch(() => undefined);
 }

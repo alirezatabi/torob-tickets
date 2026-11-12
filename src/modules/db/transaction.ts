@@ -8,8 +8,6 @@
  * serialization) — never for validation errors.
  */
 
-import type { Prisma } from "@prisma/client";
-
 import { getPrisma } from "@/modules/db/prisma";
 import { isRetryableDbError, mapPrismaError } from "@/modules/db/errors";
 
@@ -20,18 +18,27 @@ export interface TransactionOptions {
   client?: TransactionCapable;
 }
 
-/** The slice of PrismaClient we actually use, so tests can pass a fake. */
+/**
+ * The slice of PrismaClient we actually use, so tests can pass a fake.
+ *
+ * Prisma 7 generates `Prisma.TransactionClient` into `src/generated/prisma`, which does
+ * not exist until `db:generate` runs — so the transaction body is typed structurally here
+ * instead of importing that type.
+ */
+export type TransactionClient = Record<string, unknown>;
+
 export interface TransactionCapable {
-  $transaction<T>(run: (tx: Prisma.TransactionClient) => Promise<T>, options?: { timeout?: number; maxWait?: number }): Promise<T>;
+  $transaction<T>(run: (tx: TransactionClient) => Promise<T>, options?: { timeout?: number; maxWait?: number }): Promise<T>;
 }
 
 export async function withTransaction<T>(
-  run: (tx: Prisma.TransactionClient) => Promise<T>,
+  run: (tx: TransactionClient) => Promise<T>,
   options: TransactionOptions = {},
 ): Promise<T> {
   const attempts = options.maxAttempts ?? 3;
   const timeout = options.timeoutMs ?? 10_000;
-  const prisma = options.client ?? getPrisma();
+  const prisma: TransactionCapable =
+    options.client ?? ((await getPrisma()) as unknown as TransactionCapable);
 
   let lastError: unknown = null;
   for (let attempt = 1; attempt <= attempts; attempt += 1) {
