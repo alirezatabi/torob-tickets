@@ -26,9 +26,12 @@ const REQUEST: ProviderSearchRequest = {
  * fetch — the adapter itself has no test-only seam, which is deliberate: the code
  * under test is the same code that runs against the real site.
  */
-function withStubbedFetch(
-  routes: { robots?: string; search?: { body: string; status?: number } },
-) {
+function withStubbedFetch(routes: {
+  robots?: string;
+  search?: { body: string; status?: number };
+  /** Extra paths served by the fake origin, e.g. discovered bundles and JSON endpoints. */
+  extra?: Record<string, string>;
+}) {
   const calls: string[] = [];
   vi.stubGlobal(
     "fetch",
@@ -38,6 +41,9 @@ function withStubbedFetch(
       if (url.endsWith("/robots.txt")) {
         return new Response(routes.robots ?? "User-agent: *\nDisallow: /systemuser", { status: 200 });
       }
+      const path = new URL(url).pathname;
+      const extra = routes.extra?.[path];
+      if (extra) return new Response(extra, { status: 200 });
       if (routes.search) {
         return new Response(routes.search.body, { status: routes.search.status ?? 200 });
       }
@@ -128,6 +134,89 @@ describe("Sepehr360Adapter", () => {
     expect(result.rawCount).toBe(0);
     vi.unstubAllGlobals();
   });
+
+  it("reads the offers from the site's own JSON feed when the HTML is only a shell", async () => {
+    // This is the real failure the user hit: HTTP 200, 5 KB shell, no price in the markup.
+    // The data exists, behind the bundle's XHR — discover it and read it.
+    const calls = withStubbedFetch({
+      search: { body: fixture("js-shell.html") },
+      extra: {
+        "/assets/app.js": 'var SEARCH_API = "https://sepehr360.ir/api/flight/search";',
+        "/assets/vendor.js": "/* runtime */",
+        "/api/flight/search": JSON.stringify({
+          data: {
+            result: [
+              {
+                airlineCode: "IR",
+                airlineName: "ایران ایر",
+                price: 5_902_000,
+                departTime: "07:30",
+                arriveTime: "08:50",
+                duration: 80,
+                stops: 0,
+                origin: "THR",
+                destination: "MHD",
+                flightNumber: "IR 452",
+              },
+              { airlineCode: "W5", price: 6_120_000, departTime: "09:15", arriveTime: "10:40", stops: 1 },
+            ],
+          },
+        }),
+      },
+    });
+
+    const adapter = new Sepehr360Adapter({ enabled: true });
+    const result = await adapter.search(REQUEST, context());
+
+    expect(result.records).toHaveLength(2);
+    expect(result.warnings?.[0]).toContain("api-endpoint:");
+
+    const batch = adapter.normalize(result.records, REQUEST, result.meta);
+    expect(batch.offers).toHaveLength(2);
+    expect(batch.offers[0]).toMatchObject({
+      dataSource: "live",
+      airlineCode: "IR",
+      // 07:30 Tehran wall clock → the stored instant (Tehran is +03:30).
+      departAt: "2026-11-13T04:00:00.000Z",
+      price: expect.objectContaining({ toman: 5_902_000 }),
+      flightNumber: "IR452",
+    });
+    expect(batch.offers[1]?.stops).toBe(1);
+    // Airports came from the feed's own IATA codes, so nothing is marked "assumed".
+    expect(batch.offers[0]?.originAirport).toBe("THR");
+    expect(batch.offers[0]?.destinationAirport).toBe("MHD");
+    expect(batch.offers[0]?.warnings).not.toContain("airport-unknown");
+
+    // One page + bundles + one endpoint: bounded, and the endpoint was called once.
+    // The endpoint was called once, and only with the search attached.
+    const apiCalls = calls.filter((url) => url.includes("/api/flight/search"));
+    expect(apiCalls).toHaveLength(1);
+    expect(apiCalls[0]).toContain("origin=THR");
+    expect(apiCalls[0]).toContain("departureDate=1405-08-22");
+    vi.unstubAllGlobals();
+  }, 30_000);
+
+  it("still reports evidence when discovery finds no offers", async () => {
+    withStubbedFetch({
+      search: { body: fixture("js-shell.html") },
+      extra: {
+        "/assets/app.js": 'var SEARCH_API = "https://sepehr360.ir/api/flight/search";',
+        "/assets/vendor.js": "/* runtime */",
+        "/api/flight/search": JSON.stringify({ data: { filters: [{ id: 1, title: "ماهان" }] } }),
+      },
+    });
+    const adapter = new Sepehr360Adapter({ enabled: true });
+
+    // The failure must say what discovery actually saw, so the next fix is data-driven.
+    await expect(adapter.search(REQUEST, context())).rejects.toMatchObject({
+      code: "parse",
+      detail: expect.stringContaining("discovery=empty"),
+    });
+    await expect(adapter.search(REQUEST, context())).rejects.toMatchObject({
+      detail: expect.stringContaining("/api/flight/search"),
+    });
+    vi.unstubAllGlobals();
+  }, 40_000);
 
   it("fails loudly when the markup no longer parses", async () => {
     withStubbedFetch({ search: { body: "<html><body><div>سایت تغییر کرده است</div></body></html>" } });

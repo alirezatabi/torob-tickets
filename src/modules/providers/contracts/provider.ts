@@ -137,4 +137,9 @@ export interface ProviderRunReport {
   error: ProviderErrorInfo | null;
   fetchedAt: string | null;
   fromCache: boolean;
+  /**
+   * Non-fatal things the connector wants on the record — which endpoint a feed came from,
+   * which facts the source does not publish. Evidence, not decoration.
+   */
+  warnings?: string[];
 }

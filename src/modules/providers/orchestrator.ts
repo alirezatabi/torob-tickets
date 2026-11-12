@@ -237,6 +237,7 @@ export class SearchOrchestrator {
           error: null,
           fetchedAt: result.meta.fetchedAt,
           fromCache: Boolean(cached),
+          warnings: result.warnings,
         },
         offers: batch.offers,
         issues: batch.issues,

@@ -4,10 +4,10 @@ Two live sources, deliberately different in kind, plus the original demo dataset
 
 | | Sepehr360 | Amadeus Self-Service | Demo dataset |
 | --- | --- | --- | --- |
-| Kind | Public HTML results page | Official REST API | Generated in-process |
+| Kind | Public results page + the page's own JSON feed | Official REST API | Generated in-process |
 | Credentials | none | OAuth2 client id/secret | none |
 | Currency | تومان (integer) | EUR (decimal string) | تومان |
-| Flight number | ❌ | ✅ | ✅ |
+| Flight number | ✅ when the feed prints one (the HTML cards do not) | ✅ | ✅ |
 | Segments / stops | stops only (no intermediate airports) | full segments | full segments |
 | Baggage | ❌ | ✅ weight or piece count | ✅ |
 | Refund terms | ❌ | ❌ | ✅ |
@@ -34,12 +34,48 @@ inflated in the provider strip or in the docs.
   availability, per-offer URL.
 - Failure modes are explicit: `prohibited` for CAPTCHA/robots/redirect, `parse` when the
   page structure is no longer understood, empty-but-valid when the route has no flights.
-- **An empty page is diagnosed, not guessed.** When nothing parses, the adapter inspects
-  the response and reports one of three causes, in `ProviderRunReport.error.summaryFa`
-  (so it shows up in `provider:check`, `search:live` and the live UI):
-  - `results-require-js` — the page is a shell; the numbers arrive from the site's own XHR,
-    so an HTML parser will never see them. *This is the honest answer when a public
-    results page stops being server-rendered.*
+- **The page is only a shell, so the adapter reads the feed the page itself reads.**
+  `GET /Flight/B2c/Search` returns HTTP 200 with ~5 KB of markup that contains **no price
+  and no clock** (`clues:price=0 clock=0`): the numbers arrive from the site's own XHR.
+  Rather than tuning selectors against markup that never holds the data, or hard-coding a
+  guessed endpoint, `src/modules/providers/shared/api-discovery.ts` does what a browser does,
+  minus the browser:
+
+  1. **Embedded JSON first.** If the document already ships the results
+     (`<script type="application/json">`, `window.__STATE__ = {…}`), that is read with **no
+     extra request**.
+  2. **The page's bundles as a roadmap.** Up to 2 same-host `<script src>` bundles are
+     fetched and scanned for quoted literals that look like API paths
+     (`/(api|ws|v\d|flight|search)/`) on an allowlisted **https** host. The page's inline
+     scripts are scanned too.
+  3. **Bounded probing.** At most 3 candidates. Each is called **with the search the page
+     carries** (`?origin=THR&destination=MHD&departureDate=1405-…`) — a fares API is
+     meaningless without the question — and then bare.
+  4. **One POST, only if nothing answered a GET with JSON.** The search is restated as a
+     JSON body (`searchBody()`), for POST-only APIs.
+  5. **Acceptance is a shape, not a hunch.** A payload is the offer feed only if it contains
+     an array of objects that each carry a price-ish **and** a departure-ish **and** an
+     arrival-ish key. Anything else is recorded as evidence and rejected.
+
+  Discovery is bounded by a wall-clock budget (`DISCOVERY_BUDGET_MS`), the same allowlist,
+  robots and token bucket as the page request (3 requests / 6 s for this source, i.e. a
+  search plus at most two discovery calls). Mapping is **key-pattern** based, not name based
+  (`sepehr360/json-mapper.ts`): a price must parse as money, a clock must be a real
+  `hh:mm`, a code must be 2–3 alphanumerics, an airport must be 3 letters. Everything that
+  does not fit stays `null` and surfaces as *unknown* in the UI — never as a fabricated
+  number. A successful discovery appends `api-endpoint:<url>` to the run's warnings, which
+  `search:live` prints, so every displayed price has a traceable origin.
+
+- **An empty page is diagnosed, not guessed.** When nothing parses *and* discovery finds no
+  offers, the failure carries both the diagnosis and what discovery saw, in
+  `ProviderRunReport.error.summaryFa` (so it shows up in `provider:check`, `search:live` and
+  the live UI):
+  - `discovery=empty scripts=N json=N shapes=/path[keys…]` — how many bundles were read, how
+    many endpoints answered JSON, and the key names of the payloads that did. This is the
+    line to read before changing anything.
+  - `results-require-js` — the page is a shell and the feed was not reachable (bundles
+    blocked, endpoint behind a wall). *This is the honest answer when a public results page
+    stops being server-rendered.*
   - `markup-changed` — result cards exist but none of our field patterns matched.
   - `unknown-page` — neither of the above.
 

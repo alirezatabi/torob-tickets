@@ -41,6 +41,8 @@ import {
   saveRawHtml,
   saveSnapshot,
 } from "@/modules/providers/shared/diagnostics";
+import { discoverOffersEndpoint } from "@/modules/providers/shared/api-discovery";
+import { mapApiOffer } from "./json-mapper";
 import { parseSearchPage } from "./parser";
 import { parsePersianDuration, parseStops, parseWallClock } from "./parse-duration";
 import type { Sepehr360RawOffer } from "./types";
@@ -60,9 +62,14 @@ const FRESHNESS: FreshnessPolicy = {
   noteFa: "قیمت‌ها در لحظهٔ دریافت از صفحهٔ جست‌وجوی سپهر۳۶۰ خوانده می‌شوند؛ موجودی و مبلغ نهایی را فروشنده تأیید می‌کند.",
 };
 
+/** Wall-clock budget for JSON discovery, in ms. */
+const DISCOVERY_BUDGET_MS = 9_000;
+
 const CAPABILITIES: ProviderCapabilities = {
-  hasFlightNumber: false,
-  hasAirportCodes: false,
+  // The cards publish none of these; the JSON feed may publish a number, and we keep it
+  // when it does. Capabilities describe the source, not one response shape.
+  hasFlightNumber: true,
+  hasAirportCodes: true,
   hasSegments: false,
   hasFareClass: true,
   hasBaggage: false,
@@ -110,7 +117,9 @@ export class Sepehr360Adapter implements LiveProviderAdapter<Sepehr360RawOffer> 
       robotsHosts: [SEPEHR360_HOST],
       timeoutMs: 8_000,
       maxBytes: 2_500_000,
-      rateLimit: { capacity: 2, windowMs: 6_000 },
+      // A search is one page request; discovery may add a bundle and an endpoint probe,
+      // same host, still a handful of requests per search (see docs/PROVIDERS.md).
+      rateLimit: { capacity: 3, windowMs: 6_000 },
       logger: createLogger("sepehr360"),
     });
   }
@@ -155,6 +164,16 @@ export class Sepehr360Adapter implements LiveProviderAdapter<Sepehr360RawOffer> 
     if (parsed.meta.emptyState && parsed.offers.length === 0) {
       ctx.logger.info("search.empty", { route: `${request.originCity}>${request.destinationCity}` });
     }
+
+    // The public page is a JavaScript shell (no price, no clock in the HTML at all), so the
+    // offers live behind the site's own JSON endpoint. Discover it from the page's bundles
+    // and read the same data a browser would — bounded, allowlisted, robots-respecting.
+    let discoveryEvidence: string | null = null;
+    if (parsed.offers.length === 0 && !parsed.meta.emptyState) {
+      const viaApi = await this.searchApiFallback(ctx, response.body, target.url);
+      if (viaApi.result) return viaApi.result;
+      discoveryEvidence = viaApi.evidence;
+    }
     if (parsed.offers.length === 0 && parsed.warnings.includes("no-result-cards-found") && parsed.meta.resultCount === null) {
       // Do not guess *why*. Look at the page, say what we saw, and leave a sanitized
       // snapshot behind when the operator asked for one.
@@ -168,6 +187,7 @@ export class Sepehr360Adapter implements LiveProviderAdapter<Sepehr360RawOffer> 
       throw parseError(
         [
           explainEmptyPage(diagnostics),
+          discoveryEvidence ?? "",
           clues,
           diagnostics.title ? `title="${diagnostics.title}"` : "",
           snapshot ? `snapshot=${snapshot}` : "",
@@ -200,6 +220,113 @@ export class Sepehr360Adapter implements LiveProviderAdapter<Sepehr360RawOffer> 
       rawCount: parsed.offers.length,
       // `clues:`-prefixed warnings are diagnostics for the empty case, not data problems.
       warnings: parsed.warnings.filter((warning) => !warning.startsWith("clues:")),
+    };
+  }
+
+  /**
+   * Read the offers from the source's own JSON feed.
+   *
+   * The old behaviour when the HTML yielded nothing was to *describe* the failure. That is
+   * honest but useless: the data exists, it just is not in the HTML. So we discover the
+   * endpoint the page itself calls (see `shared/api-discovery.ts`) and map its records.
+   *
+   * Returns `null` when discovery finds nothing, so the caller can still report the
+   * evidence instead of pretending the route is empty.
+   */
+  private async searchApiFallback(
+    ctx: ProviderContext,
+    html: string,
+    pageUrl: string,
+  ): Promise<{ result: ProviderSearchResult<Sepehr360RawOffer> | null; evidence: string | null }> {
+    const startedAt = Date.now();
+    let discovery;
+    try {
+      discovery = await discoverOffersEndpoint({
+        http: this.http,
+        html,
+        pageUrl,
+        allowHost: (url) => this.http.isAllowedHost(url),
+        // Discovery is an addition, not the search: it gets a slice of the provider budget
+        // so a slow or hung endpoint can never turn a page view into a long stall.
+        deadline: Date.now() + DISCOVERY_BUDGET_MS,
+      });
+    } catch (error) {
+      ctx.logger.warn("search.api-discovery.failed", {
+        detail: error instanceof Error ? error.message : String(error),
+      });
+      return { result: null, evidence: "discovery=error" };
+    }
+
+    if (discovery.items.length === 0) {
+      const evidence = [
+        `discovery=empty`,
+        `scripts=${discovery.report.scripts.length}`,
+        `json=${discovery.report.jsonEndpoints.length}`,
+        discovery.report.shapes.length > 0
+          ? `shapes=${discovery.report.shapes
+              .slice(0, 3)
+              .map((shape) => `${shortPath(shape.endpoint)}[${shape.topLevelKeys.slice(0, 6).join(",")}]`)
+              .join(" ")}`
+          : "",
+      ]
+        .filter(Boolean)
+        .join(" ");
+      ctx.logger.info("search.api-discovery.empty", { detail: evidence });
+      return { result: null, evidence };
+    }
+
+    const unit = this.config.unit ?? "toman";
+    const records: Sepehr360RawOffer[] = discovery.items.map((item, index) => {
+      const mapped = mapApiOffer(item, { unit });
+      return {
+        index,
+        airlineCode: mapped.airlineCode,
+        airlineNameFa: mapped.airlineName,
+        departTime: mapped.departAt,
+        arriveTime: mapped.arriveAt,
+        durationText: mapped.durationMinutes === null ? null : `${mapped.durationMinutes} دقیقه`,
+        priceText: mapped.priceText,
+        priceAmount: mapped.priceAmount,
+        originLabel: mapped.originAirport,
+        destinationLabel: mapped.destinationAirport,
+        originAirportCode: mapped.originAirport,
+        destinationAirportCode: mapped.destinationAirport,
+        cabinLabel: mapped.cabin,
+        stopsLabel: mapped.stops === null ? null : String(mapped.stops),
+        stopsCount: mapped.stops,
+        sellerText: null,
+        availabilityText: mapped.seatsAvailable === null ? null : String(mapped.seatsAvailable),
+        charterHint: false,
+        flightNumber: mapped.flightNumber,
+        seatsAvailable: mapped.seatsAvailable,
+        origin: "json",
+      };
+    });
+
+    ctx.logger.info("search.api-discovery.hit", {
+      endpoint: discovery.endpoint ?? "-",
+      items: records.length,
+    });
+
+    const meta: FetchMeta = {
+      providerId: this.id,
+      fetchedAt: ctx.now().toISOString(),
+      latencyMs: Date.now() - startedAt,
+      httpStatus: 200,
+      retries: 0,
+      fromCache: false,
+      endpoint: discovery.endpoint ?? "GET (discovered)",
+      sourceUpdatedAt: null,
+    };
+
+    return {
+      result: {
+        records,
+        meta,
+        rawCount: records.length,
+        warnings: [`api-endpoint:${discovery.endpoint ?? "unknown"}`],
+      },
+      evidence: null,
     };
   }
 
@@ -264,12 +391,19 @@ export class Sepehr360Adapter implements LiveProviderAdapter<Sepehr360RawOffer> 
     const departMinutes = parseWallClock(record.departTime);
     if (departMinutes === null) throw new LiveNormalizationError("invalid-time", "card has no departure time");
 
-    const origin = this.resolveAirport(record.originLabel, request.originAirports, request.originCity, request.international);
+    const origin = this.resolveAirport(
+      record.originLabel,
+      request.originAirports,
+      request.originCity,
+      request.international,
+      record.originAirportCode,
+    );
     const destination = this.resolveAirport(
       record.destinationLabel,
       request.destinationAirports,
       request.destinationCity,
       request.international,
+      record.destinationAirportCode,
     );
     const originAirport = origin.airport;
     const destinationAirport = destination.airport;
@@ -286,7 +420,7 @@ export class Sepehr360Adapter implements LiveProviderAdapter<Sepehr360RawOffer> 
 
     const departAt = wallClockToInstant(`${request.departDate}T${toWallClock(departMinutes)}`, originAirport);
     const duration = parsePersianDuration(record.durationText);
-    const stops = parseStops(record.stopsLabel);
+    const stops = typeof record.stopsCount === "number" ? record.stopsCount : parseStops(record.stopsLabel);
 
     // Arrival: prefer the printed clock; if it is missing and a duration exists, derive
     // it and mark the offer as inferred. Never fabricate a duration when both are absent.
@@ -312,10 +446,12 @@ export class Sepehr360Adapter implements LiveProviderAdapter<Sepehr360RawOffer> 
     }
 
     const airlineCode = record.airlineCode ?? "??";
+    // Only when the source published it. The HTML card never does, its JSON feed may.
+    const flightNumber = record.flightNumber ?? null;
     const segments: FlightSegment[] = [
       {
         airlineCode,
-        flightNumber: null, // the page does not publish it — never invent one
+        flightNumber,
         originCode: originAirport,
         destinationCode: destinationAirport,
         departAt,
@@ -335,7 +471,7 @@ export class Sepehr360Adapter implements LiveProviderAdapter<Sepehr360RawOffer> 
         rawRecordId: null,
         sellerLabel: record.sellerText ? normalizeDigits(record.sellerText).trim() : null,
         airlineCode,
-        flightNumber: null,
+        flightNumber,
         originAirport,
         destinationAirport,
         departAt,
@@ -354,7 +490,7 @@ export class Sepehr360Adapter implements LiveProviderAdapter<Sepehr360RawOffer> 
         offerUrl: pageUrl,
         providerUpdatedAt: meta.fetchedAt,
         fetchedAt: meta.fetchedAt,
-        seatsAvailable: null,
+        seatsAvailable: typeof record.seatsAvailable === "number" ? record.seatsAvailable : null,
         unitConverted: price.converted,
         extraWarnings: [
           ...(origin.assumed ? (["airport-unknown"] as const) : []),
@@ -386,12 +522,23 @@ export class Sepehr360Adapter implements LiveProviderAdapter<Sepehr360RawOffer> 
     candidates: string[],
     cityCode: string,
     international: boolean,
+    publishedCode?: string | null,
   ): { airport: string; assumed: boolean } {
+    // 1. A real IATA code printed by the source (JSON feeds) outranks any Persian label:
+    //    it is the airport the feed itself says it is selling.
+    if (publishedCode && airportServesCity(publishedCode, cityCode)) {
+      return { airport: publishedCode.toUpperCase(), assumed: false };
+    }
+
+    // 2. A Persian airport name we can map.
     if (label) {
       const matched = matchPersianAirport(label);
       if (matched) return { airport: matched, assumed: false };
     }
 
+    // 3. Nothing usable: fall back to the requested airport, and *say so* — the offer then
+    //    carries `airport-unknown`. Only honest when the request narrowed the city to one
+    //    airport; otherwise picking one would be a coin flip between IKA and THR.
     const options = candidates.length > 0 ? candidates : airportsForCity(cityCode, { international });
     const fallback = options[0];
     if (!fallback) throw new LiveNormalizationError("invalid-airport", `cannot resolve airport for ${cityCode}`);
@@ -457,6 +604,16 @@ export function matchPersianAirport(label: string): string | null {
     if (pattern.test(normalized)) return getAirport(code) ? code : null;
   }
   return null;
+}
+
+/** `https://host/api/flight/search?x=1` → `/api/flight/search` — enough to recognise a route. */
+function shortPath(url: string): string {
+  try {
+    const parsed = new URL(url.replace(/\s*\(.*\)$/, ""));
+    return parsed.pathname;
+  } catch {
+    return url.slice(0, 60);
+  }
 }
 
 function mapCabin(label: string | null): "economy" | "premium" | "business" | null {

@@ -23,6 +23,9 @@ export interface Sepehr360RawOffer {
   priceText: string | null;
   /** Price as an integer in the page's stated unit (toman). */
   priceAmount: number | null;
+  /** IATA origin/destination printed by a JSON feed (the HTML cards print names only). */
+  originAirportCode?: string | null;
+  destinationAirportCode?: string | null;
   /** Persian origin label ("از مهرآباد"). */
   originLabel: string | null;
   /** Persian destination label ("به مشهد"). */
@@ -37,6 +40,21 @@ export interface Sepehr360RawOffer {
   availabilityText: string | null;
   /** Whether the card says the flight is a charter ("چارتر"). */
   charterHint: boolean;
+  /**
+   * Flight number, only when the source itself printed one. The HTML cards do not; the
+   * site's own JSON feed does, so the field is optional and null means "not published".
+   */
+  flightNumber?: string | null;
+  /** Number of stops the source states, when the feed publishes a count. */
+  stopsCount?: number | null;
+  /** Seats the source states are left, when the feed publishes a count. */
+  seatsAvailable?: number | null;
+  /**
+   * Where this record came from. Used to say *one* true thing about the row: a value read
+   * from the source's JSON feed is data the page displayed to a browser; a value read from
+   * the rendered HTML is data printed in the document.
+   */
+  origin?: "html" | "json";
 }
 
 export interface Sepehr360PageMeta {

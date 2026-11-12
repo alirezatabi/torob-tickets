@@ -119,6 +119,11 @@ export class HttpClient {
    * Run a request. Throws `ProviderError` for every failure mode so callers only ever
    * deal with one error type.
    */
+  /** True when a URL is on this connector's allowlist (used by API discovery). */
+  isAllowedHost(url: URL): boolean {
+    return this.config.allowedHosts.includes(url.host) && url.protocol === "https:";
+  }
+
   async request(request: HttpRequest): Promise<HttpResponse> {
     const url = new URL(request.url);
     if (!this.config.allowedHosts.includes(url.host)) {

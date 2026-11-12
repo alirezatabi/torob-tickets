@@ -70,6 +70,10 @@ async function main(): Promise<void> {
     console.log(
       `  ${report.providerId.padEnd(10)} ${state} | ${report.latencyMs} ms | retries=${report.retries} | cache=${report.fromCache}`,
     );
+    // Warnings are evidence, not noise: they name the endpoint a feed came from.
+    for (const warning of report.warnings ?? []) {
+      console.log(`    ↳ ${warning}`);
+    }
   }
 
   if (payload.offers.length === 0) {
