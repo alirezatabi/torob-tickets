@@ -19,8 +19,7 @@
 import { DAY_PART_RANGES, type QueryPreferences } from "@/domain/trip";
 import { hourInZone } from "@/lib/format";
 import { getCity } from "@/lib/cities";
-import { deriveWeights, type ScoreFactor } from "@/ranking/score";
-import type { RankDecision, RankInput, ScoredRankInput, ScoreFactorBreakdown, PriceSource } from "./types";
+import type { RankDecision, RankInput, ScoredRankInput, ScoreFactor, ScoreFactorBreakdown, PriceSource } from "./types";
 
 export const FACTOR_LABELS_FA: Record<string, string> = {
   price: "قیمت",
@@ -147,6 +146,32 @@ export function hardConstraintViolations(input: RankInput, prefs: QueryPreferenc
     if (hour < start || hour >= end) violations.push("ساعت پرواز خارج از بازهٔ درخواستی است");
   }
   return violations;
+}
+
+/**
+ * Weight vectors per price preference (B14: these used to live in `ranking/score.ts`, which
+ * imported this module — a cycle that only worked because both sides were function-level).
+ * Owning them here makes the dependency one-way: `score.ts` → `core.ts`.
+ */
+export const BASE_WEIGHTS: Record<QueryPreferences["pricePreference"], Record<ScoreFactor, number>> = {
+  low: { price: 0.52, duration: 0.15, stops: 0.12, baggage: 0.07, refund: 0.04, timeOfDay: 0.06, airline: 0.04 },
+  balanced: { price: 0.4, duration: 0.2, stops: 0.13, baggage: 0.11, refund: 0.06, timeOfDay: 0.06, airline: 0.04 },
+  comfort: { price: 0.12, duration: 0.22, stops: 0.16, baggage: 0.18, refund: 0.09, timeOfDay: 0.07, airline: 0.04 },
+};
+
+/** Derive normalized weights (sum = 1) from the structured intent. */
+export function deriveWeights(prefs: QueryPreferences): Record<ScoreFactor, number> {
+  const weights: Record<ScoreFactor, number> = { ...BASE_WEIGHTS[prefs.pricePreference] };
+  if (prefs.maxStops !== null) weights.stops += 0.06;
+  if (prefs.baggageRequired) weights.baggage += 0.05;
+  if (prefs.refundableOnly) weights.refund += 0.05;
+  if (prefs.dayPart) weights.timeOfDay += 0.05;
+  if (prefs.preferredAirlines.length > 0) weights.airline += 0.04;
+  if (prefs.pricePreference === "low" && prefs.maxPriceToman !== null) weights.price += 0.04;
+
+  const total = Object.values(weights).reduce((a, b) => a + b, 0);
+  for (const key of Object.keys(weights) as ScoreFactor[]) weights[key] = weights[key] / total;
+  return weights;
 }
 
 export type RankWeights = Record<ScoreFactor, number> & Partial<Record<"completeness" | "freshness" | "sellers", number>>;

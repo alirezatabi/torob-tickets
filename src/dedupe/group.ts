@@ -130,16 +130,18 @@ export function groupOffers(offers: FlightOffer[]): OfferGroup[] {
 
       const identity: GroupIdentity = cluster.flightNumber ? "flight-number" : "same-departure";
       const key = canonicalGroupKey(primary);
-      for (const offer of sorted) offer.groupKey = key;
+      // Pure: the returned offers carry the canonical key, the caller's objects are untouched
+      // (the old code mutated `offer.groupKey` on the way in — B13).
+      const stamped = sorted.map((offer) => (offer.groupKey === key ? offer : { ...offer, groupKey: key }));
 
-      const providers = cheapestPerProvider(sorted);
+      const providers = cheapestPerProvider(stamped);
       const cheapestToman = providers[0]?.priceToman ?? primary.price.toman;
       const highest = providers[providers.length - 1]?.priceToman ?? cheapestToman;
 
       groups.push({
         groupKey: key,
-        primary,
-        offers: sorted,
+        primary: stamped[0] ?? primary,
+        offers: stamped,
         cheapestToman,
         providers,
         hasPriceSpread: highest - cheapestToman >= Math.max(50_000, cheapestToman * 0.02),
@@ -147,7 +149,7 @@ export function groupOffers(offers: FlightOffer[]): OfferGroup[] {
         // key (which is only for matching).
         flightNumber: primary.flightNumber,
         identity,
-        knownSellers: knownSellersOf(sorted),
+        knownSellers: knownSellersOf(stamped),
       });
     }
   }

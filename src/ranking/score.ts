@@ -1,5 +1,5 @@
 import type { FlightOffer } from "@/domain/flight";
-import { hardConstraintViolations, rankInputs } from "@/modules/ranking/core";
+import { deriveWeights, hardConstraintViolations, rankInputs } from "@/modules/ranking/core";
 import { fromDemoOffer } from "@/modules/ranking/project";
 import type { QueryPreferences, TripQuery } from "@/domain/trip";
 import { getCity } from "@/lib/cities";
@@ -17,14 +17,9 @@ import { hourInZone, isoDateInZone } from "@/lib/format";
  * `score` is 0–100, higher is better.
  */
 
-export type ScoreFactor =
-  | "price"
-  | "duration"
-  | "stops"
-  | "baggage"
-  | "refund"
-  | "timeOfDay"
-  | "airline";
+import type { ScoreFactor } from "@/modules/ranking/types";
+
+export type { ScoreFactor };
 
 export const FACTOR_LABELS: Record<ScoreFactor, string> = {
   price: "قیمت",
@@ -60,32 +55,11 @@ export interface RankedResult {
   weights: Weights;
 }
 
-/** Base weights per price preference; explicit intent then nudges them. */
-const BASE_WEIGHTS: Record<QueryPreferences["pricePreference"], Weights> = {
-  // Explicitly documented, tunable defaults. Ratios matter, absolute values do not
-  // (weights are renormalized after intent-specific adjustments).
-  low: { price: 0.52, duration: 0.15, stops: 0.12, baggage: 0.07, refund: 0.04, timeOfDay: 0.06, airline: 0.04 },
-  balanced: { price: 0.4, duration: 0.2, stops: 0.13, baggage: 0.11, refund: 0.06, timeOfDay: 0.06, airline: 0.04 },
-  comfort: { price: 0.12, duration: 0.22, stops: 0.16, baggage: 0.18, refund: 0.09, timeOfDay: 0.07, airline: 0.04 },
-};
-
-/** Derive normalized weights (sum = 1) from the structured intent. */
-export function deriveWeights(prefs: QueryPreferences): Weights {
-  const weights: Weights = { ...BASE_WEIGHTS[prefs.pricePreference] };
-
-  if (prefs.maxStops !== null) weights.stops += 0.06;
-  if (prefs.baggageRequired) weights.baggage += 0.05;
-  if (prefs.refundableOnly) weights.refund += 0.05;
-  if (prefs.dayPart) weights.timeOfDay += 0.05;
-  if (prefs.preferredAirlines.length > 0) weights.airline += 0.04;
-  if (prefs.pricePreference === "low" && prefs.maxPriceToman !== null) weights.price += 0.04;
-
-  const total = Object.values(weights).reduce((a, b) => a + b, 0);
-  for (const key of Object.keys(weights) as ScoreFactor[]) {
-    weights[key] = weights[key] / total;
-  }
-  return weights;
-}
+/**
+ * Weights live in the shared core (one direction of dependency: score → core, never back).
+ * Re-exported here because the UI and tests import them from the ranking module.
+ */
+export { BASE_WEIGHTS, deriveWeights } from "@/modules/ranking/core";
 
 /** Local departure hour in the origin's timezone — that is what the user experiences. */
 export function localDepartureHour(offer: FlightOffer): number {

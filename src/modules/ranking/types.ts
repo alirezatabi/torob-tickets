@@ -87,3 +87,9 @@ export interface ScoredRankInput {
   /** Persian reasons for the exclusion, empty when feasible. */
   violations: string[];
 }
+
+/**
+ * The seven user-facing score factors. Defined here, in the shared core's own type module,
+ * so `core.ts` never has to import from `ranking/score.ts` (B14).
+ */
+export type ScoreFactor = "price" | "duration" | "stops" | "baggage" | "refund" | "timeOfDay" | "airline";
