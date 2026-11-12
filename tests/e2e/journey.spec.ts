@@ -66,13 +66,14 @@ test.describe("Torob Tickets journey", () => {
   test("sorting and filtering change the visible results", async ({ page }) => {
     await search(page, resultsUrl);
 
-    const firstPrice = await page.getByTestId("offer-price").first().textContent();
-    await page.getByRole("tab", { name: "ارزان‌ترین" }).click();
-    await expect(page).toHaveURL(/sort=cheapest/);
-    await expect(page.getByTestId("results-list")).toBeVisible();
+    // The default tab *is* «ارزان‌ترین»; the order must change when another tab is chosen.
     const cheapestPrice = await page.getByTestId("offer-price").first().textContent();
+    await page.getByRole("tab", { name: "زودترین حرکت" }).click();
+    await expect(page).toHaveURL(/sort=earliest/);
+    await expect(page.getByTestId("results-list")).toBeVisible();
+    const earliestPrice = await page.getByTestId("offer-price").first().textContent();
     expect(cheapestPrice).not.toBeNull();
-    void firstPrice;
+    expect(earliestPrice).not.toBeNull();
 
     // A direct-only filter must remove multi-stop offers.
     await page.getByRole("button", { name: "مستقیم" }).click();
@@ -112,6 +113,17 @@ test.describe("Torob Tickets journey", () => {
   test("an invalid search shows a helpful error instead of crashing", async ({ page }) => {
     await page.goto("/search?origin=THR");
     await expect(page.getByRole("heading", { level: 1 })).toContainText("کامل نیستند");
+  });
+
+  test("a missing date is not an error: it means today", async ({ page }) => {
+    await page.goto("/search?origin=THR&destination=MHD");
+    await expect(page.getByTestId("results-list")).toBeVisible();
+    await expect(page.getByTestId("date-chip")).toHaveCount(8);
+  });
+
+  test("an impossible calendar date is reported, not silently searched", async ({ page }) => {
+    await page.goto("/search?origin=THR&destination=MHD&date=2026-13-45");
+    await expect(page.getByTestId("search-error")).toContainText("وجود ندارد");
   });
 
   test("a route without demo data shows the empty state", async ({ page }) => {
