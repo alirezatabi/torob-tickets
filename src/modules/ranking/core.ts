@@ -99,9 +99,15 @@ function timeOfDayScore(input: RankInput, prefs: QueryPreferences): number {
   return 0.15;
 }
 
+/**
+ * Airline preference has exactly **one** meaning in this codebase: a hard requirement.
+ * `lib/filter` removes other carriers from the list, and this returns the same verdict as a
+ * violation — used to be a soft 0.25 nudge in the score, so the same URL parameter both hid
+ * flights and merely demoted them (B16).
+ */
 function airlineScore(input: RankInput, prefs: QueryPreferences): number {
-  if (prefs.preferredAirlines.length === 0) return 0.6;
-  return prefs.preferredAirlines.includes(input.airlineCode) ? 1 : 0.25;
+  if (prefs.preferredAirlines.length === 0) return 1;
+  return prefs.preferredAirlines.includes(input.airlineCode) ? 1 : 0;
 }
 
 function freshnessScore(freshness: string | undefined): number {
@@ -144,6 +150,9 @@ export function hardConstraintViolations(input: RankInput, prefs: QueryPreferenc
     const [start, end] = DAY_PART_RANGES[prefs.dayPart];
     const hour = localDepartureHour(input);
     if (hour < start || hour >= end) violations.push("ساعت پرواز خارج از بازهٔ درخواستی است");
+  }
+  if (prefs.preferredAirlines.length > 0 && !prefs.preferredAirlines.includes(input.airlineCode)) {
+    violations.push("ایرلاین درخواستی نیست");
   }
   return violations;
 }
@@ -265,13 +274,20 @@ export function rankInputs(
     };
   });
 
+  // Strict-weak ordering (B19): every comparison below is transitive. The old version
+  // treated scores within 0.05 as "equal" and only then compared price, which made
+  // a < b, b < c but c < a possible — a genuinely unstable sort. Scores are rounded to one
+  // decimal for comparison instead, and the final tie-break is a code-point comparison so the
+  // order never depends on the machine's locale.
   const byScore = scored.sort((a, b) => {
     if (a.feasible !== b.feasible) return a.feasible ? -1 : 1;
-    if (Math.abs(b.score - a.score) > 0.05) return b.score - a.score;
+    const scoreA = Math.round(a.score * 10);
+    const scoreB = Math.round(b.score * 10);
+    if (scoreA !== scoreB) return scoreB - scoreA;
     if (a.input.priceToman !== b.input.priceToman) return a.input.priceToman - b.input.priceToman;
     if (a.input.durationMinutes !== b.input.durationMinutes) return a.input.durationMinutes - b.input.durationMinutes;
-    // Final tie-break on id keeps the order stable across runs and machines.
-    return a.input.id.localeCompare(b.input.id);
+    if (a.input.departAt !== b.input.departAt) return a.input.departAt < b.input.departAt ? -1 : 1;
+    return a.input.id < b.input.id ? -1 : a.input.id > b.input.id ? 1 : 0;
   });
 
   byScore.forEach((entry, index) => {

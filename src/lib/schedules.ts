@@ -39,8 +39,14 @@ export interface FlightPattern {
 }
 
 const ALL: Weekday[] = [0, 1, 2, 3, 4, 5, 6];
+/** Sunday–Thursday: the Iranian working week (Friday is the weekly holiday). */
 const WEEKDAYS: Weekday[] = [0, 1, 2, 3, 4];
-const WEEKEND: Weekday[] = [4, 5, 6];
+/**
+ * Thursday + Friday — the Iranian weekend, which is also what `quoteFare` prices as a peak
+ * (`weekday === 4 || weekday === 5`). Saturday used to be included here, which contradicted
+ * both the fare curve and the comments (B20).
+ */
+const WEEKEND: Weekday[] = [4, 5];
 
 interface LegSpec {
   airlineCode: string;
