@@ -310,6 +310,11 @@ const REGIONAL: RouteSpec[] = [
     legs: daily({ airlineCode: "W5", number: 115, depart: "04:20", minutes: 230, aircraft: "Airbus A310", price: 4_520_000, checkedKg: 30, cabinKg: 7, refundable: false }),
   },
   {
+    from: "KIK",
+    to: "DXB",
+    legs: daily({ airlineCode: "G9", number: 407, depart: "09:05", minutes: 145, aircraft: "Airbus A320", price: 4_650_000, checkedKg: 20, cabinKg: 7, refundable: false, days: [1, 3, 5] }),
+  },
+  {
     from: "THR",
     to: "KIK",
     legs: daily({ airlineCode: "ZV", number: 811, depart: "12:05", minutes: 125, aircraft: "Airbus A320", price: 2_120_000, checkedKg: 15, cabinKg: 5, refundable: false }),
@@ -458,17 +463,643 @@ const REGIONAL: RouteSpec[] = [
   {
     from: "THR",
     to: "IST",
-    legs: daily({ airlineCode: "TK", number: 879, depart: "12:30", minutes: 190, aircraft: "Airbus A321", price: 5_400_000, checkedKg: 25, cabinKg: 8, refundable: true }),
+    legs: daily({ airlineCode: "TK", number: 1779, depart: "12:30", minutes: 190, aircraft: "Airbus A321", price: 5_400_000, checkedKg: 25, cabinKg: 8, refundable: true }),
   },
   {
     from: "NJF",
     to: "IST",
     legs: daily({ airlineCode: "TK", number: 807, depart: "16:40", minutes: 185, aircraft: "Boeing 737-800", price: 8_100_000, checkedKg: 25, cabinKg: 8, refundable: false }),
   },
+
+  // ——— The other direction of every route: people also fly home. ———
+  {
+    from: "MHD",
+    to: "THR",
+    legs: daily({ airlineCode: "IR", number: 1551, depart: "09:10", minutes: 95, aircraft: "Airbus A320", price: 1_870_000, checkedKg: 20, cabinKg: 7, refundable: true }),
+  },
+  {
+    from: "MHD",
+    to: "THR",
+    legs: daily({ airlineCode: "EP", number: 652, depart: "18:20", minutes: 100, aircraft: "Boeing 737-400", price: 1_940_000, checkedKg: 20, cabinKg: 5, refundable: false }),
+  },
+  {
+    from: "SYZ",
+    to: "THR",
+    legs: daily({ airlineCode: "EP", number: 382, depart: "08:05", minutes: 105, aircraft: "Airbus A320", price: 1_980_000, checkedKg: 20, cabinKg: 7, refundable: false }),
+  },
+  {
+    from: "SYZ",
+    to: "THR",
+    legs: daily({ airlineCode: "IR", number: 383, depart: "17:45", minutes: 110, aircraft: "Airbus A319", price: 2_060_000, checkedKg: 20, cabinKg: 7, refundable: true }),
+  },
+  {
+    from: "IFN",
+    to: "THR",
+    legs: daily({ airlineCode: "IR", number: 331, depart: "12:30", minutes: 75, aircraft: "Airbus A320", price: 1_450_000, checkedKg: 20, cabinKg: 7, refundable: true }),
+  },
+  {
+    from: "TBZ",
+    to: "THR",
+    legs: daily({ airlineCode: "B9", number: 262, depart: "13:15", minutes: 85, aircraft: "McDonnell Douglas MD-82", price: 1_410_000, checkedKg: 20, cabinKg: 7, refundable: false }),
+  },
+  {
+    from: "KIH",
+    to: "THR",
+    legs: daily({ airlineCode: "W5", number: 342, depart: "16:10", minutes: 130, aircraft: "Airbus A310", price: 2_390_000, checkedKg: 30, cabinKg: 7, refundable: false }),
+  },
+  {
+    from: "AWZ",
+    to: "THR",
+    legs: daily({ airlineCode: "ZV", number: 612, depart: "11:40", minutes: 90, aircraft: "Boeing 737-500", price: 1_590_000, checkedKg: 20, cabinKg: 5, refundable: false }),
+  },
+  {
+    from: "BND",
+    to: "THR",
+    legs: daily({ airlineCode: "EP", number: 724, depart: "20:05", minutes: 140, aircraft: "Airbus A320", price: 2_180_000, checkedKg: 20, cabinKg: 7, refundable: false }),
+  },
+  {
+    from: "GSM",
+    to: "THR",
+    legs: daily({ airlineCode: "W5", number: 452, depart: "12:55", minutes: 145, aircraft: "Airbus A310", price: 2_290_000, checkedKg: 30, cabinKg: 7, refundable: false }),
+  },
+  {
+    from: "RAS",
+    to: "THR",
+    legs: daily({ airlineCode: "B9", number: 513, depart: "15:35", minutes: 70, aircraft: "Fokker 100", price: 1_350_000, checkedKg: 20, cabinKg: 7, refundable: false }),
+  },
+  {
+    from: "KER",
+    to: "THR",
+    legs: daily({ airlineCode: "IR", number: 272, depart: "10:20", minutes: 110, aircraft: "Airbus A320", price: 1_710_000, checkedKg: 20, cabinKg: 7, refundable: true }),
+  },
+  {
+    from: "ZAH",
+    to: "THR",
+    legs: daily({ airlineCode: "EP", number: 442, depart: "19:30", minutes: 125, aircraft: "Airbus A320", price: 1_820_000, checkedKg: 20, cabinKg: 7, refundable: false }),
+  },
+  {
+    from: "OMH",
+    to: "THR",
+    legs: daily({ airlineCode: "ZV", number: 302, depart: "14:45", minutes: 100, aircraft: "Boeing 737-500", price: 1_640_000, checkedKg: 20, cabinKg: 5, refundable: false }),
+  },
+  {
+    from: "AZD",
+    to: "THR",
+    legs: daily({ airlineCode: "B9", number: 191, depart: "09:55", minutes: 80, aircraft: "Fokker 100", price: 1_480_000, checkedKg: 20, cabinKg: 7, refundable: false }),
+  },
+  {
+    from: "THR",
+    to: "IST",
+    legs: daily({ airlineCode: "TK", number: 1773, depart: "04:25", minutes: 195, aircraft: "Airbus A321neo", price: 5_150_000, checkedKg: 25, cabinKg: 8, refundable: true }),
+  },
+  {
+    from: "THR",
+    to: "IST",
+    legs: daily({ airlineCode: "PC", number: 511, depart: "03:35", minutes: 200, aircraft: "Airbus A320neo", price: 4_150_000, checkedKg: 20, cabinKg: 8, refundable: false }),
+  },
+  {
+    from: "THR",
+    to: "DXB",
+    legs: daily({ airlineCode: "FZ", number: 43, depart: "20:15", minutes: 130, aircraft: "Boeing 737-800", price: 5_250_000, checkedKg: 20, cabinKg: 7, refundable: false }),
+  },
+  {
+    from: "THR",
+    to: "DOH",
+    legs: daily({ airlineCode: "QR", number: 496, depart: "17:05", minutes: 165, aircraft: "Airbus A320", price: 9_450_000, checkedKg: 30, cabinKg: 7, refundable: true }),
+  },
+  {
+    from: "THR",
+    to: "DOH",
+    legs: daily({ airlineCode: "WY", number: 712, depart: "16:20", minutes: 175, aircraft: "Boeing 737 MAX 8", price: 9_150_000, checkedKg: 30, cabinKg: 7, refundable: true }),
+  },
+  {
+    from: "THR",
+    to: "MCT",
+    legs: daily({ airlineCode: "WY", number: 718, depart: "18:40", minutes: 150, aircraft: "Boeing 737-800", price: 8_400_000, checkedKg: 30, cabinKg: 7, refundable: true }),
+  },
+  {
+    from: "THR",
+    to: "KWI",
+    legs: daily({ airlineCode: "J9", number: 611, depart: "12:35", minutes: 125, aircraft: "Airbus A320neo", price: 6_150_000, checkedKg: 20, cabinKg: 7, refundable: false }),
+  },
+  {
+    from: "THR",
+    to: "SHJ",
+    legs: daily({ airlineCode: "G9", number: 631, depart: "15:10", minutes: 120, aircraft: "Airbus A320", price: 4_950_000, checkedKg: 20, cabinKg: 7, refundable: false }),
+  },
+  {
+    from: "THR",
+    to: "RUH",
+    legs: daily({ airlineCode: "GF", number: 771, depart: "14:25", minutes: 175, aircraft: "Airbus A321neo", price: 8_950_000, checkedKg: 25, cabinKg: 7, refundable: true }),
+  },
+  {
+    from: "THR",
+    to: "JED",
+    legs: daily({ airlineCode: "RJ", number: 811, depart: "13:50", minutes: 200, aircraft: "Airbus A320", price: 9_250_000, checkedKg: 25, cabinKg: 7, refundable: true }),
+  },
+  {
+    from: "THR",
+    to: "NJF",
+    legs: daily({ airlineCode: "IA", number: 921, depart: "07:45", minutes: 115, aircraft: "Boeing 737-800", price: 3_450_000, checkedKg: 20, cabinKg: 7, refundable: false }),
+  },
+  {
+    from: "THR",
+    to: "BGW",
+    legs: daily({ airlineCode: "IA", number: 933, depart: "11:05", minutes: 145, aircraft: "Boeing 737-800", price: 4_150_000, checkedKg: 20, cabinKg: 7, refundable: false }),
+  },
+  {
+    from: "THR",
+    to: "DAM",
+    legs: daily({ airlineCode: "IA", number: 941, depart: "16:55", minutes: 175, aircraft: "Boeing 737-800", price: 5_450_000, checkedKg: 20, cabinKg: 7, refundable: false, days: [2, 5] }),
+  },
+  {
+    from: "THR",
+    to: "BEY",
+    legs: daily({ airlineCode: "IR", number: 851, depart: "09:20", minutes: 195, aircraft: "Airbus A320", price: 7_450_000, checkedKg: 25, cabinKg: 7, refundable: true }),
+  },
+  {
+    from: "THR",
+    to: "EVN",
+    legs: daily({ airlineCode: "IR", number: 861, depart: "10:45", minutes: 105, aircraft: "Airbus A319", price: 5_250_000, checkedKg: 25, cabinKg: 7, refundable: true }),
+  },
+  {
+    from: "THR",
+    to: "TBS",
+    legs: daily({ airlineCode: "IR", number: 871, depart: "08:55", minutes: 125, aircraft: "Airbus A320", price: 5_950_000, checkedKg: 25, cabinKg: 7, refundable: true }),
+  },
+  {
+    from: "THR",
+    to: "GYD",
+    legs: daily({ airlineCode: "IR", number: 881, depart: "12:10", minutes: 100, aircraft: "Airbus A319", price: 4_950_000, checkedKg: 25, cabinKg: 7, refundable: true }),
+  },
+  {
+    from: "THR",
+    to: "ASB",
+    legs: daily({ airlineCode: "IR", number: 891, depart: "05:35", minutes: 130, aircraft: "Airbus A320", price: 6_250_000, checkedKg: 25, cabinKg: 7, refundable: true }),
+  },
+  {
+    from: "THR",
+    to: "TAS",
+    legs: daily({ airlineCode: "HY", number: 761, depart: "03:15", minutes: 185, aircraft: "Airbus A320", price: 3_460_000, checkedKg: 30, cabinKg: 7, refundable: false }),
+  },
+  {
+    from: "THR",
+    to: "TAS",
+    legs: daily({ airlineCode: "KC", number: 911, depart: "02:40", minutes: 170, aircraft: "Airbus A321", price: 3_890_000, checkedKg: 30, cabinKg: 7, refundable: true }),
+  },
+  {
+    from: "THR",
+    to: "KHI",
+    legs: daily({ airlineCode: "W5", number: 1105, depart: "05:50", minutes: 180, aircraft: "Airbus A310", price: 3_020_000, checkedKg: 30, cabinKg: 7, refundable: false }),
+  },
+  {
+    from: "THR",
+    to: "DEL",
+    legs: daily({ airlineCode: "W5", number: 701, depart: "02:15", minutes: 250, aircraft: "Airbus A310", price: 10_450_000, checkedKg: 30, cabinKg: 7, refundable: true }),
+  },
+  {
+    from: "THR",
+    to: "BOM",
+    legs: daily({ airlineCode: "W5", number: 703, depart: "03:05", minutes: 285, aircraft: "Airbus A310", price: 11_150_000, checkedKg: 30, cabinKg: 7, refundable: true }),
+  },
+  {
+    from: "THR",
+    to: "KIK",
+    legs: daily({ airlineCode: "J9", number: 307, depart: "08:15", minutes: 165, aircraft: "Airbus A320", price: 2_590_000, checkedKg: 20, cabinKg: 7, refundable: false, days: [1, 4] }),
+  },
+  {
+    from: "THR",
+    to: "SAW",
+    legs: daily({ airlineCode: "PC", number: 513, depart: "06:20", minutes: 195, aircraft: "Airbus A320neo", price: 4_050_000, checkedKg: 20, cabinKg: 8, refundable: false }),
+  },
+  {
+    from: "THR",
+    to: "AYT",
+    legs: daily({ airlineCode: "XQ", number: 921, depart: "05:05", minutes: 215, aircraft: "Boeing 737-800", price: 6_350_000, checkedKg: 20, cabinKg: 8, refundable: false, days: [0, 3, 6] }),
+  },
+  {
+    from: "THR",
+    to: "ADB",
+    legs: daily({ airlineCode: "XQ", number: 933, depart: "04:50", minutes: 205, aircraft: "Boeing 737-800", price: 6_150_000, checkedKg: 20, cabinKg: 8, refundable: false, days: [1, 4] }),
+  },
+  {
+    from: "THR",
+    to: "FRA",
+    legs: daily({ airlineCode: "LH", number: 1501, depart: "02:25", minutes: 340, aircraft: "Airbus A340-300", price: 21_500_000, checkedKg: 23, cabinKg: 8, refundable: true, days: [0, 6, 2] }),
+  },
+  {
+    from: "THR",
+    to: "MUC",
+    legs: daily({ airlineCode: "LH", number: 1539, depart: "02:05", minutes: 320, aircraft: "Airbus A330-300", price: 19_800_000, checkedKg: 23, cabinKg: 8, refundable: true }),
+  },
+  {
+    from: "THR",
+    to: "BER",
+    legs: daily({ airlineCode: "IR", number: 757, depart: "23:40", minutes: 330, aircraft: "Airbus A330-200", price: 17_900_000, checkedKg: 30, cabinKg: 7, refundable: false, days: [2, 5] }),
+  },
+  {
+    from: "THR",
+    to: "LHR",
+    legs: daily({ airlineCode: "IR", number: 711, depart: "07:30", minutes: 400, aircraft: "Airbus A330-200", price: 24_800_000, checkedKg: 30, cabinKg: 7, refundable: true, days: [0, 3, 5] }),
+  },
+  {
+    from: "THR",
+    to: "CDG",
+    legs: daily({ airlineCode: "IR", number: 721, depart: "06:50", minutes: 415, aircraft: "Airbus A330-200", price: 23_900_000, checkedKg: 30, cabinKg: 7, refundable: true, days: [1, 4] }),
+  },
+  {
+    from: "THR",
+    to: "AMS",
+    legs: daily({ airlineCode: "IR", number: 1631, depart: "07:10", minutes: 400, aircraft: "Airbus A330-200", price: 22_600_000, checkedKg: 30, cabinKg: 7, refundable: true, days: [2, 5] }),
+  },
+  {
+    from: "THR",
+    to: "VIE",
+    legs: daily({ airlineCode: "OS", number: 1772, depart: "04:35", minutes: 330, aircraft: "Airbus A320neo", price: 14_900_000, checkedKg: 23, cabinKg: 8, refundable: true }),
+  },
+  {
+    from: "THR",
+    to: "ARN",
+    legs: daily({ airlineCode: "IR", number: 751, depart: "05:45", minutes: 355, aircraft: "Airbus A330-200", price: 18_400_000, checkedKg: 30, cabinKg: 7, refundable: false, days: [1, 4] }),
+  },
+  // ——— Beyond Tehran: the Gulf hubs, Türkiye and the Caucasus also sell tickets
+  // from their own city, not only as connections into Iran.
+  {
+    from: "IST",
+    to: "DXB",
+    legs: [
+      { airlineCode: "TK", number: 1662, depart: "08:25", minutes: 275, aircraft: "Airbus A321neo", price: 12_800_000, checkedKg: 25, cabinKg: 8, refundable: true },
+    ],
+  },
+
+  {
+    from: "IST",
+    to: "SAW",
+    legs: [
+      { airlineCode: "PC", number: 101, depart: "07:05", minutes: 55, aircraft: "Airbus A320", price: 1_250_000, checkedKg: 20, cabinKg: 8, refundable: false },
+    ],
+  },
+
+  {
+    from: "SAW",
+    to: "IST",
+    legs: [
+      { airlineCode: "PC", number: 102, depart: "21:10", minutes: 55, aircraft: "Airbus A320", price: 1_190_000, checkedKg: 20, cabinKg: 8, refundable: false },
+    ],
+  },
+
+  {
+    from: "AYT",
+    to: "IST",
+    legs: [
+      { airlineCode: "XQ", number: 922, depart: "09:40", minutes: 85, aircraft: "Boeing 737-800", price: 1_850_000, checkedKg: 20, cabinKg: 8, refundable: false },
+    ],
+  },
+
+  {
+    from: "ADB",
+    to: "IST",
+    legs: [
+      { airlineCode: "XQ", number: 934, depart: "08:20", minutes: 75, aircraft: "Boeing 737-800", price: 1_620_000, checkedKg: 20, cabinKg: 8, refundable: false },
+    ],
+  },
+
+  {
+    from: "SHJ",
+    to: "DXB",
+    legs: [
+      { airlineCode: "G9", number: 632, depart: "10:20", minutes: 45, aircraft: "Airbus A320", price: 1_150_000, checkedKg: 20, cabinKg: 7, refundable: false },
+    ],
+  },
+  {
+    from: "DAM",
+    to: "IST",
+    legs: [
+      { airlineCode: "TK", number: 845, depart: "07:55", minutes: 175, aircraft: "Airbus A321", price: 7_950_000, checkedKg: 25, cabinKg: 8, refundable: true, days: [1, 4] },
+    ],
+  },
+
+  {
+    from: "DXB",
+    to: "DOH",
+    legs: [
+      { airlineCode: "QR", number: 1913, depart: "11:00", minutes: 65, aircraft: "Airbus A350-900", price: 4_300_000, checkedKg: 25, cabinKg: 7, refundable: true },
+    ],
+  },
+
+  {
+    from: "DXB",
+    to: "IST",
+    legs: [
+      { airlineCode: "EK", number: 1021, depart: "13:30", minutes: 300, aircraft: "Boeing 777-300ER", price: 14_200_000, checkedKg: 30, cabinKg: 7, refundable: true },
+    ],
+  },
+
+  {
+    from: "DOH",
+    to: "DXB",
+    legs: [
+      { airlineCode: "QR", number: 1014, depart: "15:35", minutes: 70, aircraft: "Airbus A350-900", price: 4_450_000, checkedKg: 25, cabinKg: 7, refundable: true },
+    ],
+  },
+
+  {
+    from: "DOH",
+    to: "MCT",
+    legs: [
+      { airlineCode: "WY", number: 662, depart: "12:45", minutes: 90, aircraft: "Boeing 737 MAX 8", price: 3_950_000, checkedKg: 25, cabinKg: 7, refundable: true },
+    ],
+  },
+
+  {
+    from: "DOH",
+    to: "KWI",
+    legs: [
+      { airlineCode: "J9", number: 612, depart: "18:05", minutes: 95, aircraft: "Airbus A320neo", price: 4_150_000, checkedKg: 20, cabinKg: 7, refundable: false },
+    ],
+  },
+
+  {
+    from: "MCT",
+    to: "DXB",
+    legs: [
+      { airlineCode: "WY", number: 719, depart: "09:15", minutes: 60, aircraft: "Boeing 737-800", price: 2_850_000, checkedKg: 25, cabinKg: 7, refundable: true },
+    ],
+  },
+
+  {
+    from: "KWI",
+    to: "DOH",
+    legs: [
+      { airlineCode: "J9", number: 613, depart: "07:30", minutes: 90, aircraft: "Airbus A320neo", price: 4_050_000, checkedKg: 20, cabinKg: 7, refundable: false },
+    ],
+  },
+
+  {
+    from: "RUH",
+    to: "DXB",
+    legs: [
+      { airlineCode: "FZ", number: 842, depart: "09:50", minutes: 110, aircraft: "Boeing 737 MAX 8", price: 5_850_000, checkedKg: 20, cabinKg: 7, refundable: false },
+    ],
+  },
+
+  {
+    from: "RUH",
+    to: "JED",
+    legs: [
+      { airlineCode: "SV", number: 1015, depart: "07:40", minutes: 95, aircraft: "Airbus A320", price: 2_150_000, checkedKg: 25, cabinKg: 7, refundable: true },
+    ],
+  },
+
+  {
+    from: "JED",
+    to: "RUH",
+    legs: [
+      { airlineCode: "SV", number: 1016, depart: "18:30", minutes: 95, aircraft: "Airbus A320", price: 2_050_000, checkedKg: 25, cabinKg: 7, refundable: true },
+    ],
+  },
+
+  {
+    from: "JED",
+    to: "DXB",
+    legs: [
+      { airlineCode: "EK", number: 803, depart: "03:20", minutes: 175, aircraft: "Boeing 777-300ER", price: 9_150_000, checkedKg: 30, cabinKg: 7, refundable: true },
+    ],
+  },
+
+  {
+    from: "BGW",
+    to: "DXB",
+    legs: [
+      { airlineCode: "IA", number: 934, depart: "08:40", minutes: 130, aircraft: "Boeing 737-800", price: 4_950_000, checkedKg: 20, cabinKg: 7, refundable: false },
+    ],
+  },
+
+  {
+    from: "BGW",
+    to: "IST",
+    legs: [
+      { airlineCode: "TK", number: 1697, depart: "06:15", minutes: 190, aircraft: "Airbus A321", price: 7_450_000, checkedKg: 25, cabinKg: 8, refundable: true },
+    ],
+  },
+
+  {
+    from: "BGW",
+    to: "DAM",
+    legs: [
+      { airlineCode: "IA", number: 942, depart: "12:20", minutes: 70, aircraft: "Boeing 737-800", price: 2_250_000, checkedKg: 20, cabinKg: 7, refundable: false },
+    ],
+  },
+
+  {
+    from: "BEY",
+    to: "IST",
+    legs: [
+      { airlineCode: "TK", number: 827, depart: "09:35", minutes: 145, aircraft: "Airbus A321", price: 6_850_000, checkedKg: 25, cabinKg: 8, refundable: true },
+    ],
+  },
+
+  {
+    from: "BEY",
+    to: "DXB",
+    legs: [
+      { airlineCode: "EK", number: 954, depart: "15:45", minutes: 205, aircraft: "Boeing 777-300ER", price: 10_450_000, checkedKg: 30, cabinKg: 7, refundable: true },
+    ],
+  },
+
+  {
+    from: "EVN",
+    to: "IST",
+    legs: [
+      { airlineCode: "TK", number: 379, depart: "04:50", minutes: 160, aircraft: "Airbus A321", price: 6_450_000, checkedKg: 25, cabinKg: 8, refundable: true },
+    ],
+  },
+
+  {
+    from: "EVN",
+    to: "DXB",
+    legs: [
+      { airlineCode: "FZ", number: 174, depart: "11:25", minutes: 215, aircraft: "Boeing 737 MAX 8", price: 8_450_000, checkedKg: 20, cabinKg: 7, refundable: false },
+    ],
+  },
+
+  {
+    from: "TBS",
+    to: "IST",
+    legs: [
+      { airlineCode: "TK", number: 381, depart: "05:40", minutes: 170, aircraft: "Airbus A321", price: 7_150_000, checkedKg: 25, cabinKg: 8, refundable: true },
+    ],
+  },
+
+  {
+    from: "TBS",
+    to: "DXB",
+    legs: [
+      { airlineCode: "FZ", number: 184, depart: "13:10", minutes: 215, aircraft: "Boeing 737 MAX 8", price: 8_950_000, checkedKg: 20, cabinKg: 7, refundable: false },
+    ],
+  },
+
+  {
+    from: "GYD",
+    to: "IST",
+    legs: [
+      { airlineCode: "TK", number: 335, depart: "07:20", minutes: 180, aircraft: "Airbus A321", price: 7_950_000, checkedKg: 25, cabinKg: 8, refundable: true },
+    ],
+  },
+
+  {
+    from: "GYD",
+    to: "DXB",
+    legs: [
+      { airlineCode: "FZ", number: 194, depart: "14:45", minutes: 200, aircraft: "Boeing 737 MAX 8", price: 7_850_000, checkedKg: 20, cabinKg: 7, refundable: false },
+    ],
+  },
+
+  {
+    from: "ASB",
+    to: "IST",
+    legs: [
+      { airlineCode: "TK", number: 323, depart: "06:30", minutes: 185, aircraft: "Airbus A321", price: 8_450_000, checkedKg: 25, cabinKg: 8, refundable: true },
+    ],
+  },
+
+  {
+    from: "ASB",
+    to: "DXB",
+    legs: [
+      { airlineCode: "FZ", number: 702, depart: "15:55", minutes: 180, aircraft: "Boeing 737 MAX 8", price: 7_450_000, checkedKg: 20, cabinKg: 7, refundable: false },
+    ],
+  },
+
+  {
+    from: "TAS",
+    to: "IST",
+    legs: [
+      { airlineCode: "TK", number: 371, depart: "08:10", minutes: 300, aircraft: "Airbus A330-300", price: 12_450_000, checkedKg: 30, cabinKg: 8, refundable: true },
+    ],
+  },
+
+  {
+    from: "TAS",
+    to: "DXB",
+    legs: [
+      { airlineCode: "FZ", number: 712, depart: "16:20", minutes: 230, aircraft: "Boeing 737 MAX 8", price: 8_650_000, checkedKg: 20, cabinKg: 7, refundable: false },
+    ],
+  },
+
+  {
+    from: "KHI",
+    to: "DXB",
+    legs: [
+      { airlineCode: "EK", number: 601, depart: "05:15", minutes: 150, aircraft: "Boeing 777-300ER", price: 8_150_000, checkedKg: 30, cabinKg: 7, refundable: true },
+    ],
+  },
+
+  {
+    from: "DEL",
+    to: "DXB",
+    legs: [
+      { airlineCode: "EK", number: 513, depart: "04:30", minutes: 210, aircraft: "Boeing 777-300ER", price: 10_950_000, checkedKg: 30, cabinKg: 7, refundable: true },
+    ],
+  },
+
+  {
+    from: "BOM",
+    to: "DXB",
+    legs: [
+      { airlineCode: "EK", number: 503, depart: "02:45", minutes: 195, aircraft: "Boeing 777-300ER", price: 10_150_000, checkedKg: 30, cabinKg: 7, refundable: true },
+    ],
+  },
+
+  {
+    from: "FRA",
+    to: "IST",
+    legs: [
+      { airlineCode: "TK", number: 1590, depart: "11:40", minutes: 185, aircraft: "Airbus A321neo", price: 11_850_000, checkedKg: 25, cabinKg: 8, refundable: true },
+    ],
+  },
+
+  {
+    from: "FRA",
+    to: "LHR",
+    legs: [
+      { airlineCode: "LH", number: 916, depart: "08:15", minutes: 95, aircraft: "Airbus A320neo", price: 6_150_000, checkedKg: 23, cabinKg: 8, refundable: true },
+    ],
+  },
+
+  {
+    from: "MUC",
+    to: "FRA",
+    legs: [
+      { airlineCode: "LH", number: 103, depart: "07:45", minutes: 65, aircraft: "Airbus A320", price: 4_250_000, checkedKg: 23, cabinKg: 8, refundable: true },
+    ],
+  },
+
+  {
+    from: "LHR",
+    to: "CDG",
+    legs: [
+      { airlineCode: "AF", number: 1681, depart: "09:05", minutes: 80, aircraft: "Airbus A320", price: 5_650_000, checkedKg: 23, cabinKg: 8, refundable: true },
+    ],
+  },
+
+  {
+    from: "CDG",
+    to: "AMS",
+    legs: [
+      { airlineCode: "AF", number: 1240, depart: "10:30", minutes: 75, aircraft: "Airbus A319", price: 4_950_000, checkedKg: 23, cabinKg: 8, refundable: true },
+    ],
+  },
+
+  {
+    from: "AMS",
+    to: "FRA",
+    legs: [
+      { airlineCode: "LH", number: 989, depart: "12:20", minutes: 70, aircraft: "Airbus A320", price: 4_450_000, checkedKg: 23, cabinKg: 8, refundable: true },
+    ],
+  },
+
+  {
+    from: "VIE",
+    to: "FRA",
+    legs: [
+      { airlineCode: "OS", number: 127, depart: "08:50", minutes: 85, aircraft: "Airbus A320", price: 5_050_000, checkedKg: 23, cabinKg: 8, refundable: true },
+    ],
+  },
+
+  {
+    from: "BER",
+    to: "MUC",
+    legs: [
+      { airlineCode: "LH", number: 1965, depart: "13:15", minutes: 65, aircraft: "Airbus A320", price: 4_150_000, checkedKg: 23, cabinKg: 8, refundable: true },
+    ],
+  },
+
+  {
+    from: "ARN",
+    to: "FRA",
+    legs: [
+      { airlineCode: "LH", number: 803, depart: "07:05", minutes: 125, aircraft: "Airbus A320neo", price: 7_150_000, checkedKg: 23, cabinKg: 8, refundable: true },
+    ],
+  },
+
+  {
+    from: "FCO",
+    to: "VIE",
+    legs: [
+      { airlineCode: "OS", number: 506, depart: "10:40", minutes: 95, aircraft: "Airbus A320", price: 5_450_000, checkedKg: 23, cabinKg: 8, refundable: true },
+    ],
+  },
+
   {
     from: "THR",
     to: "FCO",
     legs: daily({ airlineCode: "IR", number: 741, depart: "05:20", minutes: 370, aircraft: "Airbus A330-200", price: 18_600_000, checkedKg: 30, cabinKg: 7, refundable: false }),
+  },
+  {
+    from: "THR",
+    to: "FCO",
+    legs: daily({ airlineCode: "IR", number: 1641, depart: "05:20", minutes: 370, aircraft: "Airbus A330-200", price: 18_600_000, checkedKg: 30, cabinKg: 7, refundable: false }),
   },
 ];
 
@@ -499,29 +1130,7 @@ function buildPatterns(): FlightPattern[] {
       });
     }
   }
-  // Every served route flies both ways in real life. Rather than hand-writing
-  // 60+ return legs, mirror any one-directional route with a deterministic
-  // inverse rotation (later departure, same duration, a small fare difference).
-  const keys = new Set(patterns.map((pattern) => `${pattern.originCode}-${pattern.destinationCode}`));
-  const generated: FlightPattern[] = [];
-  for (const pattern of patterns) {
-    const reverseKey = `${pattern.destinationCode}-${pattern.originCode}`;
-    if (keys.has(reverseKey)) continue;
-    keys.add(reverseKey);
-    // Keep the return leg inside civil daylight so it never wraps past midnight.
-    let departMinutes = (pattern.departMinutes + 660) % 1440;
-    if (departMinutes < 300) departMinutes += 360;
-    if (departMinutes > 1290) departMinutes -= 360;
-    generated.push({
-      ...pattern,
-      id: patternId(pattern.destinationCode, pattern.originCode, pattern.airlineCode, pattern.flightNumber),
-      originCode: pattern.destinationCode,
-      destinationCode: pattern.originCode,
-      departMinutes,
-      basePriceToman: Math.round((pattern.basePriceToman * 1.02) / 10_000) * 10_000,
-    });
-  }
-  return [...patterns, ...generated];
+  return patterns;
 }
 
 export const FLIGHT_PATTERNS: FlightPattern[] = buildPatterns();

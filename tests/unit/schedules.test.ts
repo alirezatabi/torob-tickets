@@ -3,6 +3,7 @@ import { CITIES } from "@/lib/cities";
 import {
   availableRoutes,
   destinationsFrom,
+  FLIGHT_PATTERNS,
   materializePattern,
   patternsForRoute,
   routeCount,
@@ -10,6 +11,16 @@ import {
 } from "@/lib/schedules";
 
 const DATE = "2026-11-19";
+
+/** Nearest date on/after `fromIso` that falls on the given weekday (0 = Sunday). */
+function dateWithWeekday(fromIso: string, weekday: number): string {
+  const date = new Date(`${fromIso}T00:00:00Z`);
+  for (let offset = 0; offset < 7; offset += 1) {
+    const candidate = new Date(date.getTime() + offset * 86_400_000);
+    if (candidate.getUTCDay() === weekday) return candidate.toISOString().slice(0, 10);
+  }
+  return fromIso;
+}
 
 /**
  * Guard rails for the demo timetable. These assertions are what "wide coverage"
@@ -35,16 +46,19 @@ describe("demo timetable coverage", () => {
     expect(routeCount()).toBeGreaterThanOrEqual(100);
   });
 
-  it("materializes a flight for every pattern on a served date", () => {
-    for (const route of availableRoutes()) {
-      const patterns = patternsForRoute(route.originCode, route.destinationCode, DATE);
+  it("materializes every pattern on a day it actually operates", () => {
+    // Some routes are not daily, so a single test date is not enough: pick a date
+    // inside each pattern's own operating weekdays.
+    for (const pattern of FLIGHT_PATTERNS) {
+      const weekday = pattern.days[0] ?? 0;
+      const date = dateWithWeekday(DATE, weekday);
+      const patterns = patternsForRoute(pattern.originCode, pattern.destinationCode, date);
       expect(patterns.length).toBeGreaterThan(0);
-      for (const pattern of patterns) {
-        const flight = materializePattern(pattern, DATE);
-        expect(flight.segments.length).toBeGreaterThan(0);
-        expect(flight.durationMinutes).toBeGreaterThan(0);
-        expect(Date.parse(flight.arriveAtUtc)).toBeGreaterThan(Date.parse(flight.departAtUtc));
-      }
+
+      const flight = materializePattern(pattern, date);
+      expect(flight.segments.length).toBeGreaterThan(0);
+      expect(flight.durationMinutes).toBeGreaterThan(0);
+      expect(Date.parse(flight.arriveAtUtc)).toBeGreaterThan(Date.parse(flight.departAtUtc));
     }
   });
 });
