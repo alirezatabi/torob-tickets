@@ -179,3 +179,26 @@ describe("deduplication", () => {
     expect(groups.some((group) => group.providers.length > 1)).toBe(true);
   });
 });
+
+describe("live grouping (the product promise)", () => {
+  it("folds two sources of one real flight into a single row with both prices", async () => {
+    const { groupOffers: group } = await import("@/dedupe/group");
+    const base = offer({ id: "sepehr360:0", providerId: "sepehr360", price: price(6_800_000) });
+    const mirror = offer({ id: "other:0", providerId: "other", price: price(7_038_000) });
+    const groups = group([base, mirror]);
+    expect(groups).toHaveLength(1);
+    expect(groups[0]?.providers.map((provider) => provider.providerId)).toEqual(["sepehr360", "other"]);
+    expect(groups[0]?.cheapestToman).toBe(6_800_000);
+    expect(groups[0]?.hasPriceSpread).toBe(true);
+  });
+
+  it("keeps two different flights of the same carrier as two rows even at the same price", () => {
+    // W5 1084 and W5 1086 leaving 23 minutes apart: different tickets, different rows.
+    const groups = groupOffers([
+      offer({ id: "a:1", providerId: "a", price: cheap, flightNumber: "W5-1084", departAt: "2026-11-20T05:00:00.000Z" }),
+      offer({ id: "b:1", providerId: "b", price: cheap, flightNumber: "W5-1086", departAt: "2026-11-20T05:23:00.000Z" }),
+    ]);
+    expect(groups).toHaveLength(2);
+    expect(() => assertNoUnsafeMerge(groups)).not.toThrow();
+  });
+});

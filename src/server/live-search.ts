@@ -17,6 +17,7 @@ import { fromDemoOffer, fromLiveOffer } from "@/modules/ranking/project";
 import type { RankInput } from "@/modules/ranking/types";
 import { createOrchestrator, describeLiveProviders, searchMode, type SearchMode } from "@/modules/providers/registry-live";
 import { dedupeSameOffer, SearchOrchestrator } from "@/modules/providers/orchestrator";
+import { groupOffers } from "@/dedupe/group";
 import { AmadeusAdapter, amadeusConfigFromEnv } from "@/modules/providers/amadeus/adapter";
 import { createLogger } from "@/modules/providers/shared/logger";
 import type { ProviderRunReport } from "@/modules/providers/contracts/provider";
@@ -85,6 +86,29 @@ export interface LiveOfferView {
   dataSource: "live" | "demo";
 }
 
+/**
+ * One row in the live results: a *flight*, with every source's price for that same flight.
+ * `prices` always contains the displayed quote (cheapest first), so the card can show both
+ * "what you would pay" and "what each source asks for the same seat".
+ */
+export interface LiveGroupView extends LiveOfferView {
+  groupKey: string;
+  identity: "flight-number" | "same-departure";
+  knownSellers: number;
+  /** How many sources we actually have a price from. */
+  providerCount: number;
+  /** One row per source selling this exact flight, cheapest first. */
+  prices: QuoteView[];
+}
+
+export interface QuoteView {
+  id: string;
+  providerId: string;
+  providerName: string;
+  priceToman: number;
+  isCheapest: boolean;
+}
+
 export interface LiveSearchOptions {
   mode?: SearchMode;
   persist?: boolean;
@@ -142,6 +166,46 @@ export async function runLiveSearch(query: TripQuery, options: LiveSearchOptions
     })
     .filter((view): view is LiveOfferView => view !== null);
 
+  // The list is *flights*, not offers: one row per physical flight, every source's price for
+  // exactly that flight underneath. Ranked offers are folded into the group they belong to,
+  // and the group's cheapest quote is the one the row displays.
+  let groupSource = offers.filter((offer) => offer.dataSource === mode);
+  if (process.env.TOROB_SIMULATE_SECOND_SOURCE === "1" && groupSource.length > 0) {
+    // DEV/TEST ONLY: a mirror of the same flights under a second provider id, so the
+    // "one flight, several sources" path can be exercised without a second live source.
+    // Never enabled by default; the offers are clones of real ones and say so in the UI.
+    const clones = groupSource.slice(0, 4).map((offer) => ({
+      ...offer,
+      id: `${offer.id}::mirror`,
+      providerId: "mirror-source",
+      providerName: "منبع دوم (شبیه‌سازی)",
+      price: { ...offer.price, toman: Math.round(offer.price.toman * 1.035) },
+    }));
+    groupSource = [...groupSource, ...clones];
+  }
+  const groups = groupOffers(groupSource);
+  const groupViews: LiveGroupView[] = groups
+    .map((group) => {
+      const row = views.find((view) => view.id === group.primary.id);
+      if (!row) return null;
+      return {
+        ...row,
+        groupKey: group.groupKey,
+        flightNumber: group.flightNumber ?? row.flightNumber,
+        identity: group.identity,
+        knownSellers: group.knownSellers,
+        providerCount: group.providers.length,
+        prices: group.providers.map((provider, index) => ({
+          id: provider.offerId,
+          providerId: provider.providerId,
+          providerName: provider.providerName,
+          priceToman: provider.priceToman,
+          isCheapest: index === 0,
+        })),
+      } satisfies LiveGroupView;
+    })
+    .filter((view): view is LiveGroupView => view !== null);
+
   const persistence = await persistIfPossible(query, reports, offers, mode, options.persist ?? true);
 
   const badgeId = (decision: string) =>
@@ -156,7 +220,7 @@ export async function runLiveSearch(query: TripQuery, options: LiveSearchOptions
       passengers: query.passengers ?? 1,
       cabin: String(query.cabin ?? "economy"),
     },
-    offers: views,
+    offers: groupViews.length > 0 ? groupViews : views,
     reports,
     ranking: {
       best: badgeId("best"),

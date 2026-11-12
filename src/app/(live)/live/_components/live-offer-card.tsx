@@ -1,9 +1,10 @@
 import Link from "next/link";
 import { ArrowUpLeft, BadgeCheck, Clock, ExternalLink, Info, ShieldQuestion, Timer, Users } from "lucide-react";
 
-import type { LiveOfferView } from "@/server/live-search";
+import type { LiveGroupView, LiveOfferView } from "@/server/live-search";
 import { WARNING_LABELS } from "@/domain/flight";
 import { formatRelative, formatToman, toPersianDigits } from "@/lib/format";
+import { normalizeDigits } from "@/modules/money/price";
 import { formatJalaliFull } from "@/lib/jalali";
 import { getCity } from "@/lib/cities";
 import { cn } from "@/lib/cn";
@@ -54,7 +55,9 @@ const FALLBACK_FRESHNESS = { label: "تأییدنشده", className: "bg-ink-100
  * numbers, unknown baggage, foreign currency, and — most importantly — the exact time
  * the price was observed at the source. Every unknown is a visible label, not a gap.
  */
-export function LiveOfferCard({ offer, index }: { offer: LiveOfferView; index: number }) {
+export function LiveOfferCard({ offer, index }: { offer: LiveOfferView | LiveGroupView; index: number }) {
+  // A grouped row is one flight; a bare offer is a single quote. Both render the same card.
+  const group = "groupKey" in offer ? (offer as LiveGroupView) : null;
   const origin = getCity(offer.originCity);
   const destination = getCity(offer.destinationCity);
   const freshness = FRESHNESS_LABELS[offer.freshness] ?? FALLBACK_FRESHNESS;
@@ -86,13 +89,43 @@ export function LiveOfferCard({ offer, index }: { offer: LiveOfferView; index: n
             <div className="min-w-0">
               <p className="truncate text-sm font-bold text-ink-900">{offer.airlineName}</p>
               <p className="nums text-[0.64rem] text-ink-400">
-                {offer.flightNumber ?? "بدون شماره"}
+                {offer.flightNumber ? `پرواز ${offer.flightNumber}` : "شماره پرواز اعلام نشده"}
                 <span className="mx-1 text-ink-300">·</span>
                 {offer.providerName}
               </p>
+              {/* When the source printed who sells the fare, say it verbatim. */}
+              {offer.sellerLabel ? (
+                <p className="mt-0.5 truncate text-[0.6rem] text-ink-400">
+                  {toPersianDigits(normalizeDigits(offer.sellerLabel))}
+                </p>
+              ) : null}
             </div>
-            <span className={cn("mr-auto rounded-md border px-1.5 py-0.5 text-[0.62rem] font-medium", freshness.className)} title={freshness.hint}>
-              {freshness.label}
+            <span className="mr-auto flex flex-wrap items-center justify-end gap-1">
+              {/* Two different facts: sources we queried, and agencies the source itself
+                  says carry this fare. The second is usually the real market size. */}
+              {group && group.knownSellers > group.providerCount ? (
+                <span
+                  className="rounded-md border border-teal-500/30 bg-teal-50 px-1.5 py-0.5 text-[0.62rem] font-medium text-teal-700"
+                  title="تعداد آژانس‌هایی که همین پرواز را می‌فروشند، به گفتهٔ منبع؛ فهرست تک‌تک آن‌ها منتشر نشده است."
+                >
+                  {toPersianDigits(group.knownSellers)} فروشنده
+                </span>
+              ) : group && group.providerCount > 1 ? (
+                <span className="rounded-md border border-saffron-300/60 bg-saffron-50 px-1.5 py-0.5 text-[0.62rem] font-medium text-saffron-700">
+                  {toPersianDigits(group.providerCount)} منبع
+                </span>
+              ) : null}
+              {group?.identity === "same-departure" ? (
+                <span
+                  className="rounded-md border border-ink-200 bg-ink-100 px-1.5 py-0.5 text-[0.62rem] font-medium text-ink-500"
+                  title="هیچ منبعی شمارهٔ پرواز را اعلام نکرده؛ یکسان بودن ساعت حرکت مبنای این گروه است."
+                >
+                  شناسایی با ساعت حرکت
+                </span>
+              ) : null}
+              <span className={cn("rounded-md border px-1.5 py-0.5 text-[0.62rem] font-medium", freshness.className)} title={freshness.hint}>
+                {freshness.label}
+              </span>
             </span>
           </div>
 
@@ -239,6 +272,24 @@ export function LiveOfferCard({ offer, index }: { offer: LiveOfferView; index: n
           )}
         </div>
       </div>
+
+      {/* The core of the product: this identical flight, and what each source asks for it. */}
+      {group && group.prices.length > 1 ? (
+        <div className="border-t border-ink-200/60 bg-ink-50/60 px-4 py-2">
+          <p className="mb-1 text-[0.6rem] text-ink-400">همین پرواز، در هر منبعی که نرخش را دارد:</p>
+          <ul className="flex flex-wrap gap-x-4 gap-y-1">
+            {group.prices.map((quote) => (
+              <li key={quote.id} className="inline-flex items-center gap-1.5 text-[0.65rem] text-ink-600">
+                <span className="font-medium">{quote.providerName}</span>
+                <span className="nums text-ink-800">{formatToman(quote.priceToman)}</span>
+                {quote.isCheapest ? (
+                  <span className="rounded bg-teal-100 px-1 text-[0.55rem] font-semibold text-teal-800">کمترین</span>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
 
       {offer.warnings.length > 0 ? (
         <div className="flex flex-wrap items-center gap-1 border-t border-ink-200/60 px-4 py-1.5">

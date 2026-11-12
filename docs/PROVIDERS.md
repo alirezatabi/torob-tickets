@@ -34,6 +34,21 @@ one page fetch plus a few allowlisted follow-ups.
 only within 5 minutes of departure (`identity: "same-departure"`, labelled in the card).
 A daily "cheapest price" bar is therefore *never* compared to a flight price.
 
+**Where the comparison shows up:** `/live` rows are *flights*, not offers. Each row carries
+`identity` (`flight-number`, or `same-departure` when no source published a number — labelled
+on the card), `knownSellers` (agencies the source says carry this fare, e.g. «۱۲۵ فروشنده»)
+and a per-source price list («همین پرواز، در هر منبعی که نرخش را دارد»). `providerCount` is
+how many sources we actually hold a price from; it is never conflated with `knownSellers`.
+
+To exercise the multi-source path on this machine (no second live source needed):
+
+```bash
+TOROB_SIMULATE_SECOND_SOURCE=1 TOROB_SEARCH_MODE=live npm run dev   # /live
+```
+
+It mirrors the first four real offers under a second provider id with a 3.5% spread — a
+test-only switch, off by default, and the mirrored rows are labelled «منبع دوم (شبیه‌سازی)».
+
 ## Sepehr360
 
 - Hosts: the publisher's own — `sepehr360.ir`, `www.`, `api.`, `cdn.` (its logos already
