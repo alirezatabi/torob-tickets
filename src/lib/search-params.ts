@@ -1,10 +1,16 @@
 import type { CabinClass, DayPart, PricePreference, TripQuery, TripType } from "@/domain/trip";
 import { DEFAULT_PREFERENCES } from "@/domain/trip";
+import { isoToday, isValidCivilDate } from "./jalali";
 import { isKnownCity } from "./cities";
 
 /**
  * URL is the state container for a search: shareable, back-button friendly and
  * server-renderable. This module is the single (validated) reader/writer.
+ *
+ * The product only needs **origin + destination**. The date is optional and falls back to
+ * "today in Tehran" (`isoToday()`), because the results page itself answers "which day
+ * should I fly?" with the 8-day strip. A date is validated as a *real* civil day: a typo
+ * like `2026-13-45` is an error the user must see, not an empty result set.
  */
 
 export interface SearchParamsObject {
@@ -23,12 +29,29 @@ export interface SearchParamsObject {
   time?: DayPart;
   airlines?: string;
   price_max?: string;
-  sort?: "best" | "cheapest" | "fastest";
+  sort?: SortKeyParam;
   q?: string;
 }
 
-export const SORT_KEYS = ["best", "cheapest", "fastest"] as const;
+export const SORT_KEYS = ["best", "cheapest", "fastest", "earliest"] as const;
 export type SortKeyParam = (typeof SORT_KEYS)[number];
+
+/** A price-finder's natural default: the cheapest price first. */
+export const DEFAULT_SORT: SortKeyParam = "cheapest";
+
+/** Persian messages for the only three things that can be wrong with a date. */
+export const DATE_ERRORS = {
+  malformed: "تاریخ پرواز معتبر نیست؛ قالب درست ۲۰۲۶-۱۱-۲۰ است.",
+  impossible: "این تاریخ در تقویم وجود ندارد.",
+  past: "تاریخ پرواز گذشته است؛ روزی از امروز به بعد را انتخاب کنید.",
+} as const;
+
+export interface ParseOptions {
+  /** Defaults for fields the URL may omit. */
+  date?: string;
+  /** Injectable clock, so "today" and "in the past" are testable. */
+  now?: Date;
+}
 
 /**
  * Turn raw (possibly hostile) query params into a valid `TripQuery`.
@@ -36,36 +59,56 @@ export type SortKeyParam = (typeof SORT_KEYS)[number];
  */
 export function parseSearchParams(
   raw: SearchParamsObject,
-  defaults: { date: string },
-): { ok: true; query: TripQuery } | { ok: false; reason: string; missing: string[] } {
+  options: ParseOptions = {},
+): { ok: true; query: TripQuery } | { ok: false; reason: string; missing: string[]; invalid?: "date" } {
+  const today = options.date ?? isoToday(options.now);
   const missing: string[] = [];
   const origin = raw.origin?.toUpperCase();
   const destination = raw.destination?.toUpperCase();
 
   if (!origin || !isKnownCity(origin)) missing.push("origin");
   if (!destination || !isKnownCity(destination)) missing.push("destination");
-  if (!raw.date || !/^\d{4}-\d{2}-\d{2}$/.test(raw.date)) missing.push("date");
-
   if (missing.length > 0) {
     return { ok: false, reason: "پارامترهای جستجو کامل نیستند", missing };
   }
-
   if (origin === destination) {
     return { ok: false, reason: "مبدأ و مقصد نمی‌توانند یکسان باشند", missing: [] };
   }
 
+  // The date is optional: no `date` means "today in Tehran".
+  const requested = raw.date?.trim() ?? "";
+  let departDate = today;
+  if (requested.length > 0) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(requested)) {
+      return { ok: false, reason: DATE_ERRORS.malformed, missing: [], invalid: "date" };
+    }
+    if (!isValidCivilDate(requested)) {
+      return { ok: false, reason: DATE_ERRORS.impossible, missing: [], invalid: "date" };
+    }
+    if (requested < today) {
+      return { ok: false, reason: DATE_ERRORS.past, missing: [], invalid: "date" };
+    }
+    departDate = requested;
+  }
+
   const pax = clampInt(raw.pax, 1, 9, 1);
   const stopsRaw = raw.stops === undefined || raw.stops === "" ? null : Number(raw.stops);
+  const returnDate =
+    raw.trip === "roundtrip" && raw.return && /^\d{4}-\d{2}-\d{2}$/.test(raw.return) && isValidCivilDate(raw.return)
+      ? raw.return
+      : null;
 
   return {
     ok: true,
     query: {
       mode: "flight",
-      tripType: raw.trip === "roundtrip" ? "roundtrip" : "oneway",
+      tripType: "oneway",
       originCode: origin as string,
       destinationCode: destination as string,
-      departDate: raw.date ?? defaults.date,
-      returnDate: raw.return && /^\d{4}-\d{2}-\d{2}$/.test(raw.return) ? raw.return : null,
+      departDate,
+      // Round-trip search is not implemented end to end (no provider is queried twice), so
+      // the pipeline never pretends: the form no longer offers it (B9).
+      returnDate,
       passengers: pax,
       cabin: isCabin(raw.cabin) ? raw.cabin : "economy",
       filters: {

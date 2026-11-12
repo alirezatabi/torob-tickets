@@ -1,4 +1,6 @@
 import type { FlightOffer, GroupIdentity, GroupProvider, OfferGroup } from "@/domain/flight";
+import { getCity } from "@/lib/cities";
+import { localDepartDate } from "@/lib/time";
 
 /**
  * Grouping offers into **one physical flight, many prices**.
@@ -33,6 +35,15 @@ export function normalizeFlightNumber(value: string | null | undefined): string 
   if (!value) return null;
   const compact = value.replace(/[^A-Za-z0-9]/g, "").toUpperCase();
   return compact.length >= 3 ? compact : null;
+}
+
+/**
+ * The trip's local departure day (`YYYY-MM-DD` at the origin airport). Exported because the
+ * rest of the pipeline must agree with the grouper on what "the day of this flight" means.
+ */
+export function departDayOf(offer: Pick<FlightOffer, "departAt" | "originCode">): string {
+  const timeZone = getCity(offer.originCode)?.timezone ?? "Asia/Tehran";
+  return localDepartDate(offer.departAt, timeZone);
 }
 
 interface Cluster {
@@ -134,7 +145,7 @@ function compareGroups(a: OfferGroup, b: OfferGroup): number {
 
 /** Carrier + route + departure day. Route and day are part of what a flight *is*. */
 function bucketKeyOf(offer: FlightOffer): string {
-  return `${offer.airlineCode}|${offer.originCode}>${offer.destinationCode}|${offer.departAt.slice(0, 10)}`;
+  return `${offer.airlineCode}|${offer.originCode}>${offer.destinationCode}|${departDayOf(offer)}`;
 }
 
 /**
@@ -151,7 +162,7 @@ export function canonicalGroupKey(offer: {
   originCode: string;
   destinationCode: string;
 }): string {
-  const day = offer.departAt.slice(0, 10);
+  const day = departDayOf(offer);
   const number = offer.flightNumber?.replace(/[^A-Z0-9]/gi, "").toUpperCase() ?? "~";
   return `${offer.airlineCode}|${number}|${day}|${offer.originCode}>${offer.destinationCode}`;
 }
@@ -216,7 +227,7 @@ export function assertNoUnsafeMerge(groups: OfferGroup[]): void {
     if (numbers.size > 1) {
       throw new Error(`Unsafe merge in group ${group.groupKey}: ${[...numbers].join(", ")}`);
     }
-    const days = new Set(group.offers.map((offer) => offer.departAt.slice(0, 10)));
+    const days = new Set(group.offers.map((offer) => departDayOf(offer)));
     if (days.size > 1) {
       throw new Error(`Unsafe merge in group ${group.groupKey}: multiple days`);
     }

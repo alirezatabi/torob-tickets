@@ -14,6 +14,8 @@
  */
 
 import { buildSearchUrl } from "@/modules/providers/sepehr360/url";
+import { getCity } from "@/lib/cities";
+import { localDepartDate, localDepartTime } from "@/lib/time";
 
 export type SourceLink =
   /** A page the user can open: our redirect hop, or the source's own URL. */
@@ -97,12 +99,17 @@ export function sourceRedirectFor(offer: SourceLinkInput & OfferRoute): SourceLi
 
   if (!REDIRECTABLE.has(offer.providerId)) return base;
 
+  // The source's day and clock are **local** facts: a 13:00 Tehran departure is `13:00`
+  // in the URL, not the UTC instant (which would send the user to 09:30, or to the day
+  // before for an early-morning flight).
+  const originTimeZone = getCity(offer.originCity)?.timezone ?? "Asia/Tehran";
+  const departDate = localDepartDate(offer.departAt, originTimeZone);
   const params = new URLSearchParams({
     origin: offer.originCity,
     destination: offer.destinationCity,
-    date: offer.departAt.slice(0, 10),
+    date: departDate,
   });
-  const time = offer.departTime ?? offer.departAt.slice(11, 16);
+  const time = offer.departTime ?? localDepartTime(offer.departAt, originTimeZone);
   if (/^([01]?\d|2[0-3]):[0-5]\d$/.test(time)) params.set("time", time);
   if (offer.airlineCode && offer.airlineCode !== "??") params.set("airline", offer.airlineCode);
 
@@ -110,7 +117,7 @@ export function sourceRedirectFor(offer: SourceLinkInput & OfferRoute): SourceLi
   const expected = buildSearchUrl({
     originCity: offer.originCity,
     destinationCity: offer.destinationCity,
-    departDate: offer.departAt.slice(0, 10),
+    departDate,
   });
   if (!expected.url.startsWith("https://sepehr360.ir/")) return base;
 
@@ -119,10 +126,11 @@ export function sourceRedirectFor(offer: SourceLinkInput & OfferRoute): SourceLi
 
 /** The demo search page for an offer, so "go and compare it yourself" still works. */
 export function demoSearchHref(offer: { originCity: string; destinationCity: string; departAt: string }): string {
+  const originTimeZone = getCity(offer.originCity)?.timezone ?? "Asia/Tehran";
   const params = new URLSearchParams({
     origin: offer.originCity,
     destination: offer.destinationCity,
-    date: offer.departAt.slice(0, 10),
+    date: localDepartDate(offer.departAt, originTimeZone),
   });
   return `/search?${params.toString()}`;
 }

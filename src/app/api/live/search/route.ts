@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { parseSearchParams, SORT_KEYS, type SortKeyParam } from "@/lib/search-params";
-import { addDays, isoToday } from "@/lib/jalali";
+import { DEFAULT_SORT, parseSearchParams, SORT_KEYS, type SortKeyParam } from "@/lib/search-params";
 import { runLiveSearch } from "@/server/live-search";
 
 export const runtime = "nodejs";
@@ -20,7 +19,7 @@ export const dynamic = "force-dynamic";
 export async function GET(request: Request) {
   const url = new URL(request.url);
   const raw = Object.fromEntries(url.searchParams.entries());
-  const parsed = parseSearchParams(raw, { date: addDays(isoToday(), 7) });
+  const parsed = parseSearchParams(raw);
 
   if (!parsed.ok) {
     return NextResponse.json(
@@ -30,12 +29,12 @@ export async function GET(request: Request) {
   }
 
   const requestedMode = raw.mode === "live" || raw.mode === "demo" ? raw.mode : undefined;
-  const sort = (SORT_KEYS as readonly string[]).includes(raw.sort ?? "") ? (raw.sort as SortKeyParam) : "best";
+  const sort = (SORT_KEYS as readonly string[]).includes(raw.sort ?? "") ? (raw.sort as SortKeyParam) : DEFAULT_SORT;
 
   try {
     const payload = await runLiveSearch(parsed.query, {
       mode: requestedMode,
-      sort: sort === "best" ? "best" : sort,
+      sort,
       persist: raw.persist !== "false",
     });
     return NextResponse.json(payload, { headers: { "cache-control": "no-store" } });

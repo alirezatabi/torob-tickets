@@ -23,10 +23,43 @@ describe("search parameters", () => {
   });
 
   it("reports which essentials are missing", () => {
+    // `date` is no longer an essential: the product searches "today" by default (B1).
     const result = parseSearchParams({ origin: "THR" }, defaults);
     expect(result.ok).toBe(false);
     if (result.ok) return;
-    expect(result.missing).toEqual(expect.arrayContaining(["destination", "date"]));
+    expect(result.missing).toEqual(["destination"]);
+  });
+
+  it("searches today in Tehran when no date is given", () => {
+    const result = parseSearchParams({ origin: "IFN", destination: "KIH" }, { now: new Date("2026-11-20T09:00:00Z") });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.query.departDate).toBe("2026-11-20");
+    expect(result.query.passengers).toBe(1);
+    expect(result.query.cabin).toBe("economy");
+  });
+
+  it("rejects an impossible calendar date with a Persian reason instead of returning nothing", () => {
+    const impossible = parseSearchParams({ origin: "THR", destination: "IST", date: "2026-13-45" }, defaults);
+    expect(impossible.ok).toBe(false);
+    if (impossible.ok) return;
+    expect(impossible.invalid).toBe("date");
+    expect(impossible.reason).toContain("وجود ندارد");
+
+    const malformed = parseSearchParams({ origin: "THR", destination: "IST", date: "20-11-2026" }, defaults);
+    expect(malformed.ok).toBe(false);
+    if (malformed.ok) return;
+    expect(malformed.reason).toContain("قالب درست");
+  });
+
+  it("rejects a departure date in the past", () => {
+    const result = parseSearchParams(
+      { origin: "THR", destination: "IST", date: "2026-11-19" },
+      { now: new Date("2026-11-20T09:00:00Z") },
+    );
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.reason).toContain("گذشته");
   });
 
   it("rejects unknown airports rather than guessing", () => {

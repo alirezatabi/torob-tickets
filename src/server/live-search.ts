@@ -112,7 +112,7 @@ export interface QuoteView {
 export interface LiveSearchOptions {
   mode?: SearchMode;
   persist?: boolean;
-  sort?: "best" | "cheapest" | "fastest";
+  sort?: "best" | "cheapest" | "fastest" | "earliest";
 }
 
 export async function runLiveSearch(query: TripQuery, options: LiveSearchOptions = {}): Promise<LiveSearchPayload> {
@@ -154,6 +154,12 @@ export async function runLiveSearch(query: TripQuery, options: LiveSearchOptions
 
   if (options.sort === "cheapest") {
     ranked.ranked.sort((a, b) => a.input.priceToman - b.input.priceToman || a.input.durationMinutes - b.input.durationMinutes);
+  } else if (options.sort === "earliest") {
+    ranked.ranked.sort(
+      (a, b) =>
+        new Date(a.input.departAt).getTime() - new Date(b.input.departAt).getTime() ||
+        a.input.priceToman - b.input.priceToman,
+    );
   } else if (options.sort === "fastest") {
     ranked.ranked.sort((a, b) => a.input.durationMinutes - b.input.durationMinutes || a.input.priceToman - b.input.priceToman);
   }

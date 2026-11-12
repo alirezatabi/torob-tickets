@@ -1,10 +1,9 @@
 import { NextResponse } from "next/server";
 import { parseSearchParams } from "@/lib/search-params";
-import { addDays, isoToday } from "@/lib/jalali";
 import { runSearch } from "@/providers/search";
 import type { SortKey } from "@/ranking/score";
 import { prepareResultList } from "@/providers/search";
-import { SORT_KEYS } from "@/lib/search-params";
+import { DEFAULT_SORT, SORT_KEYS } from "@/lib/search-params";
 
 export const runtime = "nodejs";
 
@@ -15,13 +14,13 @@ export const runtime = "nodejs";
 export async function GET(request: Request) {
   const url = new URL(request.url);
   const raw = Object.fromEntries(url.searchParams.entries());
-  const parsed = parseSearchParams(raw, { date: addDays(isoToday(), 7) });
+  const parsed = parseSearchParams(raw);
 
   if (!parsed.ok) {
     return NextResponse.json({ error: parsed.reason, missing: parsed.missing }, { status: 422 });
   }
 
-  const sort = (SORT_KEYS as readonly string[]).includes(raw.sort ?? "") ? (raw.sort as SortKey) : "best";
+  const sort = (SORT_KEYS as readonly string[]).includes(raw.sort ?? "") ? (raw.sort as SortKey) : DEFAULT_SORT;
   const outcome = await runSearch(parsed.query);
   const { groups } = prepareResultList(outcome, sort);
 

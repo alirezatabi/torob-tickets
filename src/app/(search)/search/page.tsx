@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
 import { AlertTriangle, ArrowRight, SearchX } from "lucide-react";
-import { parseSearchParams, SORT_KEYS, type SortKeyParam } from "@/lib/search-params";
-import { addDays, formatJalaliFull, isoToday } from "@/lib/jalali";
+import { DEFAULT_SORT, parseSearchParams, SORT_KEYS, type SortKeyParam } from "@/lib/search-params";
+import { addDays, formatJalaliFull } from "@/lib/jalali";
 import { cityLabel } from "@/lib/cities";
 import { toPersianDigits } from "@/lib/format";
 import { searchTrips } from "@/server/search-service";
@@ -32,7 +32,7 @@ export async function generateMetadata({ searchParams }: SearchPageProps): Promi
 
 export default async function SearchPage({ searchParams }: SearchPageProps) {
   const raw = flatten(await searchParams);
-  const parsed = parseSearchParams(raw, { date: addDays(isoToday(), 7) });
+  const parsed = parseSearchParams(raw);
 
   if (!parsed.ok) {
     return (
@@ -56,7 +56,7 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
     );
   }
 
-  const sortParam = (SORT_KEYS as readonly string[]).includes(raw.sort ?? "") ? (raw.sort as SortKeyParam) : "best";
+  const sortParam = (SORT_KEYS as readonly string[]).includes(raw.sort ?? "") ? (raw.sort as SortKeyParam) : DEFAULT_SORT;
   const view = await searchTrips(parsed.query, sortParam);
   const { outcome, groups } = view;
 

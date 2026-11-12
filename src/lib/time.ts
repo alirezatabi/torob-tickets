@@ -77,6 +77,25 @@ export function wallClockInZone(iso: string, timeZone: string): { date: string; 
   return { date: date ?? iso.slice(0, 10), time: time ?? "00:00" };
 }
 
+/**
+ * The civil day **at the departure airport** for a UTC instant.
+ *
+ * "The day the user flies" is a local fact, not a UTC one: a 00:30 Tehran departure is
+ * still *yesterday* in UTC (UTC+3:30 = 21:00 the day before). Every place that buckets,
+ * groups, links or filters by "day" must use this, never `iso.slice(0, 10)`.
+ */
+export function localDepartDate(isoUtc: string, timeZone: string, fallbackIsoDate?: string): string {
+  if (!isoUtc) return fallbackIsoDate ?? "";
+  const date = wallClockInZone(isoUtc, timeZone).date;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(date)) return date;
+  return fallbackIsoDate ?? isoUtc.slice(0, 10);
+}
+
+/** `HH:MM` wall clock at the departure airport, for links that must quote local time. */
+export function localDepartTime(isoUtc: string, timeZone: string): string {
+  return wallClockInZone(isoUtc, timeZone).time;
+}
+
 /** Deterministic 32-bit FNV-1a hash, used for stable demo price jitter. */
 export function hashString(input: string): number {
   let hash = 0x811c9dc5;
@@ -89,5 +108,6 @@ export function hashString(input: string): number {
 
 /** Deterministic number in [0, 1) derived from the input string. */
 export function seededUnit(input: string): number {
-  return hashString(input) / 0xffffffff;
+  // 2**32, not 0xffffffff: the hash space is 0 .. 2**32-1, so the result is [0, 1).
+  return hashString(input) / 0x100000000;
 }

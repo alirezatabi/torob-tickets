@@ -9,6 +9,8 @@ export interface Airline {
 export const AIRLINES: Airline[] = [
   { code: "IR", fa: "هما (ایران‌ایر)", en: "Iran Air", shortHaul: false },
   { code: "W5", fa: "ماهان ایر", en: "Mahan Air", shortHaul: false },
+  // Kish Air — IATA `Y9`, ICAO `KIS` (the carrier that actually flies IFN⇄KIH).
+  { code: "Y9", fa: "کیش‌ایر", en: "Kish Air", shortHaul: true },
   { code: "B9", fa: "ایران ایرتور", en: "Iran Airtour", shortHaul: false },
   { code: "TK", fa: "ترکیش ایرلاینز", en: "Turkish Airlines", shortHaul: false },
   { code: "PC", fa: "پگاسوس", en: "Pegasus", shortHaul: true },

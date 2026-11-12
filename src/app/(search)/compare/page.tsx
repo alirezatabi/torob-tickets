@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowRight, Check, GitCompareArrows, Minus, TriangleAlert } from "lucide-react";
 import { parseSearchParams } from "@/lib/search-params";
-import { addDays, isoToday, formatJalaliFull } from "@/lib/jalali";
+import { formatJalaliFull } from "@/lib/jalali";
 import { cityLabel, getCity } from "@/lib/cities";
 import { formatDuration, formatStopsShort, formatTimeInZone, formatToman, toPersianDigits } from "@/lib/format";
 import { searchTrips } from "@/server/search-service";
@@ -25,7 +25,7 @@ interface ComparePageProps {
 
 export default async function ComparePage({ searchParams }: ComparePageProps) {
   const raw = flatten(await searchParams);
-  const parsed = parseSearchParams(raw, { date: addDays(isoToday(), 7) });
+  const parsed = parseSearchParams(raw);
 
   if (!parsed.ok) {
     return <CompareError message={parsed.reason} />;

@@ -7,6 +7,8 @@ import { formatRelative, formatToman, toPersianDigits } from "@/lib/format";
 import { normalizeDigits } from "@/modules/money/price";
 import { formatJalaliFull } from "@/lib/jalali";
 import { getCity } from "@/lib/cities";
+import { formatTimeInZone } from "@/lib/format";
+import { localDepartDate } from "@/lib/time";
 import { cn } from "@/lib/cn";
 import { demoSearchHref, sourceRedirectFor } from "@/modules/live/source-link";
 
@@ -61,6 +63,12 @@ export function LiveOfferCard({ offer, index }: { offer: LiveOfferView | LiveGro
   const origin = getCity(offer.originCity);
   const destination = getCity(offer.destinationCity);
   const freshness = FRESHNESS_LABELS[offer.freshness] ?? FALLBACK_FRESHNESS;
+  // Wall clocks in each airport's own timezone, and the local departure day — never the
+  // UTC slice of the instant (B4/B5).
+  const originTz = origin?.timezone ?? "Asia/Tehran";
+  const destinationTz = destination?.timezone ?? "Asia/Tehran";
+  const departClock = formatTimeInZone(offer.departAt, originTz);
+  const arriveClock = formatTimeInZone(offer.arriveAt, destinationTz);
   // Never render a placeholder/relative URL as if it were the source's page.
   const source = sourceRedirectFor({
     offerUrl: offer.offerUrl,
@@ -69,7 +77,7 @@ export function LiveOfferCard({ offer, index }: { offer: LiveOfferView | LiveGro
     originCity: offer.originCity,
     destinationCity: offer.destinationCity,
     departAt: offer.departAt,
-    departTime: offer.departAt.slice(11, 16),
+    departTime: departClock,
     airlineCode: offer.airlineCode,
   });
 
@@ -131,7 +139,7 @@ export function LiveOfferCard({ offer, index }: { offer: LiveOfferView | LiveGro
 
           <div className="mt-3 flex items-center gap-3 text-sm">
             <div className="text-center">
-              <p className="nums font-bold text-ink-900">{offer.departAt.slice(11, 16)}</p>
+              <p className="nums font-bold text-ink-900">{departClock}</p>
               <p className="mt-0.5 text-[0.6rem] text-ink-400">
                 {offer.originAirport && offer.originAirport !== offer.originCity
                   ? `${offer.originAirport} · ${origin?.fa ?? offer.originCity}`
@@ -149,7 +157,7 @@ export function LiveOfferCard({ offer, index }: { offer: LiveOfferView | LiveGro
               </span>
             </div>
             <div className="text-center">
-              <p className="nums font-bold text-ink-900">{offer.arriveAt.slice(11, 16)}</p>
+              <p className="nums font-bold text-ink-900">{arriveClock}</p>
               <p className="mt-0.5 text-[0.6rem] text-ink-400">
                 {offer.destinationAirport && offer.destinationAirport !== offer.destinationCity
                   ? `${offer.destinationAirport} · ${destination?.fa ?? offer.destinationCity}`
@@ -159,7 +167,7 @@ export function LiveOfferCard({ offer, index }: { offer: LiveOfferView | LiveGro
           </div>
 
           <div className="mt-2.5 flex flex-wrap items-center gap-1 text-[0.62rem]">
-            <span className="rounded-md bg-ink-100 px-1.5 py-0.5 text-ink-600">{formatJalaliFull(offer.departAt.slice(0, 10))}</span>
+            <span className="rounded-md bg-ink-100 px-1.5 py-0.5 text-ink-600">{formatJalaliFull(localDepartDate(offer.departAt, originTz))}</span>
             <span className="rounded-md bg-ink-100 px-1.5 py-0.5 text-ink-600">{CABIN_SHORT[offer.cabin] ?? offer.cabin}</span>
             {offer.fareClass ? <span className="rounded-md bg-ink-100 px-1.5 py-0.5 text-ink-600">{offer.fareClass}</span> : null}
             <span

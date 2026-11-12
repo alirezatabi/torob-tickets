@@ -93,8 +93,9 @@ describe("search → results journey", () => {
     const user = userEvent.setup();
     render(createElement(SortTabs, { current: "best" }));
 
-    await user.click(screen.getByRole("tab", { name: /ارزان‌ترین/ }));
-    expect(push).toHaveBeenCalledWith("/search?origin=THR&destination=IST&date=2026-11-20&sort=cheapest", {
+    // The default sort *is* «ارزان‌ترین», so a different tab is what produces a URL change.
+    await user.click(screen.getByRole("tab", { name: /سریع‌ترین/ }));
+    expect(push).toHaveBeenCalledWith("/search?origin=THR&destination=IST&date=2026-11-20&sort=fastest", {
       scroll: false,
     });
   });

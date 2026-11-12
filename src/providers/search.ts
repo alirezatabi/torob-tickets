@@ -1,7 +1,7 @@
 import type { FlightOffer } from "@/domain/flight";
 import type { TripQuery } from "@/domain/trip";
 import { groupOffers } from "@/dedupe/group";
-import { rankOffers, type RankedResult, type SortKey, sortScored } from "@/ranking/score";
+import { isWithinSalesWindow, rankOffers, tripMatchesOfferDate, type RankedResult, type SortKey, sortScored } from "@/ranking/score";
 import { FLIGHT_PROVIDERS } from "./registry";
 import type { NormalizationIssue, ProviderHealth } from "./types";
 
@@ -100,8 +100,11 @@ export async function runSearch(
     });
   }
 
-  // Keep only offers that actually match the requested date in the origin's zone.
-  const onDate = offers.filter((offer) => matchesRequestedDate(offer, query));
+  // Keep only offers that really depart on the requested **local** day, and — when that day
+  // is today — only those still on sale (a 14:00 departure cannot be sold at 16:00).
+  const onDate = offers.filter(
+    (offer) => tripMatchesOfferDate(query, offer) && isWithinSalesWindow(offer, now),
+  );
   const ranked = rankOffers(onDate, query.filters);
 
   return {
@@ -113,10 +116,6 @@ export async function runSearch(
     fetchedAt: now.toISOString(),
     totalMs: Date.now() - startedAt,
   };
-}
-
-function matchesRequestedDate(offer: FlightOffer, query: TripQuery): boolean {
-  return offer.departAt.slice(0, 10) >= query.departDate || true; // demo schedules are per-date already
 }
 
 /** Grouped + sorted offers, the shape the results page consumes. */

@@ -2,13 +2,15 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { useTransition } from "react";
-import { Clock, Sparkles, Wallet } from "lucide-react";
+import { CalendarClock, Clock, Sparkles, Wallet } from "lucide-react";
 import { SORT_LABELS, type SortKey } from "@/ranking/score";
+import { DEFAULT_SORT } from "@/lib/search-params";
 import { cn } from "@/lib/cn";
 
 const ICONS: Record<SortKey, React.ReactNode> = {
   best: <Sparkles className="size-3.5" aria-hidden="true" />,
   cheapest: <Wallet className="size-3.5" aria-hidden="true" />,
+  earliest: <CalendarClock className="size-3.5" aria-hidden="true" />,
   fastest: <Clock className="size-3.5" aria-hidden="true" />,
 };
 
@@ -23,7 +25,8 @@ export function SortTabs({ current }: { current: SortKey }) {
 
   function select(key: SortKey) {
     const params = new URLSearchParams(searchParams.toString());
-    if (key === "best") params.delete("sort");
+    // The URL is the state: no `sort` means the default (cheapest), which keeps links short.
+    if (key === DEFAULT_SORT) params.delete("sort");
     else params.set("sort", key);
     startTransition(() => router.push(`/search?${params.toString()}`, { scroll: false }));
   }

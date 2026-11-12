@@ -23,6 +23,7 @@ import { withTransaction } from "@/modules/db/transaction";
 import { DatabaseError, mapPrismaError } from "@/modules/db/errors";
 import { baggageFacts, localDate } from "@/modules/providers/shared/normalize-offer";
 import { offerKey, type FareFacts } from "@/modules/live/offer-identity";
+import { departDayOf } from "@/dedupe/group";
 import type {
   FlightOfferCreateInput,
   JsonValue,
@@ -108,7 +109,7 @@ function fareFactsOf(offer: FlightOffer): FareFacts {
     flightNumber: offer.flightNumber,
     originAirport: offer.originAirport ?? offer.originCode,
     destinationAirport: offer.destinationAirport ?? offer.destinationCode,
-    departDate: offer.departAt.slice(0, 10),
+    departDate: departDayOf(offer),
     cabin: offer.cabin,
     fareClass: offer.fare?.fareClass ?? null,
     baggage: baggageFacts(offer.baggage),

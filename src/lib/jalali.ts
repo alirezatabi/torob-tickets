@@ -119,6 +119,21 @@ export function parseIsoDate(iso: string): { year: number; month: number; day: n
   return { year: y, month: m, day: d };
 }
 
+/**
+ * True only for a real civil day written `YYYY-MM-DD`.
+ *
+ * `2026-13-45` and `2026-02-30` are not "unknown dates", they are typos: the caller must
+ * be able to say so in Persian instead of silently searching some other day.
+ */
+export function isValidCivilDate(iso: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(iso)) return false;
+  const [year, month, day] = iso.split("-").map(Number);
+  if (!year || !month || !day) return false;
+  if (month < 1 || month > 12 || day < 1) return false;
+  const date = new Date(Date.UTC(year, month - 1, day));
+  return date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day;
+}
+
 export function toIsoDate(year: number, month: number, day: number): string {
   return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
 }

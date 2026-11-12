@@ -179,6 +179,260 @@ function domesticRoutes(): RouteSpec[] {
   return routes;
 }
 
+/**
+ * Domestic city pairs that do **not** go through Tehran.
+ *
+ * The demo used to be hub-and-spoke: every domestic flight started or ended at THR, so
+ * «اصفهان ← کیش» — the reference scenario of the product — returned "no flights" while the
+ * README promised every city works as both origin and destination. Long-haul Iranian
+ * domestic traffic is real (IFN⇄KIH and MHD⇄KIH especially), so the timetable now contains
+ * a small mesh as well.
+ *
+ * Duration and base fare come from the **great-circle distance** between the two airports
+ * (`haversineKm`), not from hand-tuned numbers: a shorter hop is a shorter, cheaper flight,
+ * automatically and consistently. Frequency is one rotation per direction per carrier
+ * pattern, and the two carriers are spread across the day so the demo has a morning and an
+ * evening option.
+ */
+interface MeshPair {
+  from: string;
+  to: string;
+  /** Carriers serving the pair, in the order their rotations are scheduled. */
+  carriers: { airlineCode: string; number: number; depart: string }[];
+}
+
+const DOMESTIC_MESH: MeshPair[] = [
+  // ——— The reference scenario: Isfahan ⇄ Kish ———
+  {
+    from: "IFN",
+    to: "KIH",
+    carriers: [
+      { airlineCode: "IR", number: 3301, depart: "13:00" },
+      { airlineCode: "Y9", number: 7204, depart: "19:00" },
+    ],
+  },
+  {
+    from: "KIH",
+    to: "IFN",
+    carriers: [
+      { airlineCode: "IR", number: 3302, depart: "15:10" },
+      { airlineCode: "Y9", number: 7205, depart: "21:00" },
+    ],
+  },
+  // ——— Mashhad ⇄ Kish ———
+  {
+    from: "MHD",
+    to: "KIH",
+    carriers: [
+      { airlineCode: "Y9", number: 7230, depart: "09:40" },
+      { airlineCode: "IR", number: 3341, depart: "17:30" },
+    ],
+  },
+  {
+    from: "KIH",
+    to: "MHD",
+    carriers: [
+      { airlineCode: "Y9", number: 7231, depart: "12:20" },
+      { airlineCode: "IR", number: 3342, depart: "20:05" },
+    ],
+  },
+  // ——— Shiraz ⇄ Kish ———
+  {
+    from: "SYZ",
+    to: "KIH",
+    carriers: [
+      { airlineCode: "Y9", number: 7240, depart: "08:15" },
+      { airlineCode: "EP", number: 3711, depart: "16:00" },
+    ],
+  },
+  {
+    from: "KIH",
+    to: "SYZ",
+    carriers: [
+      { airlineCode: "Y9", number: 7241, depart: "10:30" },
+      { airlineCode: "EP", number: 3712, depart: "18:10" },
+    ],
+  },
+  // ——— Isfahan ⇄ Mashhad ———
+  {
+    from: "IFN",
+    to: "MHD",
+    carriers: [
+      { airlineCode: "IR", number: 3361, depart: "07:20" },
+      { airlineCode: "B9", number: 2631, depart: "14:40" },
+    ],
+  },
+  {
+    from: "MHD",
+    to: "IFN",
+    carriers: [
+      { airlineCode: "IR", number: 3362, depart: "09:50" },
+      { airlineCode: "B9", number: 2632, depart: "17:00" },
+    ],
+  },
+  // ——— Isfahan ⇄ Shiraz ———
+  {
+    from: "IFN",
+    to: "SYZ",
+    carriers: [
+      { airlineCode: "EP", number: 3731, depart: "11:10" },
+      { airlineCode: "IR", number: 3381, depart: "18:20" },
+    ],
+  },
+  {
+    from: "SYZ",
+    to: "IFN",
+    carriers: [
+      { airlineCode: "EP", number: 3732, depart: "13:20" },
+      { airlineCode: "IR", number: 3382, depart: "20:30" },
+    ],
+  },
+  // ——— Shiraz ⇄ Mashhad ———
+  {
+    from: "SYZ",
+    to: "MHD",
+    carriers: [
+      { airlineCode: "B9", number: 2641, depart: "06:50" },
+      { airlineCode: "IR", number: 3391, depart: "15:30" },
+    ],
+  },
+  {
+    from: "MHD",
+    to: "SYZ",
+    carriers: [
+      { airlineCode: "B9", number: 2642, depart: "09:20" },
+      { airlineCode: "IR", number: 3392, depart: "18:00" },
+    ],
+  },
+  // ——— Tabriz ⇄ Kish ———
+  {
+    from: "TBZ",
+    to: "KIH",
+    carriers: [
+      { airlineCode: "Y9", number: 7250, depart: "10:20" },
+      { airlineCode: "B9", number: 2651, depart: "19:40" },
+    ],
+  },
+  {
+    from: "KIH",
+    to: "TBZ",
+    carriers: [
+      { airlineCode: "Y9", number: 7251, depart: "13:50" },
+      { airlineCode: "B9", number: 2652, depart: "23:00" },
+    ],
+  },
+  // ——— Ahvaz ⇄ Kish ———
+  {
+    from: "AWZ",
+    to: "KIH",
+    carriers: [
+      { airlineCode: "Y9", number: 7260, depart: "12:10" },
+      { airlineCode: "EP", number: 3751, depart: "20:15" },
+    ],
+  },
+  {
+    from: "KIH",
+    to: "AWZ",
+    carriers: [
+      { airlineCode: "Y9", number: 7261, depart: "14:40" },
+      { airlineCode: "EP", number: 3752, depart: "22:30" },
+    ],
+  },
+  // ——— Bandar Abbas ⇄ Kish ———
+  {
+    from: "BND",
+    to: "KIH",
+    carriers: [
+      { airlineCode: "Y9", number: 7270, depart: "08:40" },
+      { airlineCode: "IR", number: 3401, depart: "17:15" },
+    ],
+  },
+  {
+    from: "KIH",
+    to: "BND",
+    carriers: [
+      { airlineCode: "Y9", number: 7271, depart: "10:30" },
+      { airlineCode: "IR", number: 3402, depart: "19:00" },
+    ],
+  },
+  // ——— Isfahan ⇄ Ahvaz ———
+  {
+    from: "IFN",
+    to: "AWZ",
+    carriers: [
+      { airlineCode: "EP", number: 3771, depart: "09:30" },
+      { airlineCode: "IR", number: 3421, depart: "16:50" },
+    ],
+  },
+  {
+    from: "AWZ",
+    to: "IFN",
+    carriers: [
+      { airlineCode: "EP", number: 3772, depart: "11:50" },
+      { airlineCode: "IR", number: 3422, depart: "19:10" },
+    ],
+  },
+];
+
+/**
+ * Great-circle distance between two catalogue airports, in km.
+ * Used for the mesh's block time and base fare so neither is invented on the spot.
+ */
+export function haversineKm(fromCode: string, toCode: string): number {
+  const from = getCity(fromCode);
+  const to = getCity(toCode);
+  if (!from || !to) return 0;
+  const toRad = (deg: number) => (deg * Math.PI) / 180;
+  const dLat = toRad(to.lat - from.lat);
+  const dLon = toRad(to.lon - from.lon);
+  const a =
+    Math.sin(dLat / 2) ** 2 + Math.cos(toRad(from.lat)) * Math.cos(toRad(to.lat)) * Math.sin(dLon / 2) ** 2;
+  return Math.round(2 * 6371 * Math.asin(Math.sqrt(a)));
+}
+
+/**
+ * Block time from distance: ~560 km/h cruise plus 25 minutes of taxi/climb/descent,
+ * rounded up to five minutes (airline schedules are quoted that way).
+ */
+export function blockMinutesFor(km: number): number {
+  return Math.max(45, Math.ceil((25 + km / 9.33) / 5) * 5);
+}
+
+/** Base economy fare from distance: a fixed handling cost plus a per-km fare. */
+export function baseFareFor(km: number): number {
+  return Math.round((850_000 + km * 4_100) / 10_000) * 10_000;
+}
+
+const MESH_FLEET = ["Airbus A320", "Boeing 737-400", "ATR 72", "Fokker 100"];
+
+/** Both directions of every mesh pair, with distance-derived time and price. */
+function domesticMesh(): RouteSpec[] {
+  const routes: RouteSpec[] = [];
+  for (const pair of DOMESTIC_MESH) {
+    const km = haversineKm(pair.from, pair.to);
+    if (km <= 0) continue;
+    const minutes = blockMinutesFor(km);
+    const price = baseFareFor(km);
+    routes.push({
+      from: pair.from,
+      to: pair.to,
+      legs: pair.carriers.map((carrier, index) => ({
+        airlineCode: carrier.airlineCode,
+        number: carrier.number,
+        depart: carrier.depart,
+        minutes,
+        aircraft: MESH_FLEET[index % MESH_FLEET.length] ?? "Airbus A320",
+        // The second carrier of the day is a little cheaper, like a real off-peak fare.
+        price: index === 0 ? price : Math.round((price * 0.94) / 10_000) * 10_000,
+        checkedKg: 20,
+        cabinKg: 7,
+        refundable: index === 0,
+      })),
+    });
+  }
+  return routes;
+}
+
 const REGIONAL: RouteSpec[] = [
   // ——— Istanbul: the flagship demo route ———
   {
@@ -1105,7 +1359,7 @@ const REGIONAL: RouteSpec[] = [
 
 function buildPatterns(): FlightPattern[] {
   const patterns: FlightPattern[] = [];
-  for (const route of [...REGIONAL, ...domesticRoutes()]) {
+  for (const route of [...REGIONAL, ...domesticRoutes(), ...domesticMesh()]) {
     if (!route.legs.length) continue;
     for (const leg of route.legs) {
       const stops = (leg.stops ?? 0) as number;

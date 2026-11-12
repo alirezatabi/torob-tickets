@@ -149,26 +149,49 @@ export function rankOffers(offers: FlightOffer[], prefs: QueryPreferences): Rank
   return { ranked: scored, feasible, excluded, cheapest, fastest, best: scored[0] ?? null, weights };
 }
 
-export type SortKey = "best" | "cheapest" | "fastest";
+/**
+ * The four tabs are genuinely different orders, and every one of them ends in a
+ * deterministic tie-break (`providerId`-free: price → duration → departure → id) so the same
+ * data always produces the same page, on any machine.
+ */
+export type SortKey = "best" | "cheapest" | "earliest" | "fastest";
 
 export const SORT_LABELS: Record<SortKey, string> = {
   best: "بهترین تطابق",
   cheapest: "ارزان‌ترین",
+  earliest: "زودترین حرکت",
   fastest: "سریع‌ترین",
 };
+
+function byCodePoint(a: string, b: string): number {
+  return a < b ? -1 : a > b ? 1 : 0;
+}
+
+/** Stable, locale-independent tie-break shared by every sort mode. */
+export function compareStable(a: ScoredOffer, b: ScoredOffer): number {
+  if (a.offer.price.toman !== b.offer.price.toman) return a.offer.price.toman - b.offer.price.toman;
+  if (a.offer.durationMinutes !== b.offer.durationMinutes) return a.offer.durationMinutes - b.offer.durationMinutes;
+  const departure = new Date(a.offer.departAt).getTime() - new Date(b.offer.departAt).getTime();
+  if (departure !== 0) return departure;
+  return byCodePoint(a.offer.id, b.offer.id);
+}
 
 /** Apply a user-chosen sort to the ranked candidates (stable and explicit). */
 export function sortScored(scored: ScoredOffer[], key: SortKey): ScoredOffer[] {
   const copy = [...scored];
   if (key === "cheapest") {
-    return copy.sort((a, b) => a.offer.price.toman - b.offer.price.toman || a.offer.durationMinutes - b.offer.durationMinutes);
+    return copy.sort((a, b) => a.offer.price.toman - b.offer.price.toman || compareStable(a, b));
   }
   if (key === "fastest") {
+    return copy.sort((a, b) => a.offer.durationMinutes - b.offer.durationMinutes || compareStable(a, b));
+  }
+  if (key === "earliest") {
     return copy.sort(
-      (a, b) => a.offer.durationMinutes - b.offer.durationMinutes || a.offer.price.toman - b.offer.price.toman,
+      (a, b) =>
+        new Date(a.offer.departAt).getTime() - new Date(b.offer.departAt).getTime() || compareStable(a, b),
     );
   }
-  return copy.sort((a, b) => (b.feasible !== a.feasible ? (a.feasible ? -1 : 1) : b.score - a.score));
+  return copy.sort((a, b) => (a.feasible !== b.feasible ? (a.feasible ? -1 : 1) : b.score - a.score || compareStable(a, b)));
 }
 
 /** Hour/day-part of an offer in the origin timezone, for filters and UI labels. */
@@ -177,6 +200,24 @@ export function departureContext(offer: FlightOffer): { hour: number; dateIso: s
   return { hour: hourInZone(offer.departAt, tz), dateIso: isoDateInZone(offer.departAt, tz) };
 }
 
+/**
+ * True when the offer departs on the requested **local** day at the origin airport.
+ * This is the only correct reading of "the flight on 29 Aban": a 00:30 Tehran departure is
+ * that day in Tehran even though it is the previous day in UTC.
+ */
 export function tripMatchesOfferDate(query: TripQuery, offer: FlightOffer): boolean {
   return departureContext(offer).dateIso === query.departDate;
+}
+
+/**
+ * Already-past departures inside today's list.
+ *
+ * Tickets cannot be sold up to the minute of departure, so "today" hides anything that
+ * departs within `SALES_CUTOFF_MINUTES`; it is a named constant so the UI and the tests
+ * agree on the same rule.
+ */
+export const SALES_CUTOFF_MINUTES = 90;
+
+export function isWithinSalesWindow(offer: FlightOffer, now: Date, cutoffMinutes = SALES_CUTOFF_MINUTES): boolean {
+  return new Date(offer.departAt).getTime() - now.getTime() >= cutoffMinutes * 60_000;
 }
