@@ -22,6 +22,8 @@ inflated in the provider strip or in the docs.
 
 ## Sepehr360
 
+- Hosts: the publisher's own — `sepehr360.ir`, `www.`, `api.`, `cdn.` (its logos already
+  come from the CDN). No other domain is reachable, and robots.txt is honoured on each.
 - Endpoint: `GET https://sepehr360.ir/Flight/B2c/Search?origin=THR&destination=MHD&departureDate=1405-08-22`
   (`departureDate` is **Jalali**; a Gregorian date silently returns an empty list, so the
   URL builder converts and is unit-tested).
@@ -50,10 +52,18 @@ inflated in the provider strip or in the docs.
   1. **Embedded JSON first.** If the document already ships the results
      (`<script type="application/json">`, `window.__STATE__ = {…}`), that is read with **no
      extra request**.
-  2. **The page's bundles as a roadmap.** Up to 2 same-host `<script src>` bundles are
-     fetched and scanned for quoted literals that look like API paths
-     (`/(api|ws|v\d|flight|search)/`) on an allowlisted **https** host. The page's inline
-     scripts are scanned too.
+  1b. **Same-URL JSON negotiation.** If the page is a single-page app, its own client asks
+     *the very same URL* for JSON. One request with `Accept: application/json` (then an
+     XHR-flavoured retry) answers the question without guessing any route.
+  2. **The app's bundles as a roadmap.** Up to 2 same-host bundles are fetched — the app
+     chunks, never `runtime`/`polyfills`/`vendor`/CSS, which cost 300 KB and never name an
+     endpoint. Each quoted literal is judged **on its own text**, not on the URL it would
+     resolve to (that is how `/Flight/B2c/gtm.start` once looked like an API route), ranked
+     by how much it reads like a fares route, and tag-manager/analytics literals are dropped.
+  2b. **Routes implied by the page's own layout.** With `/Flight/B2c/Search` and an API
+     namespace visible in the site's asset paths (`/Flight/B2c/src/assets/…`), the
+     `/Flight/B2c/api/search` family is probed last, still JSON-only, still
+     shape-verified. Every probe asks for JSON; a probe that receives HTML is not counted.
   3. **Bounded probing.** At most 3 candidates. Each is called **with the search the page
      carries** (`?origin=THR&destination=MHD&departureDate=1405-…`) — a fares API is
      meaningless without the question — and then bare.
@@ -76,9 +86,10 @@ inflated in the provider strip or in the docs.
   offers, the failure carries both the diagnosis and what discovery saw, in
   `ProviderRunReport.error.summaryFa` (so it shows up in `provider:check`, `search:live` and
   the live UI):
-  - `discovery=empty scripts=N json=N shapes=/path[keys…]` — how many bundles were read, how
-    many endpoints answered JSON, and the key names of the payloads that did. This is the
-    line to read before changing anything.
+  - `discovery=empty [spa=same-url-html] scripts=N json=N shapes=/path[keys…]` — whether the
+    search URL only ever returned the app shell, how many bundles were read, how many
+    endpoints answered JSON, and the key names of the payloads that did. This is the line to
+    read before changing anything.
   - `results-require-js` — the page is a shell and the feed was not reachable (bundles
     blocked, endpoint behind a wall). *This is the honest answer when a public results page
     stops being server-rendered.*

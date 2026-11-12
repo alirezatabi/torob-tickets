@@ -22,6 +22,21 @@ import { airportsForCity } from "@/modules/airports";
 export const SEPEHR360_BASE = "https://sepehr360.ir";
 export const SEPEHR360_HOST = "sepehr360.ir";
 
+/**
+ * The publisher's own hosts.
+ *
+ * `api.sepehr360.ir` and `cdn.sepehr360.ir` appear in the site's own markup (its airline
+ * logos come from the CDN); a JSON feed served from a sub-host of the publisher is the same
+ * source, not a new one, so it is allowlisted — with robots and the token bucket still in
+ * force. No other domain is ever reachable.
+ */
+export const SEPEHR360_HOSTS = [
+  SEPEHR360_HOST,
+  "www.sepehr360.ir",
+  "api.sepehr360.ir",
+  "cdn.sepehr360.ir",
+] as const;
+
 export interface Sepehr360UrlInput {
   originCity: string;
   destinationCity: string;

@@ -4,6 +4,7 @@ import {
   discoverOffersEndpoint,
   extractApiCandidates,
   extractEmbeddedJson,
+  derivedRoutes,
   findOfferArray,
   looksLikeFlightOffer,
   scanText,
@@ -64,12 +65,20 @@ describe("extractApiCandidates", () => {
     expect(scanText(noise, PAGE, allowHost, "x.js")).toHaveLength(0);
   });
 
-  it("lists the page's own bundles as the roadmap", () => {
-    const { scripts } = extractApiCandidates(SHELL, PAGE, allowHost);
-    expect(scripts).toEqual([
-      "https://sepehr360.ir/assets/app.4f2c.js",
-      "https://sepehr360.ir/assets/vendor.9a1b.js",
-    ]);
+  it("lists the app bundle as the roadmap and drops framework noise", () => {
+    const { scripts } = extractApiCandidates(
+      // The real page's first two scripts were exactly this pair — 300 KB that never names
+      // the fares endpoint. The app chunk is the one worth reading.
+      `<!doctype html><html><body>
+        <script src="/Flight/B2c/runtime.cc96c6be35fde7e3.js"></script>
+        <script src="/Flight/B2c/polyfills.216cfe321010e39c.js"></script>
+        <script src="/Flight/B2c/main.77aa11bb22cc33dd.js"></script>
+        <script src="/Flight/B2c/styles.css"></script>
+      </body></html>`,
+      PAGE,
+      allowHost,
+    );
+    expect(scripts).toEqual(["https://sepehr360.ir/Flight/B2c/main.77aa11bb22cc33dd.js"]);
   });
 });
 
@@ -210,6 +219,121 @@ describe("extractEmbeddedJson", () => {
     expect(requests).toBe(0);
     expect(result.endpoint).toBe(PAGE);
     expect(result.items).toHaveLength(1);
+  });
+});
+
+describe("a client-side source that serves one HTML shell for every path", () => {
+  // This is the failure the operator hit, reproduced: every path answers 200 with the same
+  // 5151-byte SPA shell, including `/Flight/B2c/gtm.start`, and the fares only exist behind
+  // an `Accept: application/json` request to the site's own data route.
+  const SHELL_5151 = `<!doctype html><html><head><title>سپهر360:نمایش بلیت هواپیما - خرید بلیت چارتر و ارزان هواپیما</title></head>
+  <body><div id="app"></div>
+  <script src="/Flight/B2c/runtime.cc96c6be35fde7e3.js"></script>
+  <script src="/Flight/B2c/polyfills.216cfe321010e39c.js"></script>
+  <script src="/Flight/B2c/main.77aa11bb22cc33dd.js"></script>
+  </body></html>`;
+
+  const FEED = JSON.stringify({
+    data: {
+      flights: [
+        { airlineCode: "VR", price: 6_800_000, departTime: "13:00", arriveTime: "14:15" },
+        { airlineCode: "W5", price: 11_606_000, departTime: "17:45", arriveTime: "19:10" },
+      ],
+    },
+  });
+
+  const RUNTIME = 'var s = "gtm.start"; var d = "dataLayer"; var g = "GTM-KMZRMWH";';
+  const MAIN = 'var api = "/Flight/B2c/api/search"; var other = "https://www.googletagmanager.com/gtm.js";';
+
+  /** Serves the shell for every path; JSON only when the caller asks for JSON. */
+  function spaHttp(options: { jsonPath: string; honourAccept?: boolean }) {
+    const calls: Array<{ url: string; accept?: string }> = [];
+    const http = {
+      request: async ({ url, headers }: { url: string; headers?: Record<string, string> }) => {
+        calls.push({ url, accept: headers?.accept });
+        const path = new URL(url).pathname;
+        const wantsJson = (headers?.accept ?? "").includes("application/json");
+        if (options.honourAccept !== false && wantsJson && path === options.jsonPath) {
+          return { status: 200, body: FEED, headers: {}, latencyMs: 1, retries: 0, url, fromCache: false };
+        }
+        if (path.endsWith("/runtime.cc96c6be35fde7e3.js")) {
+          return { status: 200, body: RUNTIME, headers: {}, latencyMs: 1, retries: 0, url, fromCache: false };
+        }
+        if (path.endsWith("/main.77aa11bb22cc33dd.js")) {
+          return { status: 200, body: MAIN, headers: {}, latencyMs: 1, retries: 0, url, fromCache: false };
+        }
+        return { status: 200, body: SHELL_5151, headers: {}, latencyMs: 1, retries: 0, url, fromCache: false };
+      },
+      isAllowedHost: (url: URL) => allowHost(url),
+    } as unknown as HttpClient;
+    return { http, calls };
+  }
+
+  it("finds the feed on the route the page's own bundle names", async () => {
+    const { http, calls } = spaHttp({ jsonPath: "/Flight/B2c/api/search" });
+    const result = await discoverOffersEndpoint({ http, html: SHELL_5151, pageUrl: PAGE, allowHost });
+
+    expect(result.items).toHaveLength(2);
+    expect(result.endpoint).toContain("/Flight/B2c/api/search");
+    // Every probe asked for JSON (bundle fetches are the only plain GETs); none was a blind
+    // HTML GET that the shell could satisfy with 5151 bytes.
+    expect(calls.filter((call) => call.accept !== undefined).every((call) => call.accept!.includes("application/json"))).toBe(true);
+    // No bundle was fetched beyond the two allowed, and no tag-manager junk was probed.
+    expect(calls.some((call) => /gtm\.start|dataLayer|GTM-KMZRMWH/.test(call.url))).toBe(false);
+    expect(calls.some((call) => call.url.includes("googletagmanager"))).toBe(false);
+  });
+
+  it("finds it even when no bundle names a route (derived from the page's own layout)", async () => {
+    const { http } = spaHttp({ jsonPath: "/Flight/B2c/api/search" });
+    // Bundles are unavailable; only the page's structure remains.
+    const blind = {
+      request: async ({ url, headers }: { url: string; headers?: Record<string, string> }) => {
+        const path = new URL(url).pathname;
+        if ((headers?.accept ?? "").includes("application/json") && path === "/Flight/B2c/api/search") {
+          return { status: 200, body: FEED, headers: {}, latencyMs: 1, retries: 0, url, fromCache: false };
+        }
+        throw new Error("404");
+      },
+      isAllowedHost: () => true,
+    } as unknown as HttpClient;
+
+    const result = await discoverOffersEndpoint({ http: blind, html: SHELL_5151, pageUrl: PAGE, allowHost });
+    expect(result.items).toHaveLength(2);
+    expect(result.endpoint).toContain("/Flight/B2c/api/search");
+    expect(http).toBeDefined();
+  });
+
+  it("reports sameUrlApi when even the search URL only returns the shell", async () => {
+    const shellOnly = {
+      request: async ({ url }: { url: string }) => ({
+        status: 200,
+        body: SHELL_5151,
+        headers: {},
+        latencyMs: 1,
+        retries: 0,
+        url,
+        fromCache: false,
+      }),
+      isAllowedHost: () => true,
+    } as unknown as HttpClient;
+
+    const result = await discoverOffersEndpoint({ http: shellOnly, html: SHELL_5151, pageUrl: PAGE, allowHost });
+    expect(result.items).toEqual([]);
+    expect(result.report.sameUrlApi).toBe(true);
+    expect(result.report.shapes).toEqual([]);
+  });
+});
+
+describe("derivedRoutes", () => {
+  it("stays inside the page's own directory and carries the search", () => {
+    const routes = derivedRoutes("https://sepehr360.ir/Flight/B2c/Search?origin=THR&destination=MHD");
+    expect(routes.length).toBeGreaterThan(0);
+    expect(routes.every((route) => route.startsWith("https://sepehr360.ir/Flight/B2c/"))).toBe(true);
+    expect(routes.every((route) => route.includes("origin=THR"))).toBe(true);
+  });
+
+  it("returns nothing for a page that has no directory to work from", () => {
+    expect(derivedRoutes("https://sepehr360.ir/")).toEqual([]);
   });
 });
 

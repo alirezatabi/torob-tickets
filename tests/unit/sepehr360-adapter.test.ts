@@ -247,6 +247,7 @@ describe("Sepehr360Adapter", () => {
     await expect(adapter.search(REQUEST, context())).rejects.toMatchObject({
       detail: expect.stringContaining("/api/flight/search"),
     });
+    void 0;
     vi.unstubAllGlobals();
   }, 40_000);
 

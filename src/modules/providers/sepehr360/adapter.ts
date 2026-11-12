@@ -46,7 +46,7 @@ import { mapApiOffer } from "./json-mapper";
 import { parseSearchPage } from "./parser";
 import { parsePersianDuration, parseStops, parseWallClock } from "./parse-duration";
 import type { Sepehr360RawOffer } from "./types";
-import { buildSearchUrl, SEPEHR360_HOST } from "./url";
+import { buildSearchUrl, SEPEHR360_HOST, SEPEHR360_HOSTS } from "./url";
 
 /**
  * Freshness policy.
@@ -117,7 +117,7 @@ export class Sepehr360Adapter implements LiveProviderAdapter<Sepehr360RawOffer> 
     const overrideHost = config.baseUrl ? safeHost(config.baseUrl) : null;
     const insecureHosts = overrideHost && config.baseUrl?.startsWith("http://") ? [overrideHost] : [];
     this.http = new HttpClient({
-      allowedHosts: [SEPEHR360_HOST, "www.sepehr360.ir", ...(overrideHost ? [overrideHost] : [])],
+      allowedHosts: [...SEPEHR360_HOSTS, ...(overrideHost ? [overrideHost] : [])],
       insecureHosts,
       robotsHosts: [...(overrideHost ? [overrideHost] : []), SEPEHR360_HOST],
       timeoutMs: 8_000,
@@ -265,6 +265,7 @@ export class Sepehr360Adapter implements LiveProviderAdapter<Sepehr360RawOffer> 
     if (discovery.items.length === 0) {
       const evidence = [
         `discovery=empty`,
+        discovery.report.sameUrlApi ? "spa=same-url-html" : "",
         `scripts=${discovery.report.scripts.length}`,
         `json=${discovery.report.jsonEndpoints.length}`,
         discovery.report.shapes.length > 0

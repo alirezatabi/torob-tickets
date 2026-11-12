@@ -39,6 +39,13 @@ export interface DiscoveryReport {
   matches: string[];
   /** Recorded JSON shapes for the report: `{endpoint, topLevelKeys, itemKeys}`. */
   shapes: Array<{ endpoint: string; topLevelKeys: string[]; itemKeys: string[] }>;
+  /**
+   * True when the search URL answered a JSON request with the single-page app's HTML shell.
+   * That is the signature of a same-URL JSON API: the data is behind a header, not a route.
+   */
+  sameUrlApi?: boolean;
+  /** Hosts the page's own code pointed at, for the operator's allowlist decision. */
+  hosts: string[];
 }
 
 export interface DiscoveryResult {
@@ -53,6 +60,19 @@ const MAX_SCRIPTS = 2;
 const MAX_PROBES = 3;
 const MAX_BYTES = 400_000;
 
+/**
+ * Headers that ask a single-page app's own origin for data instead of markup.
+ *
+ * The site the operator hit serves one 5151-byte HTML shell for *every* path — including
+ * `/Flight/B2c/gtm.start` — for browsers and for XHR alike, because the routing is
+ * client-side. Its own client calls its API host with these headers; asking the same URL
+ * that way is exactly what a browser does, not a bypass.
+ */
+const JSON_ACCEPT: [string, string] = [
+  "application/json, text/plain, */*",
+  "application/json, application/problem+json, text/plain, */*",
+];
+
 /** Keys that must exist on a "flight offer" object for us to accept the endpoint. */
 const PRICE_KEY = /(price|fare|amount|total|cost|قیمت)/i;
 const DEPART_KEY = /(depart|takeoff|take_off|origin.*time|time.*origin|خروج)/i;
@@ -64,6 +84,54 @@ const ARRIVE_KEY = /(arriv|landing|land|destination.*time|ورود)/i;
  * Exported separately because the interesting text is usually a *bundle*, not the page: the
  * page loads `/assets/app.<hash>.js`, and the bundle is where the endpoint is named. Only
  * quoted literals on an allowlisted https host whose path looks like an API are kept.
+ */
+/** Anti-bot walls embed tag-manager shims; probing them is pure noise. */
+const VENDOR_LITERAL = /(googletagmanager|google-analytics|gtag|gtm[.-]|recaptcha|gstatic|doubleclick|sentry|hotjar|clarity|facebook|yandex|zarinpal|yektanet)/i;
+
+/**
+ * Paths we refuse to probe even when they technically match: static assets, auth walls and
+ * analytics shims can never be a fares feed.
+ */
+const REJECTED_PATH =
+  /\.(js|mjs|css|map|png|jpe?g|gif|svg|webp|ico|woff2?|ttf|eot|mp4|pdf|json)$|\/(gtm|analytics|track|pixel|tag)([.\-/]|$)/i;
+
+/**
+ * How much a literal looks like an API route. Higher is probed first; `null` means never.
+ *
+ * The key lesson from a real run: `/Flight/B2c/gtm.start` and `/Flight/B2c/dataLayer` are
+ * artefacts of resolving a relative literal against the page URL — the *literal* was
+ * `gtm.start`, and it has nothing to do with flight search. So we judge the literal, not the
+ * resolved URL, and we require an API word to actually appear *in* it.
+ */
+function literalScore(literal: string): number | null {
+  const value = literal.trim();
+  if (value.length < 4 || value.length > 160) return null;
+  if (VENDOR_LITERAL.test(value)) return null;
+  if (REJECTED_PATH.test(value.split("?")[0] ?? value)) return null;
+
+  const lower = value.toLowerCase();
+  let score = 0;
+  // Strongest: a route that names what we want.
+  if (/(flight|fare|ticket|ava?il\w*|search|result|offer|itinerary|price)/.test(lower)) score += 4;
+  // An explicit API namespace.
+  if (/(^|\/)api(s)?(\/|$|\?)|\/v\d+(\/|$)|\/ws(\/|$)|\/(b2c|b2b)\/api/.test(lower)) score += 3;
+  // Data-ish verbs.
+  if (/(list|query|filter|matrix|calendar|routes?|lowest|cheapest|schedule)/.test(lower)) score += 2;
+  // An absolute URL is a stronger statement about intent than a relative path.
+  if (/^https?:\/\//i.test(value)) score += 2;
+
+  // But a literal must at least carry one of those words — the page path prefix it inherits
+  // from `new URL(literal, page)` does not count.
+  return score >= 4 ? score : null;
+}
+
+/**
+ * Pull API-looking string literals out of a chunk of JavaScript.
+ *
+ * Exported separately because the interesting text is usually a *bundle*, not the page: the
+ * page loads `/Flight/B2c/app.<hash>.js`, and there the endpoint is named. Candidates are
+ * ranked by `literalScore`, so the handful of probes we can afford go to the most likely
+ * routes instead of to whatever the `<script>` tags happened to list first.
  */
 export function scanText(
   text: string,
@@ -80,31 +148,35 @@ export function scanText(
     return candidates;
   }
 
-  const push = (raw: string) => {
+  const scored: Array<{ candidate: ApiCandidate; score: number }> = [];
+
+  const push = (raw: string, score: number) => {
     let url: URL;
     try {
-      url = new URL(raw, page);
+      // `api/flight/search` (no leading slash) is relative to the origin, not to the page;
+      // an absolute URL is used as written.
+      const target = /^https?:\/\//i.test(raw) ? raw : `/${raw.replace(/^\.\//, "").replace(/^\/+/, "")}`;
+      url = new URL(target, page.origin);
     } catch {
       return;
     }
     if (url.protocol !== "https:" || !allowHost(url)) return;
-    if (!/\/(api|ws|v\d|flight|search)/i.test(url.pathname)) return;
     const key = url.toString();
     if (seen.has(key)) return;
     seen.add(key);
-    candidates.push({ url: key, source });
+    scored.push({ candidate: { url: key, source }, score });
   };
 
-  // Quoted literals only: a URL is a string in JS, and this keeps false positives low.
-  for (const match of text.matchAll(/["'`]([/a-zA-Z0-9._~:?&=%-]{8,160})["'`]/g)) {
+  for (const match of text.matchAll(/["'`]([/a-zA-Z0-9._~:?&=%-]{4,160})["'`]/g)) {
     const literal = match[1];
     if (!literal) continue;
-    push(literal);
-    // Bundles often write `"api/flight/search"` and concatenate the base at runtime; resolved
-    // as-is that would land under the current path, so also try it as an absolute path.
-    if (!literal.startsWith("/") && !literal.startsWith("http")) push(`/${literal}`);
+    const score = literalScore(literal);
+    if (score === null) continue;
+    push(literal, score);
   }
 
+  scored.sort((a, b) => b.score - a.score);
+  for (const entry of scored) candidates.push(entry.candidate);
   return candidates;
 }
 
@@ -121,6 +193,24 @@ export function extractApiCandidates(
     sources.push({ text: match[1] ?? "", origin: pageUrl });
   }
 
+  /**
+   * Which bundles are worth reading.
+   *
+   * A real run taught this the hard way: the first two `<script>` tags were `runtime.js` and
+   * `polyfills.js`, 300 KB of framework code that never names the fares endpoint — while the
+   * app's own chunk was never fetched. So framework/vendor bundles are dropped and the app
+   * chunks (longest names, hashed `main`/`app`/`chunk` bundles) come first.
+   */
+  const scriptRank = (url: string): number => {
+    const path = new URL(url).pathname.toLowerCase();
+    if (/\.css$/.test(path)) return -100;
+    if (/(polyfill|runtime|vendor|manifest|gtm|analytics|recaptcha|jquery|bootstrap|lodash)/.test(path)) return -50;
+    let score = 10;
+    if (/(main|app|index|chunk|bundle)/.test(path)) score += 20;
+    if (/-[a-f0-9]{8,}\.js$/.test(path)) score += 5; // content-hashed build output
+    return score;
+  };
+
   const scripts = [...html.matchAll(/<script[^>]*\bsrc=["']([^"']+)["']/gi)]
     .map((match) => match[1])
     .filter((src): src is string => Boolean(src))
@@ -132,6 +222,8 @@ export function extractApiCandidates(
       }
     })
     .filter((url): url is string => Boolean(url) && allowHost(new URL(url as string)))
+    .filter((url): url is string => scriptRank(url as string) > 0)
+    .sort((a, b) => scriptRank(b as string) - scriptRank(a as string))
     .slice(0, MAX_SCRIPTS);
 
   const candidates: ApiCandidate[] = [];
@@ -269,6 +361,46 @@ export interface DiscoveryOptions {
   deadline?: number;
 }
 
+
+/**
+ * API routes derived from the *source's own* vocabulary, not from a guess.
+ *
+ * Two facts are observable on the page we already hold:
+ *   • the site calls a host that serves both its UI and its data (its assets live under
+ *     `/Flight/B2c/src/…`, so the API lives under `/Flight/B2c/…` too);
+ *   • its search vocabulary is in the document (`Search`, `origin`, `destination`,
+ *     `departureDate`).
+ * Combining those is not invention: it is the set of routes the site's own code structure
+ * implies. They are probed only after the page's own literals, and every one of them must
+ * still answer with a flight-shaped JSON array to be accepted.
+ */
+export function derivedRoutes(pageUrl: string): string[] {
+  let page: URL;
+  try {
+    page = new URL(pageUrl);
+  } catch {
+    return [];
+  }
+  const query = page.search;
+  const segments = page.pathname.split("/").filter(Boolean);
+
+  // The deepest directory the page lives in ("/Flight/B2c/Search" → "/Flight/B2c").
+  const base = segments.length > 1 ? `/${segments.slice(0, -1).join("/")}` : "";
+  if (!base) return [];
+
+  const names = ["search", "flight", "flights", "result", "results", "searchresult", "list", "query"];
+  // API-prefixed routes first: a data route is far likelier than a sibling page route, and
+  // the probe budget is small.
+  const prefixes = ["/api", "/Api", "/api/v1", "/api/flight", "/api/search", ""];
+  const routes: string[] = [];
+  for (const prefix of prefixes) {
+    for (const name of names.slice(0, prefix === "" ? 3 : 4)) {
+      routes.push(`${page.origin}${base}${prefix}/${name}${query ? `?${query.replace(/^\?/, "")}` : ""}`);
+    }
+  }
+  return routes;
+}
+
 /**
  * The same question the search page carries, as a JSON body.
  *
@@ -305,7 +437,7 @@ export async function discoverOffersEndpoint(options: DiscoveryOptions): Promise
   const deadline = options.deadline ?? Number.POSITIVE_INFINITY;
   const expired = () => Date.now() >= deadline;
   const { candidates, scripts } = extractApiCandidates(html, pageUrl, allowHost);
-  const report: DiscoveryReport = { scripts, jsonEndpoints: [], matches: [], shapes: [] };
+  const report: DiscoveryReport = { scripts, jsonEndpoints: [], matches: [], shapes: [], hosts: [] };
 
   // First: what the page already handed us. No extra request, no guessing.
   for (const blob of extractEmbeddedJson(html)) {
@@ -318,6 +450,27 @@ export async function discoverOffersEndpoint(options: DiscoveryOptions): Promise
       itemKeys: keysOf(found.items[0]).slice(0, 24),
     });
     return { items: found.items, endpoint: pageUrl, report };
+  }
+
+  /**
+   * Same-URL JSON negotiation — the first thing to try on a client-side rendered source.
+   *
+   * The page we already have is HTML: the offers did not arrive with it. If the site is an
+   * SPA, its own client calls *this same URL* with an `Accept: application/json` header and
+   * the server answers with data. One request, no guessed endpoint, no crawling.
+   */
+  if (!expired()) {
+    const negotiated = await requestJson(http, pageUrl, JSON_ACCEPT[0]);
+    const outcome = recordProbe(report, pageUrl, negotiated);
+    if (outcome.found) return { items: outcome.found.items, endpoint: pageUrl, report };
+    if (outcome.shellHtml) {
+      // The URL ignored the JSON request and returned the app shell again. Record it: it
+      // explains every other probe coming back as 5151 bytes of HTML.
+      report.sameUrlApi = true;
+      const retried = await requestJson(http, pageUrl, JSON_ACCEPT[1], { "x-requested-with": "XMLHttpRequest" });
+      const second = recordProbe(report, `${pageUrl} (xhr)`, retried);
+      if (second.found) return { items: second.found.items, endpoint: pageUrl, report };
+    }
   }
 
   // Pull literals out of the bundles too — the page alone rarely names the endpoint.
@@ -333,9 +486,30 @@ export async function discoverOffersEndpoint(options: DiscoveryOptions): Promise
     }
   }
 
-  const probes = [...candidates, ...fromBundles]
-    .filter((candidate, index, all) => all.findIndex((other) => other.url === candidate.url) === index)
-    .slice(0, options.maxProbes ?? MAX_PROBES);
+  // A feed URL on the site's own sub-host (api.sepehr360.ir, www.…) is the same publisher;
+  // discovery reports it, and the adapter's allowlist decides whether it may be called.
+  for (const candidate of [...candidates, ...fromBundles]) {
+    try {
+      const host = new URL(candidate.url).host;
+      if (!report.hosts.includes(host)) report.hosts.push(host);
+    } catch {
+      // unparsable candidate: already rejected upstream
+    }
+  }
+
+  // Visible candidates first; then the routes the site's own structure implies.
+  const visible = [...candidates, ...fromBundles].filter(
+    (candidate, index, all) => all.findIndex((other) => other.url === candidate.url) === index,
+  );
+  const derived = derivedRoutes(pageUrl).filter(
+    (url) => !visible.some((candidate) => candidate.url === url),
+  );
+
+  const probes = [
+    ...visible.slice(0, options.maxProbes ?? MAX_PROBES),
+    // Derived routes fill the remaining budget; they are weaker evidence, so they go last.
+    ...derived.map((url) => ({ url, source: "derived" })).slice(0, Math.max(0, (options.maxProbes ?? MAX_PROBES) - visible.length)),
+  ].slice(0, (options.maxProbes ?? MAX_PROBES) + 1);
 
   // A fares endpoint is useless without the question: route, date, passengers. Single-page
   // apps usually call their own API with the *same* query names the page URL carries, so the
@@ -363,26 +537,13 @@ export async function discoverOffersEndpoint(options: DiscoveryOptions): Promise
 
     for (const url of attempts) {
       if (expired()) break;
-      let payload: unknown;
-      try {
-        const response = await http.request({ url, label: `probe ${new URL(url).pathname}` });
-        payload = JSON.parse(response.body.slice(0, MAX_BYTES));
-      } catch {
-        // 404 / robots / prohibited / not-JSON: fall through to the bare variant (if any)
-        // and then to the next candidate. Never retry a block.
-        continue;
-      }
-
-      if (!report.jsonEndpoints.includes(url)) report.jsonEndpoints.push(url);
-      const found = findOfferArray(payload);
-      report.shapes.push({
-        endpoint: url,
-        topLevelKeys: keysOf(payload).slice(0, 12),
-        itemKeys: found?.items[0] ? keysOf(found.items[0]).slice(0, 24) : [],
-      });
-
-      if (found && found.items.length > 0) {
-        if (!best || found.items.length > best.items.length) best = { endpoint: url, items: found.items };
+      // Probes ask for JSON explicitly: a client-side app serving one HTML shell for every
+      // path answers plain GETs with that shell, which is how an earlier run ended up with
+      // "200, 5151 bytes" for three unrelated paths.
+      const outcome = await requestJson(http, url, JSON_ACCEPT[0]);
+      const seen = recordProbe(report, url, outcome);
+      if (seen.found) {
+        if (!best || seen.found.items.length > best.items.length) best = { endpoint: url, items: seen.found.items };
         break; // This candidate answered with offers; its bare variant adds nothing.
       }
     }
@@ -421,4 +582,54 @@ export async function discoverOffersEndpoint(options: DiscoveryOptions): Promise
   if (best) report.matches.push(best.endpoint);
 
   return { items: best?.items ?? [], endpoint: best?.endpoint ?? null, report };
+}
+
+/**
+ * One GET that asks for JSON. Returns the parsed payload when the answer *is* JSON, or a
+ * marker when the answer was the app shell again.
+ */
+async function requestJson(
+  http: HttpClient,
+  url: string,
+  accept: string,
+  extraHeaders: Record<string, string> = {},
+): Promise<{ payload?: unknown; shellHtml?: boolean; error?: string }> {
+  try {
+    const response = await http.request({
+      url,
+      headers: { accept, "x-requested-with": "XMLHttpRequest", ...extraHeaders },
+      label: "json-negotiation",
+    });
+    const text = response.body.slice(0, MAX_BYTES);
+    const trimmed = text.trimStart();
+    if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
+      try {
+        return { payload: JSON.parse(trimmed) };
+      } catch {
+        return { error: "unparsable-json" };
+      }
+    }
+    if (/^\s*</.test(text)) return { shellHtml: true };
+    return { error: "not-json" };
+  } catch (error) {
+    return { error: error instanceof Error ? error.message.slice(0, 80) : String(error).slice(0, 80) };
+  }
+}
+
+/** Record what one probe saw, and return the offers if it was the feed. */
+function recordProbe(
+  report: DiscoveryReport,
+  label: string,
+  outcome: { payload?: unknown; shellHtml?: boolean; error?: string },
+): { found: { items: Record<string, unknown>[] } | null; shellHtml: boolean } {
+  if (outcome.payload === undefined) return { found: null, shellHtml: Boolean(outcome.shellHtml) };
+
+  if (!report.jsonEndpoints.includes(label)) report.jsonEndpoints.push(label);
+  const found = findOfferArray(outcome.payload);
+  report.shapes.push({
+    endpoint: label,
+    topLevelKeys: keysOf(outcome.payload).slice(0, 12),
+    itemKeys: found?.items[0] ? keysOf(found.items[0]).slice(0, 24) : [],
+  });
+  return { found: found && found.items.length > 0 ? found : null, shellHtml: false };
 }
