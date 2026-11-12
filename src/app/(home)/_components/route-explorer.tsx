@@ -80,12 +80,13 @@ export function RouteExplorer({ limit = 6 }: { limit?: number }) {
               })}
               {destinations.length > 6 && (
                 <li>
-                  <Link
-                    href={`/search?origin=${city.code}&destination=${destinations[0]?.code ?? ""}&date=${date}`}
-                    className="inline-flex items-center rounded-full bg-ink-100 px-2.5 py-1 text-[0.7rem] font-medium text-ink-600 hover:bg-ink-200"
+                  <a
+                    href="#city-index"
+                    className="inline-flex items-center rounded-full bg-ink-100 px-2.5 py-1 text-[0.7rem] font-semibold text-ink-600 hover:bg-ink-200"
+                    title="همهٔ مقصدها در فهرست کامل شهرها"
                   >
                     و {toPersianDigits(destinations.length - 6)} مقصد دیگر
-                  </Link>
+                  </a>
                 </li>
               )}
             </ul>
@@ -106,7 +107,7 @@ export function CityIndex() {
   }
 
   return (
-    <details className="card mt-3 px-4 py-3">
+    <details id="city-index" className="card mt-3 scroll-mt-24 px-4 py-3">
       <summary className="cursor-pointer text-[0.78rem] font-semibold text-ink-700 marker:text-teal-600">
         فهرست کامل {toPersianDigits(CITIES.length)} شهر تحت پوشش
       </summary>
