@@ -194,7 +194,7 @@ describe("amadeus normalization", () => {
 
   it("labels test-environment offers so they cannot pass as live prices", () => {
     const offer = adapter.normalize([parsed.offers[0]!], REQUEST, META).offers[0]!;
-    expect(offer.warnings).toContain("availability-unverified");
+    expect(offer.warnings).toContain("source-test-environment");
     expect(offer.provenance?.endpoint).toContain("test");
   });
 

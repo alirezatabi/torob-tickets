@@ -417,10 +417,12 @@ function buildAmadeusWarnings(input: {
 }): OfferWarning[] {
   const warnings: OfferWarning[] = [];
   // Foreign currency is disclosed; no FX conversion is applied — the offer is shown in
-  // its own currency and excluded from toman-price comparisons.
-  if (input.currency !== "IRR" && input.currency !== "IRT") warnings.push("price-converted");
+  // its own currency and excluded from toman-price comparisons. Claiming "converted"
+  // here would be a lie in the other direction.
+  if (input.currency !== "IRR" && input.currency !== "IRT") warnings.push("price-foreign");
   if (!input.cabinKnown) warnings.push("airport-unknown");
-  if (input.record.env === "test") warnings.push("availability-unverified");
+  // Test-environment responses are cached sample data: they must never read as live.
+  if (input.record.env === "test") warnings.push("source-test-environment");
   if (input.record.numberOfBookableSeats === null) warnings.push("availability-unverified");
   return [...new Set(warnings)];
 }

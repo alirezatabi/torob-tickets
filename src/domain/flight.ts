@@ -140,7 +140,8 @@ export type OfferWarning =
   | "availability-unverified"
   | "seller-aggregated"
   | "stops-partial"
-  | "price-foreign";
+  | "price-foreign"
+  | "source-test-environment";
 
 export const WARNING_LABELS: Record<OfferWarning, string> = {
   "price-converted": "قیمت با نرخ نمونه به تومان تبدیل شده",
@@ -154,6 +155,7 @@ export const WARNING_LABELS: Record<OfferWarning, string> = {
   "seller-aggregated": "این نرخ از میان چند فروشندهٔ همان منبع انتخاب شده",
   "stops-partial": "تعداد توقف اعلام شده، اما ایستگاه‌های میانی اعلام نشده‌اند",
   "price-foreign": "قیمت به ارز خارجی است و بدون نرخ تبدیل، قابل مقایسه با تومان نیست",
+  "source-test-environment": "این داده از محیط تست منبع آمده و قیمت واقعی/زنده نیست",
 };
 
 /**
