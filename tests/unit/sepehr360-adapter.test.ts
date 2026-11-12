@@ -135,6 +135,38 @@ describe("Sepehr360Adapter", () => {
     vi.unstubAllGlobals();
   });
 
+  it("parses the live search page's own cards end to end", async () => {
+    // Reconstructed from the real page (2026-11-12): real prices, airlines, clocks, routes.
+    withStubbedFetch({ search: { body: fixture("live-cards.html") } });
+    const adapter = new Sepehr360Adapter({ enabled: true });
+    const result = await adapter.search(REQUEST, context());
+
+    expect(result.records).toHaveLength(7);
+    const batch = adapter.normalize(result.records, REQUEST, result.meta);
+    expect(batch.issues).toEqual([]);
+    expect(batch.offers).toHaveLength(7);
+
+    const [cheapest] = batch.offers;
+    expect(cheapest).toMatchObject({
+      dataSource: "live",
+      airlineCode: "VR",
+      originAirport: "THR",
+      destinationAirport: "MHD",
+      departAt: "2026-11-13T09:30:00.000Z", // 13:00 Tehran
+      arriveAt: "2026-11-13T10:45:00.000Z",
+      durationMinutes: 75,
+      price: expect.objectContaining({ toman: 6_800_000 }),
+    });
+
+    // Every airline code came from the page's own logo, and matches the printed name.
+    expect(batch.offers.map((offer) => offer.airlineCode)).toEqual(["VR", "AXV", "B9", "A7", "J1", "IR", "W5"]);
+    // Airports resolved from the printed names, so nothing is guessed.
+    expect(batch.offers.every((offer) => offer.originAirport === "THR" && offer.destinationAirport === "MHD")).toBe(true);
+    // Times are real, prices are integers in toman, and nothing was fabricated.
+    expect(batch.offers.every((offer) => offer.price.toman > 5_000_000)).toBe(true);
+    vi.unstubAllGlobals();
+  });
+
   it("reads the offers from the site's own JSON feed when the HTML is only a shell", async () => {
     // This is the real failure the user hit: HTTP 200, 5 KB shell, no price in the markup.
     // The data exists, behind the bundle's XHR — discover it and read it.

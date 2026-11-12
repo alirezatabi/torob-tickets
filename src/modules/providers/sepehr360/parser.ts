@@ -198,12 +198,21 @@ function parseCard(
   const durationText = findDurationText(text) ?? (durationFromLabel ? `${durationFromLabel} دقیقه` : null);
   const stopsLabel = findKeyword(text, /(مستقیم|بدون توقف|\d+\s*توقف|یک توقف|دو توقف)/);
   const cabinLabel = findKeyword(text, /(اکونومی|اقتصادی|بیزنس|بیزینس|درجه یک|فرست کلاس)/);
-  const sellerText = findKeyword(text, /فروش توسط\s*\d+\s*سایت(?:\s*مختلف)?|فروشنده:\s*[^·|\d]{2,30}/);
+  // Two shapes: an aggregation count ("فروش توسط 125 سایت مختلف") or a single agency
+  // name ("فروش توسط ره بال آسمان"). Both are evidence about who sells the fare, so both
+  // are kept; the trailing name stops before the next printed field.
+  const sellerText = findKeyword(
+    text,
+    /فروش توسط\s*\d+\s*سایت(?:\s*مختلف)?|فروش توسط\s*[^\d·|]{2,40}?(?=\s*(?:اطلاعات پرواز|از |به |$))/,
+  );
   const availabilityText = findKeyword(text, /(\d+)\s*(?:صندلی|بلیط باقی|بلیت باقی)/);
-  const originLabel = findKeyword(text, /(?:^|\s)از\s+[^\d·|]{2,25}?(?=\s+(?:به|در|ساعت|قیمت|$))/);
+  const originLabel = findKeyword(
+    text,
+    /(?:^|\s)از\s+[^\d·|]{2,25}?(?=\s+(?:به|در|ساعت|قیمت|\d|$))/,
+  );
   const destinationLabel = findKeyword(
     text,
-    /(?:^|\s)به\s+[^\d·|]{2,25}?(?=\s+(?:مستقیم|بدون توقف|یک توقف|دو توقف|\d+ توقف|اکونومی|اقتصادی|بیزنس|بیزینس|در|ساعت|قیمت|فروش|$))/,
+    /(?:^|\s)به\s+[^\d·|]{2,25}?(?=\s*(?:اطلاعات پرواز|مستقیم|بدون توقف|یک توقف|دو توقف|\d+ توقف|اکونومی|اقتصادی|بیزنس|بیزینس|فروش|ساعت|قیمت|\d|$))/,
   );
 
   // A card without any clock time is not a flight row; keep the rejection explicit.

@@ -25,6 +25,12 @@ inflated in the provider strip or in the docs.
 - Endpoint: `GET https://sepehr360.ir/Flight/B2c/Search?origin=THR&destination=MHD&departureDate=1405-08-22`
   (`departureDate` is **Jalali**; a Gregorian date silently returns an empty list, so the
   URL builder converts and is unit-tested).
+- Airline codes are taken from the logo URL the page prints (the site's own authority) and
+  the printed Persian name is shown; both must agree in `src/modules/airlines/registry.ts`.
+  Codes verified against the live page: `VR` وارش, `AXV` آوا, `MEH` مهر, `B9` ایران ایرتور,
+  `A7` آسا جت, `NSN` نسیم ایر, `DZD` یزد ایر, `ATS` اطلس ایر, `J1` معراج, `TKN` فلای کیش,
+  `FP` فلای پرشیا, `IS` سپهران, `NV` کارون, `IR` ایران ایر, `CPN` کاسپین, `I3` آتا,
+  `QB` قشم ایر, `W5` ماهان. A code we cannot confirm stays `??` rather than being guessed.
 - Parser: content-driven (finds the smallest nodes containing both a price and a clock),
   not class-name-driven. It tolerates markup drift and reports warnings when it finds
   nothing, instead of pretending the route has no flights.
