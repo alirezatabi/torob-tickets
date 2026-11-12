@@ -12,7 +12,8 @@ Two live sources, deliberately different in kind, plus the original demo dataset
 | Baggage | ❌ | ✅ weight or piece count | ✅ |
 | Refund terms | ❌ | ❌ | ✅ |
 | Availability | ❌ | ✅ `numberOfBookableSeats` | ❌ |
-| Per-offer deep link | ❌ (search page only) | ❌ (B2B API) | ✅ (demo URL) |
+| Per-offer deep link | ❌ (search page only) | ❌ (B2B API) | ❌ (in-app only) |
+| "See at the source" | ✅ redirect → `/Flight/B2c/Search` | ❌ no public page | ❌ none (demo) |
 | Price re-verification | ❌ | ✅ `POST /v1/shopping/flight-offers/pricing` | n/a |
 | Freshness window | 5 min fresh / 20 min stale | 10 min fresh / 30 min stale | n/a (`demo`) |
 
@@ -51,6 +52,27 @@ inflated in the provider strip or in the docs.
 
   Without `--save-html`, an empty parse only writes a **sanitized** snapshot (title,
   headings, a few short numeric snippets) — no raw HTML is ever stored by default.
+
+### Redirect to the source
+
+A live Sepehr360 card renders **دیدن در سپهر۳۶۰**, whose `href` is our own hop:
+
+```
+/api/go/sepehr360?origin=THR&destination=MHD&date=2026-11-20&time=04:00&airline=IR
+   → 302 → https://sepehr360.ir/Flight/B2c/Search?origin=THR&destination=MHD&departureDate=1405-08-29&departureTime=04:00&airline=IR
+```
+
+- The destination is **rebuilt server-side** from validated city codes + date (with the
+  Jalali conversion), so a request parameter can never inject a host, and malformed links
+  fall back to `/live` instead of an error page.
+- `departureTime` / `airline` are context only — the site does not filter on them, and the
+  UI says so: *«لینک، صفحهٔ جست‌وجوی منبع است، نه همین نرخ.»* We do not pretend this is a
+  per-fare deep link, because no such URL exists.
+- Each click writes one log line (`[redirect] provider=… route=… date=…`) and is sent with
+  `cache-control: no-store`.
+- Demo offers get no external link at all — the button becomes an in-app
+  «همین مسیر در مقایسه» instead. (`src/modules/live/source-link.ts` is the single gate;
+  `tests/unit/source-link.test.ts` and `tests/unit/redirect-route.test.ts` pin it.)
 
 ## Amadeus Self-Service
 

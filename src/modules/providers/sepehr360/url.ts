@@ -29,6 +29,18 @@ export interface Sepehr360UrlInput {
   departDate: string;
 }
 
+/**
+ * Optional extra context appended to the source URL when the user is following a *specific*
+ * fare. The site ignores unknown query parameters, so this cannot break the search; it
+ * keeps the departure time and airline visible in the destination URL for the reader (and
+ * for anyone debugging which fare a click came from).
+ */
+export interface Sepehr360OfferContext {
+  /** "HH:MM" wall clock as printed on the card. */
+  departTime?: string | null;
+  airlineCode?: string | null;
+}
+
 export interface Sepehr360UrlResult {
   url: string;
   /** Airport codes actually used in the URL. */
@@ -43,7 +55,10 @@ export interface Sepehr360UrlResult {
  * city's domestic airport (THR = Mehrabad); international routes from the
  * international one (IKA). This mirrors what the site itself does for its own links.
  */
-export function buildSearchUrl(input: Sepehr360UrlInput): Sepehr360UrlResult {
+export function buildSearchUrl(
+  input: Sepehr360UrlInput,
+  context?: Sepehr360OfferContext | null,
+): Sepehr360UrlResult {
   const origin = getCity(input.originCity);
   const destination = getCity(input.destinationCity);
   if (!origin || !destination) throw new Error(`unknown city ${input.originCity}>${input.destinationCity}`);
@@ -57,6 +72,14 @@ export function buildSearchUrl(input: Sepehr360UrlInput): Sepehr360UrlResult {
   url.searchParams.set("origin", originAirport);
   url.searchParams.set("destination", destinationAirport);
   url.searchParams.set("departureDate", jalaliDate);
+
+  // Advisory context only — never used to filter or to claim a deep link.
+  if (context?.departTime && /^([01]?\d|2[0-3]):[0-5]\d$/.test(context.departTime)) {
+    url.searchParams.set("departureTime", context.departTime);
+  }
+  if (context?.airlineCode && /^[A-Z0-9]{2,3}$/.test(context.airlineCode)) {
+    url.searchParams.set("airline", context.airlineCode);
+  }
 
   return { url: url.toString(), originAirport, destinationAirport, jalaliDate };
 }

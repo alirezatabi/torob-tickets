@@ -7,7 +7,7 @@ import { formatRelative, formatToman, toPersianDigits } from "@/lib/format";
 import { formatJalaliFull } from "@/lib/jalali";
 import { getCity } from "@/lib/cities";
 import { cn } from "@/lib/cn";
-import { demoSearchHref, sourceLinkFor } from "@/modules/live/source-link";
+import { demoSearchHref, sourceRedirectFor } from "@/modules/live/source-link";
 
 const BADGE_LABELS: Record<string, string> = {
   best: "بهترین تطابق",
@@ -59,7 +59,16 @@ export function LiveOfferCard({ offer, index }: { offer: LiveOfferView; index: n
   const destination = getCity(offer.destinationCity);
   const freshness = FRESHNESS_LABELS[offer.freshness] ?? FALLBACK_FRESHNESS;
   // Never render a placeholder/relative URL as if it were the source's page.
-  const source = sourceLinkFor(offer);
+  const source = sourceRedirectFor({
+    offerUrl: offer.offerUrl,
+    dataSource: offer.dataSource,
+    providerId: offer.providerId,
+    originCity: offer.originCity,
+    destinationCity: offer.destinationCity,
+    departAt: offer.departAt,
+    departTime: offer.departAt.slice(11, 16),
+    airlineCode: offer.airlineCode,
+  });
 
   return (
     <article
@@ -206,11 +215,12 @@ export function LiveOfferCard({ offer, index }: { offer: LiveOfferView; index: n
                 href={source.url}
                 target="_blank"
                 rel="noopener noreferrer nofollow"
-                className="btn-ghost w-full justify-center text-[0.72rem]"
-                title="صفحهٔ جست‌وجوی منبع، نه لینک اختصاصی این نرخ"
+                className="btn-primary w-full justify-center py-1.5 text-[0.72rem]"
+                title="رفتن به صفحهٔ همین مسیر و تاریخ در منبع"
+                data-testid="source-link"
               >
                 <ExternalLink className="size-3" aria-hidden="true" />
-                منبع
+                دیدن در {offer.providerName}
               </a>
               <p className="w-full text-[0.56rem] leading-4 text-ink-400">
                 لینک، صفحهٔ جست‌وجوی منبع است، نه همین نرخ.

@@ -98,6 +98,34 @@ describe("LiveOfferCard honesty", () => {
     expect(card).not.toContain("تومان۳");
   });
 
+  it("sends a live Sepehr360 offer through our own redirect to the source", () => {
+    render(createElement(LiveOfferCard, { offer: view({ dataSource: "live" }), index: 0 }));
+    const link = screen.getByTestId("source-link");
+    const href = link.getAttribute("href") ?? "";
+    expect(href.startsWith("/api/go/sepehr360?")).toBe(true);
+    const params = new URL(href, "http://x").searchParams;
+    expect(params.get("origin")).toBe("THR");
+    expect(params.get("destination")).toBe("MHD");
+    expect(params.get("date")).toBe("2026-11-13");
+    expect(link.getAttribute("target")).toBe("_blank");
+  });
+
+  it("never links a demo offer to an external source", () => {
+    render(
+      createElement(LiveOfferCard, {
+        offer: view({
+          dataSource: "demo",
+          offerUrl: "https://example.com/pars/flight/thr-mhd-zv-652?date=2026-11-13&ref=torob-tickets-demo",
+          freshness: "demo",
+        }),
+        index: 0,
+      }),
+    );
+    expect(screen.queryByTestId("source-link")).toBeNull();
+    expect(screen.getByTestId("source-link-note").textContent).toContain("نمونه");
+    expect(screen.getByText(/همین مسیر در مقایسه/).getAttribute("href")).toContain("/search?");
+  });
+
   it("discloses that the source link is a search page, not this fare", () => {
     render(createElement(LiveOfferCard, { offer: view(), index: 0 }));
     expect(screen.getByText(/لینک، صفحهٔ جست‌وجوی منبع است/)).toBeTruthy();
