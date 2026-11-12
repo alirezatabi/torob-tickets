@@ -5,7 +5,7 @@ import { useActionState, useEffect, useRef, useState, useTransition } from "reac
 import { ArrowLeft, Loader2, Sparkles, Wand2 } from "lucide-react";
 import { CitySelect, SwapButton } from "@/components/ui/city-select";
 import { DatePicker } from "@/components/ui/date-picker";
-import { CABIN_LABELS, type CabinClass, type TripType } from "@/domain/trip";
+import { CABIN_LABELS, type CabinClass } from "@/domain/trip";
 import { toPersianDigits } from "@/lib/format";
 import { addDays, isoToday } from "@/lib/jalali";
 import { cn } from "@/lib/cn";
@@ -24,11 +24,10 @@ export function SearchForm({ initialOrigin = "THR", initialDestination = "IST" }
   const router = useRouter();
   const today = isoToday();
   const [mode, setMode] = useState<"form" | "nl">("form");
-  const [tripType, setTripType] = useState<TripType>("oneway");
+  // Round-trip search is not implemented end to end (B9); the form stays one-way.
   const [origin, setOrigin] = useState(initialOrigin);
   const [destination, setDestination] = useState(initialDestination);
   const [departDate, setDepartDate] = useState(addDays(today, 7));
-  const [returnDate, setReturnDate] = useState(addDays(today, 14));
   const [passengers, setPassengers] = useState(1);
   const [cabin, setCabin] = useState<CabinClass>("economy");
   const [text, setText] = useState("");
@@ -43,10 +42,6 @@ export function SearchForm({ initialOrigin = "THR", initialDestination = "IST" }
       destination,
       date: departDate,
     });
-    if (tripType === "roundtrip") {
-      params.set("trip", "roundtrip");
-      params.set("return", returnDate);
-    }
     if (passengers !== 1) params.set("pax", String(passengers));
     if (cabin !== "economy") params.set("cabin", cabin);
     for (const [key, value] of Object.entries(overrides)) {
@@ -139,25 +134,30 @@ export function SearchForm({ initialOrigin = "THR", initialDestination = "IST" }
         <div className="inline-flex items-center gap-0.5 rounded-full border border-ink-200 bg-white p-0.5 text-xs" role="group" aria-label="نوع سفر">
           <button
             type="button"
-            onClick={() => setTripType("oneway")}
-            aria-pressed={tripType === "oneway"}
+            aria-pressed
+            disabled
             className={cn(
               "rounded-full px-3.5 py-1.5 font-semibold transition-colors",
-              tripType === "oneway" ? "bg-ink-900 text-white" : "text-ink-500 hover:text-ink-800",
+              "bg-ink-900 text-white",
             )}
           >
             یک‌طرفه
           </button>
+          {/*
+            B9: no provider is queried for the return leg, so offering a round trip would promise
+            two directions and show one. The control is disabled and says so instead of quietly
+            ignoring the return date the user picked.
+          */}
           <button
             type="button"
-            onClick={() => setTripType("roundtrip")}
-            aria-pressed={tripType === "roundtrip"}
-            className={cn(
-              "rounded-full px-3.5 py-1.5 font-semibold transition-colors",
-              tripType === "roundtrip" ? "bg-ink-900 text-white" : "text-ink-500 hover:text-ink-800",
-            )}
+            disabled
+            aria-pressed={false}
+            aria-describedby="roundtrip-note"
+            title="جست‌وجوی رفت‌وبرگشت هنوز پیاده نشده است؛ فعلاً هر مسیر را جدا جست‌وجو کنید."
+            className="cursor-not-allowed rounded-full px-3.5 py-1.5 font-semibold text-ink-300"
           >
             رفت‌وبرگشت
+            <span className="mr-1 text-[0.6rem] font-normal">(به‌زودی)</span>
           </button>
         </div>
       </div>
@@ -195,11 +195,7 @@ export function SearchForm({ initialOrigin = "THR", initialDestination = "IST" }
 
           <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <DatePicker id="depart-date" label="تاریخ رفت" value={departDate} onChange={setDepartDate} min={today} />
-            {tripType === "roundtrip" ? (
-              <DatePicker id="return-date" label="تاریخ برگشت" value={returnDate} onChange={setReturnDate} min={departDate} />
-            ) : (
-              <div className="hidden lg:block" />
-            )}
+            <div className="hidden lg:block" />
             <div>
               <label htmlFor="passengers" className="label">
                 تعداد مسافر
