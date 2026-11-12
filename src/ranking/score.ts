@@ -1,5 +1,7 @@
 import type { FlightOffer } from "@/domain/flight";
-import { DAY_PART_RANGES, type QueryPreferences, type TripQuery } from "@/domain/trip";
+import { hardConstraintViolations, rankInputs } from "@/modules/ranking/core";
+import { fromDemoOffer } from "@/modules/ranking/project";
+import type { QueryPreferences, TripQuery } from "@/domain/trip";
 import { getCity } from "@/lib/cities";
 import { hourInZone, isoDateInZone } from "@/lib/format";
 
@@ -85,98 +87,16 @@ export function deriveWeights(prefs: QueryPreferences): Weights {
   return weights;
 }
 
-/**
- * Lower is better, scored as `best / value` (1 for the best offer, 0.5 for one
- * that costs twice as much).
- *
- * Ratio scaling is used instead of min–max because a single outlier (e.g. a
- * business-class fare on the same route) would otherwise compress every economy
- * offer into the top of the range and make the ranking meaningless.
- */
-function inverseRatio(value: number, best: number, exponent = 1): number {
-  if (!Number.isFinite(value) || value <= 0) return 0;
-  if (best <= 0) return 1;
-  return Math.max(0, Math.min(1, Math.pow(best / value, exponent)));
-}
-
-/**
- * How steeply a higher fare is penalized. When the user explicitly asks for a cheap
- * trip, paying 15% more must actually cost ranking points, otherwise the "best"
- * pick silently ignores the stated intent.
- */
-function priceCurve(preference: QueryPreferences["pricePreference"]): number {
-  if (preference === "low") return 2;
-  if (preference === "comfort") return 0.9;
-  return 1.35;
-}
-
-function stopsScore(stops: number): number {
-  if (stops === 0) return 1;
-  if (stops === 1) return 0.55;
-  if (stops === 2) return 0.22;
-  return 0.05;
-}
-
-function baggageScore(offer: FlightOffer): number {
-  if (offer.baggage.checked === "included") {
-    // More kg is genuinely better, capped at 30 kg of useful signal.
-    const kg = Math.min(offer.baggage.checkedKg ?? 20, 30);
-    return 0.75 + (kg / 30) * 0.25;
-  }
-  if (offer.baggage.checked === "unknown") return 0.45;
-  return 0.1;
-}
-
-function refundScore(offer: FlightOffer): number {
-  if (offer.refundable === true) return 1;
-  if (offer.refundable === null) return 0.35;
-  return 0.1;
-}
-
 /** Local departure hour in the origin's timezone — that is what the user experiences. */
 export function localDepartureHour(offer: FlightOffer): number {
   return hourInZone(offer.departAt, getCity(offer.originCode)?.timezone ?? "Asia/Tehran");
 }
 
-function timeOfDayScore(offer: FlightOffer, prefs: QueryPreferences): number {
-  if (!prefs.dayPart) return 0.6;
-  const [start, end] = DAY_PART_RANGES[prefs.dayPart];
-  const hour = localDepartureHour(offer);
-  if (hour >= start && hour < end) return 1;
-  const distance = Math.min(Math.abs(hour - start), Math.abs(hour - end));
-  if (distance <= 2) return 0.6;
-  if (distance <= 4) return 0.35;
-  return 0.15;
-}
-
-function airlineScore(offer: FlightOffer, prefs: QueryPreferences): number {
-  if (prefs.preferredAirlines.length === 0) return 0.6;
-  return prefs.preferredAirlines.includes(offer.airlineCode) ? 1 : 0.25;
-}
-
 /** Hard constraints — violating one makes an offer "outside your preferences". */
 export function hardConstraints(offer: FlightOffer, prefs: QueryPreferences): string[] {
-  const violations: string[] = [];
-  if (prefs.maxStops !== null && offer.stops > prefs.maxStops) {
-    violations.push(`${offer.stops} توقف دارد؛ حداکثر مجاز ${prefs.maxStops}`);
-  }
-  if (prefs.baggageRequired && offer.baggage.checked !== "included") {
-    violations.push(
-      offer.baggage.checked === "unknown" ? "وضعیت بار نامشخص است" : "بار همراه در نرخ نیست",
-    );
-  }
-  if (prefs.refundableOnly && offer.refundable !== true) {
-    violations.push(offer.refundable === null ? "شرایط استرداد نامشخص است" : "بلیت قابل استرداد نیست");
-  }
-  if (prefs.maxPriceToman !== null && offer.price.toman > prefs.maxPriceToman) {
-    violations.push("گران‌تر از بودجهٔ اعلام‌شده");
-  }
-  if (prefs.dayPart) {
-    const [start, end] = DAY_PART_RANGES[prefs.dayPart];
-    const hour = localDepartureHour(offer);
-    if (hour < start || hour >= end) violations.push("ساعت پرواز خارج از بازهٔ درخواستی است");
-  }
-  return violations;
+  // Delegated: the shared core owns the constraint definitions so demo and live offers
+  // can never diverge on what "out of scope" means.
+  return hardConstraintViolations(fromDemoOffer(offer), prefs);
 }
 
 /**
@@ -193,52 +113,40 @@ export function rankOffers(offers: FlightOffer[], prefs: QueryPreferences): Rank
     return { ranked: [], feasible: [], excluded: [], cheapest: null, fastest: null, best: null, weights };
   }
 
-  const prices = offers.map((o) => o.price.toman);
-  const durations = offers.map((o) => o.durationMinutes);
-  const minPrice = Math.min(...prices);
-  const minDuration = Math.min(...durations);
-  // Highest value is informative for the price filter, not for scoring.
-  void Math.max(...prices);
-  void Math.max(...durations);
+  // One scorer for demo and live data: project → shared core → project back.
+  const byId = new Map(offers.map((offer) => [offer.id, offer]));
+  const core = rankInputs(offers.map((offer) => fromDemoOffer(offer)), prefs);
 
-  const scored: ScoredOffer[] = offers.map((offer) => {
-    const contributions: Record<ScoreFactor, number> = {
-      price: inverseRatio(offer.price.toman, minPrice, priceCurve(prefs.pricePreference)) * weights.price,
-      duration: inverseRatio(offer.durationMinutes, minDuration, 1.15) * weights.duration,
-      stops: stopsScore(offer.stops) * weights.stops,
-      baggage: baggageScore(offer) * weights.baggage,
-      refund: refundScore(offer) * weights.refund,
-      timeOfDay: timeOfDayScore(offer, prefs) * weights.timeOfDay,
-      airline: airlineScore(offer, prefs) * weights.airline,
-    };
-    const score = Object.values(contributions).reduce((a, b) => a + b, 0) * 100;
-    const violations = hardConstraints(offer, prefs);
+  const scored: ScoredOffer[] = core.ranked.map((entry) => {
+    const offer = byId.get(entry.input.id);
+    if (!offer) throw new Error(`rank core returned unknown id ${entry.input.id}`);
+    const contributions = {
+      price: entry.factors.price?.weighted ?? 0,
+      duration: entry.factors.duration?.weighted ?? 0,
+      stops: entry.factors.stops?.weighted ?? 0,
+      baggage: entry.factors.baggage?.weighted ?? 0,
+      refund: entry.factors.refund?.weighted ?? 0,
+      timeOfDay: entry.factors.timeOfDay?.weighted ?? 0,
+      airline: entry.factors.airline?.weighted ?? 0,
+    } satisfies Record<ScoreFactor, number>;
 
     return {
       offer,
-      score: Math.round(score * 10) / 10,
-      feasible: violations.length === 0,
-      violations,
+      score: entry.score,
+      feasible: entry.feasible,
+      violations: entry.violations,
       contributions,
     };
   });
 
-  const byScore = [...scored].sort((a, b) => {
-    if (a.feasible !== b.feasible) return a.feasible ? -1 : 1;
-    if (Math.abs(b.score - a.score) > 0.05) return b.score - a.score;
-    if (a.offer.price.toman !== b.offer.price.toman) return a.offer.price.toman - b.offer.price.toman;
-    return a.offer.durationMinutes - b.offer.durationMinutes;
-  });
-
-  const feasible = byScore.filter((s) => s.feasible);
-  const excluded = byScore.filter((s) => !s.feasible);
-  const pool = feasible.length > 0 ? feasible : byScore;
+  const feasible = scored.filter((entry) => entry.feasible);
+  const excluded = scored.filter((entry) => !entry.feasible);
+  const pool = feasible.length > 0 ? feasible : scored;
 
   const cheapest = [...pool].sort((a, b) => a.offer.price.toman - b.offer.price.toman)[0] ?? null;
   const fastest = [...pool].sort((a, b) => a.offer.durationMinutes - b.offer.durationMinutes)[0] ?? null;
-  const best = byScore[0] ?? null;
 
-  return { ranked: byScore, feasible, excluded, cheapest, fastest, best, weights };
+  return { ranked: scored, feasible, excluded, cheapest, fastest, best: scored[0] ?? null, weights };
 }
 
 export type SortKey = "best" | "cheapest" | "fastest";
