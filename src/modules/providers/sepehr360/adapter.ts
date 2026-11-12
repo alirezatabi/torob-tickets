@@ -195,6 +195,10 @@ export class Sepehr360Adapter implements LiveProviderAdapter<Sepehr360RawOffer> 
           discoveryEvidence ?? "",
           clues,
           diagnostics.title ? `title="${diagnostics.title}"` : "",
+          // The shell's fingerprint: two responses for the same route can still be different
+          // pages (a CDN variant, an A/B shell), and this tells them apart without storing
+          // any of the source's content.
+          `shell=scripts:${diagnostics.scriptCount} text:${diagnostics.textLength}`,
           snapshot ? `snapshot=${snapshot}` : "",
         ]
           .filter(Boolean)
