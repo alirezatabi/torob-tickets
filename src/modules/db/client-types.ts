@@ -144,7 +144,7 @@ export interface TypedDb {
       where?: Where;
       orderBy?: Where;
       select?: Where;
-    }): Promise<{ id: string; status: string } | null>;
+    }): Promise<{ id: string; status: string; startedAt?: Date } | null>;
     findUnique(args: { where: Where; select?: Where }): Promise<Record<string, unknown> | null>;
     update(args: { where: Where; data: Where }): Promise<unknown>;
   };

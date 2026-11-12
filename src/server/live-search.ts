@@ -16,6 +16,7 @@ import { rankAndDecide } from "@/modules/ranking/core";
 import { fromDemoOffer, fromLiveOffer } from "@/modules/ranking/project";
 import type { RankInput } from "@/modules/ranking/types";
 import { createOrchestrator, describeLiveProviders, searchMode, type SearchMode } from "@/modules/providers/registry-live";
+import { dedupeSameOffer } from "@/modules/providers/orchestrator";
 import type { ProviderRunReport } from "@/modules/providers/contracts/provider";
 import { persistSearch } from "@/modules/persistence/live-store";
 import { dbMode } from "@/modules/db/prisma";
@@ -106,6 +107,10 @@ export async function runLiveSearch(query: TripQuery, options: LiveSearchOptions
     warnings.push("demo-mode");
   }
 
+  // The same intra-provider dedupe for both modes: a source that lists one product
+  // twice must not show up twice in the UI (and demo data has the same rule).
+  offers = dedupeSameOffer(offers, warnings);
+
   const inputs: RankInput[] = offers.map((offer) =>
     offer.dataSource === "live" ? fromLiveOffer(offer) : fromDemoOffer(offer),
   );
@@ -194,7 +199,7 @@ function toView(
     priceObservedAt: offer.priceObservedAt ?? null,
     lastVerifiedAt: offer.lastVerifiedAt ?? null,
     seatsAvailable: offer.seatsAvailable ?? null,
-    completeness: offer.completeness ?? 0,
+    completeness: offer.completeness ?? (offer.dataSource === "demo" ? 1 : 0),
     offerUrl: offer.offerUrl,
     sellerLabel: offer.provenance?.sellerLabel ?? null,
     warnings: offer.warnings,
