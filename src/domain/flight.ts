@@ -21,6 +21,12 @@ export interface FlightOffer {
   airlineName: string;
   flightNumber: string | null;
 
+  /**
+   * Airport-level codes when the source states them (THR vs IKA). Absent/undefined
+   * means "the source only told us the city" — never guess an airport.
+   */
+  originAirport?: string | null;
+  destinationAirport?: string | null;
   originCode: string;
   destinationCode: string;
   /** ISO 8601 instants (UTC). */
@@ -42,6 +48,53 @@ export interface FlightOffer {
   fetchedAt: string;
   dataSource: "demo" | "live";
   warnings: OfferWarning[];
+
+  // ——— live-only facts (absent on demo offers) ———
+  /** Fare identity: cabin, booking class, ticket type. */
+  fare?: FareIdentity;
+  /** Freshness of the *price*, not of the source. */
+  freshness?: FreshnessState;
+  /** Instant the price was observed (== fetchedAt unless re-verified). */
+  priceObservedAt?: string;
+  /** Instant the price+availability were last re-verified with the provider. */
+  lastVerifiedAt?: string | null;
+  /** 0..1 share of optional facts the source provided. */
+  completeness?: number;
+  provenance?: OfferProvenance;
+  /** Bookable seats, only when the source states them. */
+  seatsAvailable?: number | null;
+}
+
+/**
+ * Fare identity. Two offers for the same physical flight are still *different
+ * products* when the cabin, fare class, baggage or refund terms differ, and they
+ * must never be merged or plotted on one price line.
+ */
+export interface FareIdentity {
+  cabin: CabinClass;
+  /** Marketing carrier's booking class ("Y", "RK") when the source states it. */
+  fareClass: string | null;
+  /** Charter vs system ticket, when known. */
+  ticketType: "system" | "charter" | "unknown";
+  /** Marketing name of the fare family ("Economy Flex"), when known. */
+  fareName: string | null;
+}
+
+export type FreshnessState = "fresh" | "possibly-stale" | "unverified" | "unavailable" | "demo";
+
+export interface OfferProvenance {
+  /** "html" for scraped pricing, "api" for a documented API, "demo" for fixtures. */
+  sourceKind: "html" | "api" | "demo";
+  /** Endpoint/URL the record came from (already fetched, no secrets). */
+  endpoint: string;
+  /** The provider's own record id, when it has one. */
+  rawRecordId: string | null;
+  /** Seller/agency label inside an aggregator (Sepehr360), when the source exposes it. */
+  sellerLabel: string | null;
+  /** True when a unit conversion (rial→toman) was applied. */
+  unitConverted: boolean;
+  /** Number of source rows that collapsed into this offer (intra-provider duplicates). */
+  mergedRows: number;
 }
 
 export interface FlightSegment {
@@ -75,7 +128,12 @@ export type OfferWarning =
   | "baggage-unknown"
   | "refund-unknown"
   | "flight-number-missing"
-  | "timezone-assumed";
+  | "timezone-assumed"
+  | "duration-inferred"
+  | "airport-unknown"
+  | "availability-unverified"
+  | "seller-aggregated"
+  | "stops-partial";
 
 export const WARNING_LABELS: Record<OfferWarning, string> = {
   "price-converted": "قیمت با نرخ نمونه به تومان تبدیل شده",
@@ -83,6 +141,11 @@ export const WARNING_LABELS: Record<OfferWarning, string> = {
   "refund-unknown": "شرایط استرداد اعلام نشده",
   "flight-number-missing": "شماره پرواز اعلام نشده",
   "timezone-assumed": "منطقهٔ زمانی از روی فرودگاه فرض شده",
+  "duration-inferred": "مدت سفر از روی ساعت حرکت و رسیدن محاسبه شده",
+  "airport-unknown": "فرودگاه دقیق اعلام نشده (سطح شهر)",
+  "availability-unverified": "موجودی این نرخ توسط منبع اعلام نشده است",
+  "seller-aggregated": "این نرخ از میان چند فروشندهٔ همان منبع انتخاب شده",
+  "stops-partial": "تعداد توقف اعلام شده، اما ایستگاه‌های میانی اعلام نشده‌اند",
 };
 
 /**
