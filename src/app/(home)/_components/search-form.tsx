@@ -10,7 +10,8 @@ import { toPersianDigits } from "@/lib/format";
 import { addDays, isoToday } from "@/lib/jalali";
 import { cn } from "@/lib/cn";
 import { clarificationQuestion } from "@/ai/nlParser";
-import { INITIAL_INTENT_STATE, intentAction } from "@/server/intent-action";
+import { intentAction } from "@/server/intent-action";
+import { INITIAL_INTENT_STATE } from "@/server/intent-state";
 
 /**
  * The homepage search surface: conventional form + natural-language box.
