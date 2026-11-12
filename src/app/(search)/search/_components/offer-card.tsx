@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowLeft, ArrowUpLeft, Briefcase, GitCompareArrows, Plane, RotateCcw, Timer } from "lucide-react";
+import { ArrowLeft, ArrowUpLeft, Briefcase, GitCompareArrows, Plane, RotateCcw, Timer, TriangleAlert } from "lucide-react";
 import type { OfferGroup } from "@/domain/flight";
 import { WARNING_LABELS } from "@/domain/flight";
 import type { FlightOffer } from "@/domain/flight";
@@ -47,6 +47,22 @@ export function OfferCard({
   const departTime = formatTimeInZone(offer.departAt, origin?.timezone ?? "Asia/Tehran");
   const arriveTime = formatTimeInZone(offer.arriveAt, destination?.timezone ?? "Asia/Tehran");
   // "+۱" when the arrival is on a later civil day *at the destination*.
+  // Two different facts, never conflated: how many *providers* we queried, and how many
+  // *agencies* the source itself says carry this fare. The second is usually the real market.
+  const sellerBadge =
+    group.knownSellers > group.providers.length ? (
+      <span
+        className="inline-flex items-center gap-1 rounded-full bg-teal-50 px-2 py-0.5 text-[0.62rem] font-semibold text-teal-700"
+        title="تعداد آژانس‌هایی که همین پرواز را می‌فروشند، به گفتهٔ منبع؛ فهرست تک‌تک آن‌ها منتشر نشده است."
+      >
+        {toPersianDigits(group.knownSellers)} فروشنده
+      </span>
+    ) : group.providers.length > 1 ? (
+      <span className="inline-flex items-center gap-1 rounded-full bg-saffron-50 px-2 py-0.5 text-[0.62rem] font-semibold text-saffron-600">
+        {toPersianDigits(group.providers.length)} ارائه‌دهنده
+      </span>
+    ) : null;
+
   const arrivesNextDay =
     isoDateInZone(offer.arriveAt, destination?.timezone ?? "Asia/Tehran") !==
     isoDateInZone(offer.departAt, origin?.timezone ?? "Asia/Tehran");
@@ -83,11 +99,19 @@ export function OfferCard({
                 {offer.segments[0]?.aircraft ? ` · ${offer.segments[0].aircraft}` : ""}
               </p>
             </div>
-            {group.providers.length > 1 && (
-              <span className="mr-auto inline-flex items-center gap-1 rounded-full bg-saffron-50 px-2 py-0.5 text-[0.62rem] font-semibold text-saffron-600">
-                {toPersianDigits(group.providers.length)} ارائه‌دهنده
-              </span>
-            )}
+            <span className="mr-auto flex flex-wrap items-center justify-end gap-1.5">
+              {/* The unit being compared: this flight, at every source that sells it. */}
+              {group.identity === "same-departure" ? (
+                <span
+                  className="inline-flex items-center gap-1 rounded-full bg-ink-100 px-2 py-0.5 text-[0.6rem] font-medium text-ink-500"
+                  title="هیچ منبعی شمارهٔ پرواز را اعلام نکرده؛ یکسان بودن ساعت حرکت مبنای گروه‌بندی است."
+                >
+                  <TriangleAlert className="size-2.5" aria-hidden="true" />
+                  شناسایی بر پایهٔ ساعت حرکت
+                </span>
+              ) : null}
+              {sellerBadge}
+            </span>
           </div>
 
           <div className="mt-3 flex items-center gap-2 sm:gap-3">
@@ -236,6 +260,7 @@ export function OfferCard({
 
       {group.providers.length > 1 && (
         <div className="border-t border-ink-100 bg-ink-50/60 px-4 py-2">
+          <p className="mb-1 text-[0.6rem] text-ink-400">همین پرواز، در هر منبعی که نرخش را دارد:</p>
           <ul className="flex flex-wrap gap-x-4 gap-y-1">
             {group.providers.map((provider) => (
               <li key={provider.offerId} className="inline-flex items-center gap-1.5 text-[0.65rem] text-ink-600">

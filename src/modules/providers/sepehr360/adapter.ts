@@ -502,6 +502,8 @@ export class Sepehr360Adapter implements LiveProviderAdapter<Sepehr360RawOffer> 
         fetchedAt: meta.fetchedAt,
         seatsAvailable: typeof record.seatsAvailable === "number" ? record.seatsAvailable : null,
         unitConverted: price.converted,
+        // "فروش توسط 125 سایت مختلف" is the source's own statement about *this* fare.
+        sellerCount: declaredSellerCount(record.sellerText),
         extraWarnings: [
           ...(origin.assumed ? (["airport-unknown"] as const) : []),
           ...(destination.assumed ? (["airport-unknown"] as const) : []),
@@ -614,6 +616,20 @@ export function matchPersianAirport(label: string): string | null {
     if (pattern.test(normalized)) return getAirport(code) ? code : null;
   }
   return null;
+}
+
+/**
+ * The agency count the page printed for this fare, when it printed one.
+ * Only the "N سایت مختلف" form is a count; a single agency name is not a number and must not
+ * be turned into one.
+ */
+export function declaredSellerCount(sellerText: string | null): number | null {
+  if (!sellerText) return null;
+  const normalized = normalizeDigits(sellerText);
+  const match = /(\d{1,5})\s*سایت/.exec(normalized);
+  if (!match?.[1]) return null;
+  const count = Number(match[1]);
+  return Number.isFinite(count) && count > 0 ? count : null;
 }
 
 /** Host of a configured base URL, or null when it is not a usable absolute URL. */

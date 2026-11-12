@@ -63,6 +63,8 @@ export interface LiveOfferDraft {
   /** Set only when the provider states bookable seats / availability. */
   seatsAvailable: number | null;
   mergedRows?: number;
+  /** Sellers this source says carry the same fare; null/undefined when it does not say. */
+  sellerCount?: number | null;
   /** Which unit conversion happened, if any. */
   unitConverted: boolean;
   extraWarnings?: OfferWarning[];
@@ -259,6 +261,7 @@ export function assembleLiveOffer(
       sellerLabel: input.sellerLabel,
       unitConverted: input.price.converted || input.unitConverted,
       mergedRows: input.mergedRows ?? 1,
+      sellerCount: typeof input.sellerCount === "number" && input.sellerCount > 0 ? input.sellerCount : null,
     },
   };
 }

@@ -315,11 +315,20 @@ export function dedupeSameOffer(offers: FlightOffer[], warnings: string[] = []):
     const winner = compareCheapest(offer, existing) < 0 ? offer : existing;
     const merged = existingMerged + (offer.provenance?.mergedRows ?? 1);
 
+    const bestSellers = Math.max(existing.provenance?.sellerCount ?? 0, offer.provenance?.sellerCount ?? 0);
     byKey.set(key, {
       ...winner,
       provenance: winner.provenance
-        ? { ...winner.provenance, mergedRows: merged }
-        : { sourceKind: "demo", endpoint: "", rawRecordId: null, sellerLabel: null, unitConverted: false, mergedRows: merged },
+        ? { ...winner.provenance, mergedRows: merged, sellerCount: bestSellers > 0 ? bestSellers : null }
+        : {
+            sourceKind: "demo",
+            endpoint: "",
+            rawRecordId: null,
+            sellerLabel: null,
+            unitConverted: false,
+            mergedRows: merged,
+            sellerCount: null,
+          },
     });
     if (merged > 1 && !warnings.includes("duplicate-rows-collapsed")) warnings.push("duplicate-rows-collapsed");
   }

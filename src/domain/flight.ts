@@ -95,6 +95,12 @@ export interface OfferProvenance {
   unitConverted: boolean;
   /** Number of source rows that collapsed into this offer (intra-provider duplicates). */
   mergedRows: number;
+  /**
+   * How many independent agencies this source says sell this fare ("فروش توسط 125 سایت
+   * مختلف"). A floor on real competition for *the same flight*; null when the source does
+   * not say, which is not the same as "one".
+   */
+  sellerCount: number | null;
 }
 
 export interface FlightSegment {
@@ -163,6 +169,14 @@ export const WARNING_LABELS: Record<OfferWarning, string> = {
  * several providers becomes one group so the user compares real alternatives,
  * while every provider's own price stays visible.
  */
+/**
+ * One *physical flight*, and every price we found for exactly that flight.
+ *
+ * This is the unit the product promises to compare: `IR 452` on 29 Aban is one thing, and
+ * what varies between sources is its *price*, not its identity. A group is therefore only
+ * ever formed from offers that agree on carrier and flight number (see `dedupe/group.ts`);
+ * two different flights are never put in one card, however close their prices are.
+ */
 export interface OfferGroup {
   groupKey: string;
   /** Representative offer (cheapest, then freshest) used for card display. */
@@ -171,11 +185,33 @@ export interface OfferGroup {
   offers: FlightOffer[];
   /** Lowest normalized price in the group. */
   cheapestToman: number;
-  /** Providers that sell this flight, cheapest first. */
+  /** Sellers of *this* flight, cheapest first. */
   providers: GroupProvider[];
   /** True when the offers' prices differ enough to be worth surfacing. */
   hasPriceSpread: boolean;
+  /** The carrier's flight number, when at least one source published it. */
+  flightNumber: string | null;
+  /**
+   * How the flight's identity was established — printed in the UI, because a comparison is
+   * only as trustworthy as the identity behind it.
+   */
+  identity: GroupIdentity;
+  /**
+   * Lower bound on how many independent sellers offered this exact flight. Sepehr360
+   * publishes "فروش توسط N سایت مختلف" per fare, so the *seller* count can be far higher
+   * than the provider count; we report it as a floor and never invent the individual names.
+   */
+  knownSellers: number;
 }
+
+export type GroupIdentity =
+  /** Carrier + published flight number — the only fully trustworthy identity. */
+  | "flight-number"
+  /**
+   * No source published a number; the same carrier's offers agree on departure within a
+   * few minutes, so they are almost certainly one flight. Labelled in the UI as such.
+   */
+  | "same-departure";
 
 export interface GroupProvider {
   providerId: string;

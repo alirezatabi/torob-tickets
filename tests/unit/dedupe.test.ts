@@ -54,12 +54,75 @@ describe("deduplication", () => {
     expect(groups[0]?.hasPriceSpread).toBe(true);
   });
 
-  it("joins an offer that lacks a flight number when times and route match", () => {
+  it("never attaches an unnumbered offer to a numbered flight", () => {
+    // The product compares *this* flight, not "something on the same airline at the same
+    // time". Without a number on one side, one group would mix a confirmed identity with a
+    // guess — so they stay separate rows.
     const groups = groupOffers([
       offer({ id: "a:1", providerId: "a", price: cheap }),
       offer({ id: "b:1", providerId: "b", price: pricey, flightNumber: null, groupKey: "x" }),
     ]);
+    expect(groups).toHaveLength(2);
+    expect(groups.map((group) => group.identity).sort()).toEqual(["flight-number", "same-departure"]);
+    expect(() => assertNoUnsafeMerge(groups)).not.toThrow();
+  });
+
+  it("groups unnumbered quotes of the same departure within five minutes", () => {
+    const groups = groupOffers([
+      offer({ id: "a:1", providerId: "a", price: cheap, flightNumber: null }),
+      offer({
+        id: "b:1",
+        providerId: "b",
+        price: pricey,
+        flightNumber: null,
+        departAt: "2026-11-20T05:12:00.000Z",
+      }),
+    ]);
     expect(groups).toHaveLength(1);
+    expect(groups[0]?.identity).toBe("same-departure");
+    expect(groups[0]?.providers).toHaveLength(2);
+  });
+
+  it("does not stretch that tolerance: 13:00 and 13:40 are different flights", () => {
+    const groups = groupOffers([
+      offer({ id: "a:1", providerId: "a", price: cheap, flightNumber: null, departAt: "2026-11-20T05:00:00.000Z" }),
+      offer({ id: "b:1", providerId: "b", price: pricey, flightNumber: null, departAt: "2026-11-20T05:40:00.000Z" }),
+    ]);
+    expect(groups).toHaveLength(2);
+  });
+
+  it("reports the flight number and identity on the group, for the UI to state", () => {
+    const groups = groupOffers([
+      offer({ id: "a:1", providerId: "a", price: cheap, flightNumber: "IR-452" }),
+      offer({ id: "b:1", providerId: "b", price: pricey, flightNumber: "IR452" }),
+    ]);
+    expect(groups).toHaveLength(1);
+    // The displayed number is a real source row's, not a normalised key.
+    expect(["IR-452", "IR452"]).toContain(groups[0]?.flightNumber);
+    expect(groups[0]?.identity).toBe("flight-number");
+    expect(groups[0]?.groupKey).toBe("TK|IR452|2026-11-20|THR>IST");
+  });
+
+  it("counts the agencies the source declares as a floor on sellers", () => {
+    const groups = groupOffers([
+      offer({
+        id: "a:1",
+        providerId: "a",
+        price: cheap,
+        provenance: {
+          sourceKind: "html",
+          endpoint: "GET /Flight/B2c/Search",
+          rawRecordId: null,
+          sellerLabel: "فروش توسط 125 سایت مختلف",
+          unitConverted: false,
+          mergedRows: 1,
+          sellerCount: 125,
+        },
+      }),
+      offer({ id: "b:1", providerId: "b", price: pricey }),
+    ]);
+    // 125 agencies on one fare beats "2 providers": the number is a floor, not a sum.
+    expect(groups[0]?.knownSellers).toBe(125);
     expect(groups[0]?.providers).toHaveLength(2);
   });
 
