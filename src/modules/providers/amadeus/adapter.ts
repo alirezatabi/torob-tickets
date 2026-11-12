@@ -31,7 +31,7 @@ import { buildForeignPrice } from "@/modules/money/price";
 import { wallClockToInstant } from "@/providers/fare";
 import { getAirport } from "@/modules/airports";
 import { resolveAirlineCode } from "@/modules/airlines/registry";
-import type { FlightSegment, OfferWarning } from "@/domain/flight";
+import type { FlightOffer, FlightSegment, OfferWarning } from "@/domain/flight";
 import type { NormalizationIssue } from "@/providers/types";
 import {
   amadeusBaseUrl,
@@ -315,6 +315,56 @@ export class AmadeusAdapter implements LiveProviderAdapter<AmadeusRawOffer> {
       },
       { freshness: FRESHNESS, now: new Date(meta.fetchedAt) },
     );
+  }
+
+  /**
+   * Verify each normalized offer against Amadeus and apply the outcome.
+   *
+   * Only the first few offers are verified: re-pricing is a *billed* API call with a
+   * monthly quota, and verifying 40 offers per search would exhaust it for no benefit.
+   * The caller decides how many (default 3), and the UI states verification per offer.
+   */
+  async verifyBatch(
+    records: AmadeusRawOffer[],
+    normalized: FlightOffer[],
+    limit = 3,
+    now: Date = new Date(),
+  ): Promise<{ verified: number; changed: number; skipped: number; notes: string[] }> {
+    const { verifyAmadeusOffer } = await import("./verify");
+    const byId = new Map(records.map((record) => [record.id, record]));
+    let verified = 0;
+    let changed = 0;
+    const notes: string[] = [];
+
+    for (const offer of normalized.slice(0, limit)) {
+      const rawId = offer.provenance?.rawRecordId;
+      const record = rawId ? byId.get(rawId) : undefined;
+      if (!record) continue;
+
+      const outcome = await verifyAmadeusOffer(this, record, {
+        amountMinor: offer.price.original.amount,
+        currency: offer.price.original.currency,
+      }, now);
+
+      if (outcome.status === "verified") {
+        verified += 1;
+        if (outcome.priceChanged) {
+          changed += 1;
+          notes.push(`${offer.id}: قیمت تغییر کرده است (${outcome.total.amount / 100} ${outcome.total.currency})`);
+          // Keep the *verified* price; the old one lives on in price history.
+          offer.price.original = {
+            amount: outcome.total.amount / 100,
+            currency: outcome.total.currency as typeof offer.price.original.currency,
+          };
+          offer.price.comparable = false;
+        }
+        offer.lastVerifiedAt = outcome.verifiedAt;
+      } else {
+        notes.push(`${offer.id}: ${outcome.reasonFa}`);
+      }
+    }
+
+    return { verified, changed, skipped: Math.max(0, normalized.length - limit), notes };
   }
 
   /**

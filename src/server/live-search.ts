@@ -16,7 +16,9 @@ import { rankAndDecide } from "@/modules/ranking/core";
 import { fromDemoOffer, fromLiveOffer } from "@/modules/ranking/project";
 import type { RankInput } from "@/modules/ranking/types";
 import { createOrchestrator, describeLiveProviders, searchMode, type SearchMode } from "@/modules/providers/registry-live";
-import { dedupeSameOffer } from "@/modules/providers/orchestrator";
+import { dedupeSameOffer, SearchOrchestrator } from "@/modules/providers/orchestrator";
+import { AmadeusAdapter, amadeusConfigFromEnv } from "@/modules/providers/amadeus/adapter";
+import { createLogger } from "@/modules/providers/shared/logger";
 import type { ProviderRunReport } from "@/modules/providers/contracts/provider";
 import { persistSearch } from "@/modules/persistence/live-store";
 import { dbMode } from "@/modules/db/prisma";
@@ -102,6 +104,15 @@ export async function runLiveSearch(query: TripQuery, options: LiveSearchOptions
     offers = outcome.offers;
     reports = outcome.reports;
     warnings.push(...outcome.warnings);
+
+    // Re-verify the top Amadeus offers (price + availability) when enabled. This is a
+    // billed call with a monthly quota, so it is opt-in and bounded.
+    if (process.env.AMADEUS_VERIFY_OFFERS === "true") {
+      const verification = await verifyTopAmadeusOffers(query);
+      const verifiedById = new Map(verification.offers.map((offer) => [offer.id, offer]));
+      offers = offers.map((offer) => verifiedById.get(offer.id) ?? offer);
+      warnings.push(...verification.notes);
+    }
   } else {
     offers = await getDemoOffers(query);
     warnings.push("demo-mode");
@@ -159,6 +170,34 @@ export async function runLiveSearch(query: TripQuery, options: LiveSearchOptions
     fetchedAt: offers[0]?.fetchedAt ?? new Date().toISOString(),
     totalMs: Date.now() - startedAt,
   };
+}
+
+/**
+ * Re-run the Amadeus search for the top offers and re-price them.
+ *
+ * A separate search is needed because verification requires the *original* offer payload,
+ * which we deliberately do not store in Postgres. The cost is one extra API call pair per
+ * search, which is why it is behind `AMADEUS_VERIFY_OFFERS=true`.
+ */
+async function verifyTopAmadeusOffers(query: TripQuery): Promise<{ offers: FlightOffer[]; notes: string[] }> {
+  const amadeus = new AmadeusAdapter(amadeusConfigFromEnv());
+  if (!amadeus.isConfigured()) return { offers: [], notes: ["amadeus-verify-skipped"] };
+
+  const orchestrator = new SearchOrchestrator({ providers: [amadeus as never], logger: createLogger("verify") });
+  const request = orchestrator.buildRequest(query);
+  try {
+    const result = await amadeus.search(request, {
+      signal: AbortSignal.timeout(10_000),
+      logger: createLogger("verify"),
+      now: () => new Date(),
+      budgetMs: 10_000,
+    });
+    const batch = amadeus.normalize(result.records, request, result.meta);
+    const outcome = await amadeus.verifyBatch(result.records, batch.offers, 3);
+    return { offers: batch.offers, notes: outcome.notes };
+  } catch {
+    return { offers: [], notes: ["amadeus-verify-failed"] };
+  }
 }
 
 function toView(
@@ -240,7 +279,6 @@ async function persistIfPossible(
 
   try {
     const result = await persistSearch({
-      requestHash: "",
       query: {
         originCity: query.originCode,
         destinationCity: query.destinationCode,

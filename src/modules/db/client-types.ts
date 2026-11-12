@@ -137,7 +137,21 @@ export type Where = Record<string, unknown>;
  * Structural type of the delegates we call. Optional so `db` can be a partial fake in
  * tests; production code always has all of them.
  */
+export interface LiveProviderRow {
+  id: string;
+  name: string;
+  mode: "LIVE" | "DEMO";
+  sourceKind: string;
+  quotedCurrency: string;
+  capabilities: JsonValue;
+  complianceNote: string;
+  enabled?: boolean;
+}
+
 export interface TypedDb {
+  liveProvider: {
+    upsert(args: { where: { id: string }; create: LiveProviderRow; update: Partial<LiveProviderRow> }): Promise<unknown>;
+  };
   flightSearch: {
     create(args: { data: FlightSearchCreateInput }): Promise<{ id: string }>;
     findFirst(args?: {

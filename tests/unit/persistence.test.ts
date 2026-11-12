@@ -22,7 +22,17 @@ function fakeDb() {
   const searches: Record<string, unknown>[] = [];
   const logs: unknown[] = [];
 
+  const providers = new Map<string, unknown>();
+
   const db: TypedDb = {
+    liveProvider: {
+      async upsert({ where, create, update }) {
+        const existing = providers.get(where.id);
+        const row = existing ? { ...(existing as object), ...update } : create;
+        providers.set(where.id, row);
+        return row;
+      },
+    },
     flightSearch: {
       async create({ data }) {
         const row = { ...data, id: `search-${searches.length + 1}` };
@@ -92,7 +102,7 @@ function fakeDb() {
     },
   };
 
-  return { db, offers, observations, searches, logs };
+  return { db, offers, observations, searches, logs, providers };
 }
 
 function offerRow(overrides: Partial<FlightOfferCreateInput> = {}): FlightOfferCreateInput {

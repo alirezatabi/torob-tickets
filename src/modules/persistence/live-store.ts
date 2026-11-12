@@ -20,6 +20,7 @@ import type { FlightOffer } from "@/domain/flight";
 import type { ProviderRunReport } from "@/modules/providers/contracts/provider";
 import { getDb } from "@/modules/db/prisma";
 import { withTransaction } from "@/modules/db/transaction";
+import { DatabaseError, mapPrismaError } from "@/modules/db/errors";
 import { baggageFacts, localDate } from "@/modules/providers/shared/normalize-offer";
 import { offerKey, type FareFacts } from "@/modules/live/offer-identity";
 import type {
@@ -30,7 +31,6 @@ import type {
 } from "@/modules/db/client-types";
 
 export interface PersistSearchInput {
-  requestHash: string;
   query: {
     originCity: string;
     destinationCity: string;
@@ -54,6 +54,34 @@ export interface PersistSearchResult {
 }
 
 const DEDUPE_WINDOW_MS = 20_000;
+
+/**
+ * Every offer has a foreign key to `live_providers`, so the provider row must exist
+ * before the first offer is written — otherwise the very first live search fails on a
+ * foreign-key violation. The row is derived from the run reports (code is the source of
+ * truth for capabilities/compliance), and upserted inside the same transaction.
+ */
+function providerRowFromReport(report: ProviderRunReport): {
+  id: string;
+  name: string;
+  mode: "LIVE" | "DEMO";
+  sourceKind: string;
+  quotedCurrency: string;
+  capabilities: JsonValue;
+  complianceNote: string;
+  enabled: boolean;
+} {
+  return {
+    id: report.providerId,
+    name: report.providerName,
+    mode: report.mode === "live" ? "LIVE" : "DEMO",
+    sourceKind: report.mode === "live" ? "live" : "demo",
+    quotedCurrency: "IRT",
+    capabilities: { reportedAt: new Date(0).toISOString() } as JsonValue,
+    complianceNote: "اعلام‌شده توسط کد منبع؛ برای جزئیات docs/COMPLIANCE.md را ببینید.",
+    enabled: true,
+  };
+}
 
 /** Deterministic hash of the request, so double-submits collapse. */
 export function requestHash(input: {
@@ -181,6 +209,45 @@ function toObservationRow(
 const FORCE_OBSERVATION_AFTER_MS = 6 * 60 * 60_000;
 
 export async function persistSearch(input: PersistSearchInput): Promise<PersistSearchResult> {
+  try {
+    return await persistSearchOnce(input);
+  } catch (error) {
+    const mapped = mapPrismaError(error);
+    // A concurrent identical submit lost the race on (requestHash, startedAt). That is
+    // exactly the case idempotency is for: the other transaction stored it, so treat this
+    // as a dedupe rather than surfacing a unique-constraint error to the user.
+    if (mapped instanceof DatabaseError && mapped.code === "unique-conflict") {
+      const existing = await findRecentSearch(input);
+      if (existing) {
+        return {
+          searchId: existing.id,
+          offersWritten: 0,
+          observationsWritten: 0,
+          status: existing.status === "failed" ? "failed" : existing.status === "partial" ? "partial" : "ok",
+          deduped: true,
+        };
+      }
+    }
+    throw mapped;
+  }
+}
+
+async function findRecentSearch(input: PersistSearchInput): Promise<{ id: string; status: string } | null> {
+  try {
+    return await getDb().flightSearch.findFirst({
+      where: {
+        requestHash: requestHash({ ...input.query, mode: input.mode }),
+        startedAt: { gte: new Date(input.startedAt.getTime() - DEDUPE_WINDOW_MS) },
+      },
+      orderBy: { startedAt: "desc" },
+      select: { id: true, status: true },
+    });
+  } catch {
+    return null;
+  }
+}
+
+async function persistSearchOnce(input: PersistSearchInput): Promise<PersistSearchResult> {
   const prisma = getDb();
   const hash = requestHash({ ...input.query, mode: input.mode });
 
@@ -212,6 +279,12 @@ export async function persistSearch(input: PersistSearchInput): Promise<PersistS
 
   const result = await withTransaction(async (rawTx) => {
     const tx = rawTx as unknown as TypedDb;
+
+    // Providers referenced by these offers must exist first (FK).
+    for (const report of input.reports) {
+      const row = providerRowFromReport(report);
+      await tx.liveProvider.upsert({ where: { id: row.id }, create: row, update: {} });
+    }
     const search = await tx.flightSearch.create({
       data: {
         requestHash: hash,
