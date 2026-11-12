@@ -134,27 +134,48 @@ export function groupOffers(offers: FlightOffer[]): OfferGroup[] {
       // (the old code mutated `offer.groupKey` on the way in — B13).
       const stamped = sorted.map((offer) => (offer.groupKey === key ? offer : { ...offer, groupKey: key }));
 
-      const providers = cheapestPerProvider(stamped);
-      const cheapestToman = providers[0]?.priceToman ?? primary.price.toman;
-      const highest = providers[providers.length - 1]?.priceToman ?? cheapestToman;
-
-      groups.push({
-        groupKey: key,
-        primary: stamped[0] ?? primary,
-        offers: stamped,
-        cheapestToman,
-        providers,
-        hasPriceSpread: highest - cheapestToman >= Math.max(50_000, cheapestToman * 0.02),
-        // The displayed number comes from an actual source row, never from the normalised
-        // key (which is only for matching).
-        flightNumber: primary.flightNumber,
-        identity,
-        knownSellers: knownSellersOf(stamped),
-      });
+      groups.push(rebuildGroup(key, stamped, identity));
     }
   }
 
   return groups.sort(compareGroups);
+}
+
+/**
+ * Re-derive a group's derived fields from a set of its offers.
+ *
+ * Every derived number (`primary`, `providers`, `cheapestToman`, `hasPriceSpread`,
+ * `knownSellers`) is computed here and only here. When a surface narrows a group — the
+ * display filters do, and so does anything that drops one seller's row — it must call this
+ * rather than patch the fields by hand, or the card shows one seller and the price of
+ * another (the stale-`cheapestToman` bug this replaces).
+ */
+export function rebuildGroup(
+  groupKey: string,
+  offers: FlightOffer[],
+  identity: GroupIdentity,
+): OfferGroup {
+  const sorted = [...offers].sort(compareOffers);
+  const primary = sorted[0];
+  if (!primary) throw new Error("rebuildGroup needs at least one offer");
+  const stamped = sorted.map((offer) => (offer.groupKey === groupKey ? offer : { ...offer, groupKey }));
+  const providers = cheapestPerProvider(stamped);
+  const cheapestToman = providers[0]?.priceToman ?? primary.price.toman;
+  const highest = providers[providers.length - 1]?.priceToman ?? cheapestToman;
+
+  return {
+    groupKey,
+    primary: stamped[0] ?? primary,
+    offers: stamped,
+    cheapestToman,
+    providers,
+    hasPriceSpread: highest - cheapestToman >= Math.max(50_000, cheapestToman * 0.02),
+    // The displayed number comes from an actual source row, never from the normalised key
+    // (which is only for matching).
+    flightNumber: primary.flightNumber,
+    identity,
+    knownSellers: knownSellersOf(stamped),
+  };
 }
 
 /** Cheapest first; on a tie the flight that more sellers carry is the better answer. */

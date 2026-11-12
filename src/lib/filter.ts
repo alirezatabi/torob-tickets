@@ -2,6 +2,7 @@ import type { FlightOffer, OfferGroup } from "@/domain/flight";
 import { DAY_PART_RANGES, type QueryPreferences } from "@/domain/trip";
 import { getCity } from "./cities";
 import { hourInZone } from "./format";
+import { rebuildGroup } from "@/dedupe/group";
 
 /**
  * Display filters.
@@ -43,14 +44,10 @@ export function filterGroups(groups: OfferGroup[], filters: DisplayFilters): { v
       visible.push(group);
       continue;
     }
-    const primary = offers[0] ?? group.primary;
-    visible.push({
-      ...group,
-      offers,
-      primary,
-      cheapestToman: offers[0]?.price.toman ?? group.cheapestToman,
-      providers: group.providers.filter((provider) => offers.some((offer) => offer.id === provider.offerId)),
-    });
+    // Re-derive *every* derived field from the surviving offers. Patching only `offers`
+    // (leaving `cheapestToman`/`providers`/`knownSellers` from before the filter) made the
+    // card show a price and seller count for a row it no longer displayed.
+    visible.push(rebuildGroup(group.groupKey, offers, group.identity));
   }
 
   return { visible, hidden };
