@@ -25,6 +25,22 @@ describe("explanation grounding", () => {
     expect(result.violations[0]).toContain("unsupported-number");
   });
 
+  it("accepts a sentence that names the recommended flight number", () => {
+    // Regression: flight-number digits used to be read as unsupported numbers.
+    const result = checkGrounding(
+      "پرواز W5-107 با ۲۳ کیلو بار و قیمت ۴٬۲۵۰٬۰۰۰ تومان بهترین گزینه است.",
+      facts,
+    );
+    expect(result.violations).toEqual([]);
+    expect(result.ok).toBe(true);
+  });
+
+  it("still rejects a different flight number", () => {
+    const result = checkGrounding("پرواز TK873 ارزان‌تر است.", facts);
+    expect(result.ok).toBe(false);
+    expect(result.violations[0]).toContain("wrong-flight");
+  });
+
   it("rejects baggage claims when baggage is unknown", () => {
     const result = checkGrounding("این پرواز شامل بار ۲۳ کیلوگرمی است.", { ...facts, baggageKnown: false });
     expect(result.violations).toContain("claims-unknown-baggage");

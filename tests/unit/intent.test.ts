@@ -65,6 +65,49 @@ describe("natural-language intent parsing (deterministic)", () => {
     expect(question).toContain("مبدأ");
   });
 
+  it("keeps the route direction from the preposition, not the word order", () => {
+    const intent = parseNaturalLanguage("از تهران به کیش", { today: TODAY });
+    expect(intent.originCode).toBe("THR");
+    expect(intent.destinationCode).toBe("KIH");
+  });
+
+  it("reads two cities without a preposition in order of appearance", () => {
+    const intent = parseNaturalLanguage("پرواز تهران استانبول", { today: TODAY });
+    expect(intent.originCode).toBe("THR");
+    expect(intent.destinationCode).toBe("IST");
+  });
+
+  it("treats a single mentioned city as the destination", () => {
+    const intent = parseNaturalLanguage("کیش", { today: TODAY });
+    expect(intent.destinationCode).toBe("KIH");
+    expect(intent.missing).toContain("origin");
+  });
+
+  it("ignores short city aliases glued inside unrelated Persian words", () => {
+    // "برم" (from "می‌خوام برم ...") must not resolve to Rome ("رم").
+    const intent = parseNaturalLanguage("می‌خوام برم استانبول", { today: TODAY });
+    expect(intent.originCode).toBeNull();
+    expect(intent.destinationCode).toBe("IST");
+  });
+
+  it("parses a return date only when the return leg has one", () => {
+    const intent = parseNaturalLanguage("رفت و برگشت تهران به دبی ۲۰ آذر برگشت ۲۵ آذر", { today: TODAY });
+    expect(intent.tripType).toBe("roundtrip");
+    expect(intent.departDate).toBe("2026-12-11");
+    expect(intent.returnDate).toBe("2026-12-16");
+  });
+
+  it("does not invent a return date from the trip type alone", () => {
+    const intent = parseNaturalLanguage("رفت و برگشت تهران به استانبول ۲۰ آذر", { today: TODAY });
+    expect(intent.tripType).toBe("roundtrip");
+    expect(intent.returnDate).toBeNull();
+  });
+
+  it("understands the weekend shortcut", () => {
+    const intent = parseNaturalLanguage("از تهران به استانبول آخر هفته", { today: "2026-11-10" });
+    expect(intent.departDate).toBe("2026-11-12");
+  });
+
   it("returns a safe fallback for unrelated gibberish", () => {
     const intent = parseNaturalLanguage("سلام خوبی", { today: TODAY });
     expect(intent.missing).toEqual(["origin", "destination", "date"]);

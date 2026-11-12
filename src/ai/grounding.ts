@@ -31,6 +31,20 @@ export interface GroundingCheck {
   violations: string[];
 }
 
+/**
+ * Flight numbers ("TK873", "W5-107") are identifiers, not quantities. They used
+ * to be read twice — as an unsupported number *and* as a wrong flight — which
+ * rejected every sentence that named the recommended flight.
+ */
+const FLIGHT_CODE = /\b[A-Z]{2}\s?-?\s?\d{1,4}\b|\b[A-Z]\d-\s?\d{1,4}\b/gi;
+
+const normalizeFlightCode = (code: string) => code.replace(/[\s-]/g, "").toUpperCase();
+
+/** Blank out flight numbers so their digits are not mistaken for prices/minutes. */
+export function maskFlightNumbers(text: string): string {
+  return text.replace(FLIGHT_CODE, (match) => "x".repeat(match.length));
+}
+
 const BAGGAGE_CLAIM = /بار|چمدان/;
 const REFUND_CLAIM = /استرداد|بازگشت\s*پول|کنسل/;
 const NEGATED_BAGGAGE = /بدون\s*بار|بار\s*ندارد|بار\s*همراه\s*ندارد/;
@@ -60,7 +74,7 @@ export function checkGrounding(text: string, facts: GroundingFacts): GroundingCh
   if (text.length > 420) violations.push("too-long");
   if (!/[\u0600-\u06FF]/.test(text)) violations.push("not-persian");
 
-  for (const number of extractNumbers(text)) {
+  for (const number of extractNumbers(maskFlightNumbers(text))) {
     const allowed = facts.allowedNumbers.some((candidate) => {
       if (candidate === number) return true;
       // tolerate rounded forms (e.g. 4.2M for 4_250_000) and hour<->minute restatements
@@ -79,11 +93,11 @@ export function checkGrounding(text: string, facts: GroundingFacts): GroundingCh
     violations.push("claims-unknown-refund");
   }
 
-  const flightCodes = text.match(/\b[A-Z]{1,2}-?\s?\d{1,4}\b/gi) ?? [];
-  for (const code of flightCodes) {
-    const normalized = code.replace(/[\s-]/g, "").toUpperCase();
-    const expected = facts.flightNumber?.replace(/[\s-]/g, "").toUpperCase();
-    if (expected && normalized !== expected) violations.push(`wrong-flight:${code}`);
+  const expected = facts.flightNumber ? normalizeFlightCode(facts.flightNumber) : null;
+  for (const match of text.matchAll(FLIGHT_CODE)) {
+    const code = normalizeFlightCode(match[0]);
+    if (!expected) violations.push(`unexpected-flight:${match[0]}`);
+    else if (code !== expected) violations.push(`wrong-flight:${match[0]}`);
   }
 
   return { ok: violations.length === 0, violations };

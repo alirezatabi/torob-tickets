@@ -1,4 +1,4 @@
-import { findCityInText } from "@/lib/cities";
+import { findCitiesInOrder, findCityInText } from "@/lib/cities";
 import { findAirlineInText } from "@/lib/airlines";
 import { addDays, isoToJalali, jalaliToIso, isoToday, weekdayIndex } from "@/lib/jalali";
 import { toLatinDigits } from "@/lib/format";
@@ -52,7 +52,7 @@ export function parseNaturalLanguage(text: string, context: ParserContext = {}):
   const missing: ("origin" | "destination" | "date")[] = [];
 
   // ——— Route: "از X به Y" first, then any two city mentions, then city + TO city.
-  const { originCode, destinationCode } = extractRoute(normalized.text, text);
+  const { originCode, destinationCode } = extractRoute(normalized.text);
   if (!originCode) missing.push("origin");
   if (!destinationCode) missing.push("destination");
 
@@ -61,9 +61,10 @@ export function parseNaturalLanguage(text: string, context: ParserContext = {}):
   if (!departDate) missing.push("date");
 
   // ——— Return date (round trip) ———
-  const returnDate = /رفت\s*و\s*برگشت|رفتوبرگشت|round\s*trip|return/i.test(text)
-    ? extractReturnDate(normalized.text, departDate ?? today)
-    : null;
+  // "رفت و برگشت" alone only switches the trip type; a return *date* needs a date
+  // mention after "برگشت" ("... برگشت ۲۵ آذر").
+  const roundTripHint = /رفت\s*و\s*برگشت|رفتوبرگشت|round\s*trip|return/i.test(text);
+  const returnDate = roundTripHint ? extractReturnDate(normalized.text, departDate ?? today) : null;
 
   // ——— Stops ———
   let maxStops: number | null = null;
@@ -99,14 +100,19 @@ export function parseNaturalLanguage(text: string, context: ParserContext = {}):
   // ——— Day part ———
   let dayPart: DayPart | null = null;
   for (const { tokens, part } of DAY_PARTS) {
-    if (tokens.some((t) => normalized.text.includes(t))) {
+    const matched = tokens.some((token) => {
+      if (!/^[\x20-\x7e]+$/.test(token)) return normalized.text.includes(token);
+      const escaped = token.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      return new RegExp(`(^|[^a-z0-9])${escaped}([^a-z0-9]|$)`).test(normalized.text);
+    });
+    if (matched) {
       dayPart = part;
       break;
     }
   }
 
   // ——— Airline preference ———
-  const airline = findAirlineInText(text);
+  const airline = findAirlineInText(text, { strict: true });
 
   const confidence = 1 - missing.length * 0.25;
 
@@ -115,7 +121,7 @@ export function parseNaturalLanguage(text: string, context: ParserContext = {}):
     destinationCode,
     departDate,
     returnDate,
-    tripType: returnDate ? ("roundtrip" as const) : ("oneway" as const),
+    tripType: roundTripHint ? ("roundtrip" as const) : ("oneway" as const),
     passengers,
     cabin,
     pricePreference,
@@ -164,56 +170,38 @@ function normalizeText(text: string): { text: string } {
   return { text: latin };
 }
 
-function extractRoute(normalized: string, original: string): { originCode: string | null; destinationCode: string | null } {
-  // "از تهران به استانبول"
-  const fromTo = /از\s+([^\s]+(?:\s+[^\s]+)?)\s+(?:به|تا|ب\s*سمت)\s+([^\s]+(?:\s+[^\s]+)?)/.exec(normalized);
+function extractRoute(normalized: string): { originCode: string | null; destinationCode: string | null } {
+  // 1) Explicit direction: "از تهران به استانبول" / "from Tehran to Istanbul".
+  //    The preposition is the source of truth — never the order of the city names.
+  const fromTo =
+    /(?:از|from)\s+([^\s]+(?:\s+[^\s]+)?)\s+(?:به|ب\s*سمت|تا|to|towards?)\s+([^\s]+(?:\s+[^\s]+)?)/.exec(
+      normalized,
+    );
   if (fromTo) {
     const origin = findCityInText(fromTo[1] ?? "");
-    const dest = findCityInText(fromTo[2] ?? "");
-    if (origin && dest) return { originCode: origin, destinationCode: dest };
+    const destination = findCityInText(fromTo[2] ?? "");
+    if (origin && destination && origin !== destination) return { originCode: origin, destinationCode: destination };
   }
 
-  // "تهران به استانبول" / "tehran to istanbul"
+  // 2) "تهران به استانبول" / "tehran to istanbul" (short form, no leading preposition).
   const toSplit = /([^\s]+)\s+(?:به|to)\s+([^\s]+)/.exec(normalized);
   if (toSplit) {
     const origin = findCityInText(toSplit[1] ?? "");
-    const dest = findCityInText(toSplit[2] ?? "");
-    if (origin && dest && origin !== dest) return { originCode: origin, destinationCode: dest };
+    const destination = findCityInText(toSplit[2] ?? "");
+    if (origin && destination && origin !== destination) return { originCode: origin, destinationCode: destination };
   }
 
-  // Otherwise: collect distinct city mentions in order of appearance (longest first).
-  const mentions: { code: string; at: number }[] = [];
-  for (const candidate of collectCityMentions(normalized)) mentions.push(candidate);
-  mentions.sort((a, b) => a.at - b.at);
-  const distinct: string[] = [];
-  for (const mention of mentions) {
-    if (!distinct.includes(mention.code)) distinct.push(mention.code);
+  // 3) No preposition at all: use the order the cities appear ("پرواز تهران استانبول").
+  const mentions = findCitiesInOrder(normalized);
+  if (mentions.length >= 2) {
+    return { originCode: mentions[0]?.code ?? null, destinationCode: mentions[1]?.code ?? null };
   }
-  if (distinct.length >= 2) return { originCode: distinct[0] ?? null, destinationCode: distinct[1] ?? null };
-  if (distinct.length === 1) {
-    // One city only: assume it is the destination from Tehran, and flag origin as missing later.
-    const code = distinct[0] ?? null;
-    return { originCode: null, destinationCode: code };
+  if (mentions.length === 1) {
+    // A single city is the destination; asking for the origin is better than guessing it.
+    return { originCode: null, destinationCode: mentions[0]?.code ?? null };
   }
-  void original;
+
   return { originCode: null, destinationCode: null };
-}
-
-function collectCityMentions(text: string): { code: string; at: number }[] {
-  const out: { code: string; at: number }[] = [];
-  const probe = text;
-  let index = 0;
-  while (index < probe.length) {
-    const slice = probe.slice(index, index + 40);
-    const city = findCityInText(slice.slice(0, 20));
-    if (city) {
-      out.push({ code: city, at: index });
-      index += 6;
-    } else {
-      index += 1;
-    }
-  }
-  return out;
 }
 
 function extractDate(text: string, today: string): string | null {
@@ -222,6 +210,16 @@ function extractDate(text: string, today: string): string | null {
   // "پس فردا" must be checked before "فردا".
   if (/پس\s*فردا|day after tomorrow/.test(text)) return addDays(today, 2);
   if (/فردا|tomorrow/.test(text)) return addDays(today, 1);
+
+  // "آخر هفته" (Iranian weekend = Thursday/Friday) → the coming Thursday.
+  if (/آخر\s*هفته|weekend/.test(text)) {
+    const current = weekdayIndex(today);
+    const delta = (4 - current + 7) % 7 || 7;
+    return addDays(today, delta);
+  }
+
+  // "هفته بعد" / "next week" → same weekday next week.
+  if (/هفته\s*بعد|next\s*week/.test(text)) return addDays(today, 7);
 
   // "N روز دیگر" / "in N days"
   const inDays =
@@ -279,9 +277,40 @@ function extractDate(text: string, today: string): string | null {
   return null;
 }
 
-function extractReturnDate(text: string, fallbackDate: string): string | null {
-  const match = /(?:برگشت|بازگشت|return)[^\d]{0,12}(\d{1,2})/.exec(text);
-  if (match?.[1]) return addDays(fallbackDate, Number(match[1]));
+/**
+ * Parse the return leg: "برگشت ۲۵ آذر" / "return on 2026-12-16" / "برگشت ۵ روز بعد".
+ * Returns null when no date is actually stated — the UI then keeps the user's
+ * chosen return date instead of inventing one.
+ */
+function extractReturnDate(text: string, departureIso: string): string | null {
+  // "رفت و برگشت" is a trip-type phrase, not a date marker — mask it so the last
+  // remaining "برگشت" is the one the user actually attached a date to.
+  const masked = text.replace(/رفت\s*و\s*برگشت|رفتوبرگشت/gi, "\u0000".repeat(0));
+
+  const marker = /(?:برگشت|بازگشت|return(?:ing)?|back)\s*(?:در|on|:)?\s*(.{0,24})/i;
+  let tail = marker.exec(masked)?.[1]?.trim() ?? "";
+  if (!tail) return null;
+
+  // Use the *last* return marker: "… ۲۰ آذر برگشت ۲۵ آذر" must read "۲۵ آذر".
+  const all = [...masked.matchAll(/(?:برگشت|بازگشت|return(?:ing)?)\s*(?:در|on|:)?\s*(.{0,24})/gi)];
+  if (all.length > 1) tail = all[all.length - 1]?.[1]?.trim() ?? tail;
+  if (!tail) return null;
+
+  // Reuse the absolute-date parser on the tail only, so "فردا" in the outbound part
+  // cannot be mistaken for the return date.
+  const absolute = extractDate(tail, departureIso);
+  if (absolute && absolute !== departureIso) return absolute;
+  if (absolute && absolute === departureIso) {
+    // "رفت و برگشت ... ۲۰ آذر" states one date for both legs; the return leg is open.
+    const plusNights = /(\d+)\s*(?:شب|nights?)/.exec(text);
+    if (plusNights?.[1]) return addDays(departureIso, Number(plusNights[1]));
+    return null;
+  }
+
+  // "برگشت ۵ روز بعد" / "5 days later"
+  const relative = /(\d+)\s*(?:روز|days?)\s*(?:بعد|later)?/.exec(tail);
+  if (relative?.[1]) return addDays(departureIso, Number(relative[1]));
+
   return null;
 }
 
