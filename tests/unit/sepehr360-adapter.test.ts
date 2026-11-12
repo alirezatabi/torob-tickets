@@ -145,6 +145,88 @@ describe("Sepehr360Adapter", () => {
     vi.unstubAllGlobals();
   });
 
+  it("rejects a card whose printed airports do not serve the requested city pair", () => {
+    withStubbedFetch({});
+    const adapter = new Sepehr360Adapter({ enabled: true });
+    // The fixture cards print "مهرآباد → مشهد"; asking for THR→IST must not relabel them.
+    const records = [
+      {
+        index: 0,
+        airlineCode: "IR",
+        airlineNameFa: "ایران ایر",
+        departTime: "07:30",
+        arriveTime: "08:50",
+        durationText: "1 ساعت و 20 دقیقه",
+        priceText: "5902000 تومان",
+        priceAmount: 5_902_000,
+        originLabel: "مهرآباد",
+        destinationLabel: "مشهد",
+        cabinLabel: "اکونومی",
+        stopsLabel: "مستقیم",
+        sellerText: null,
+        availabilityText: null,
+        charterHint: false,
+      },
+    ];
+
+    const batch = adapter.normalize(records, { ...REQUEST, destinationCity: "IST", destinationAirports: ["IST"], international: true }, {
+      providerId: "sepehr360",
+      fetchedAt: "2026-11-12T10:00:00.000Z",
+      latencyMs: 10,
+      httpStatus: 200,
+      retries: 0,
+      fromCache: false,
+      endpoint: "GET /Flight/B2c/Search",
+      sourceUpdatedAt: null,
+    });
+
+    expect(batch.offers).toEqual([]);
+    expect(batch.issues[0]).toMatchObject({ code: "unknown-city" });
+    vi.unstubAllGlobals();
+  });
+
+  it("flags a card with no printed airport as airport-unknown instead of silently assuming", () => {
+    withStubbedFetch({});
+    const adapter = new Sepehr360Adapter({ enabled: true });
+    const base = {
+      index: 0,
+      airlineCode: "IR",
+      airlineNameFa: "ایران ایر",
+      departTime: "07:30",
+      arriveTime: "08:50",
+      durationText: "1 ساعت و 20 دقیقه",
+      priceText: "5902000 تومان",
+      priceAmount: 5_902_000,
+      originLabel: null,
+      destinationLabel: null,
+      cabinLabel: "اکونومی",
+      stopsLabel: "مستقیم",
+      sellerText: null,
+      availabilityText: null,
+      charterHint: false,
+    };
+
+    const batch = adapter.normalize([base], {
+      ...REQUEST,
+      originAirports: ["THR"],
+      destinationAirports: ["MHD"],
+    }, {
+      providerId: "sepehr360",
+      fetchedAt: "2026-11-12T10:00:00.000Z",
+      latencyMs: 10,
+      httpStatus: 200,
+      retries: 0,
+      fromCache: false,
+      endpoint: "GET /Flight/B2c/Search",
+      sourceUpdatedAt: null,
+    });
+
+    expect(batch.offers).toHaveLength(1);
+    expect(batch.offers[0]?.warnings).toContain("airport-unknown");
+    expect(batch.offers[0]?.originAirport).toBe("THR");
+    vi.unstubAllGlobals();
+  });
+
   it("marks a no-baggage, no-number aggregator row honestly in Persian labels", async () => {
     withStubbedFetch({ search: { body: fixture("thr-mhd.html") } });
     const adapter = new Sepehr360Adapter({ enabled: true });

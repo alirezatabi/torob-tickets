@@ -28,13 +28,11 @@ import type {
 } from "@/modules/providers/contracts/provider";
 import { HttpClient } from "@/modules/providers/shared/http";
 import { createLogger } from "@/modules/providers/shared/logger";
-import { challengeError, coverageError, parseError, ProviderError } from "@/modules/providers/shared/errors";
+import { challengeError, parseError, ProviderError } from "@/modules/providers/shared/errors";
 import { assembleLiveOffer, LiveNormalizationError } from "@/modules/providers/shared/normalize-offer";
-import { buildForeignPrice, buildIranianPrice, normalizeDigits } from "@/modules/money/price";
+import { buildIranianPrice, normalizeDigits } from "@/modules/money/price";
 import { wallClockToInstant } from "@/providers/fare";
-import { cityTimeZone } from "@/providers/fare";
-import { getCity } from "@/lib/cities";
-import { airportsForCity, getAirport } from "@/modules/airports";
+import { airportServesCity, airportsForCity, getAirport } from "@/modules/airports";
 import type { FlightSegment } from "@/domain/flight";
 import type { NormalizationIssue } from "@/providers/types";
 import { parseSearchPage } from "./parser";
@@ -241,13 +239,25 @@ export class Sepehr360Adapter implements LiveProviderAdapter<Sepehr360RawOffer> 
     const departMinutes = parseWallClock(record.departTime);
     if (departMinutes === null) throw new LiveNormalizationError("invalid-time", "card has no departure time");
 
-    const originAirport = this.resolveAirport(record.originLabel, request.originAirports, request.originCity, request.international);
-    const destinationAirport = this.resolveAirport(
+    const origin = this.resolveAirport(record.originLabel, request.originAirports, request.originCity, request.international);
+    const destination = this.resolveAirport(
       record.destinationLabel,
       request.destinationAirports,
       request.destinationCity,
       request.international,
     );
+    const originAirport = origin.airport;
+    const destinationAirport = destination.airport;
+
+    // The card printed an airport we could place, but not one belonging to the city the
+    // user asked for. That is a real mismatch (the source answered a different query), so
+    // the record is rejected rather than relabelled.
+    if (!airportServesCity(originAirport, request.originCity) || !airportServesCity(destinationAirport, request.destinationCity)) {
+      throw new LiveNormalizationError(
+        "unknown-city",
+        `card route ${originAirport}>${destinationAirport} does not serve ${request.originCity}>${request.destinationCity}`,
+      );
+    }
 
     const departAt = wallClockToInstant(`${request.departDate}T${toWallClock(departMinutes)}`, originAirport);
     const duration = parsePersianDuration(record.durationText);
@@ -321,7 +331,10 @@ export class Sepehr360Adapter implements LiveProviderAdapter<Sepehr360RawOffer> 
         fetchedAt: meta.fetchedAt,
         seatsAvailable: null,
         unitConverted: price.converted,
-        extraWarnings: ["airport-unknown"].filter(() => !record.originLabel) as never[],
+        extraWarnings: [
+          ...(origin.assumed ? (["airport-unknown"] as const) : []),
+          ...(destination.assumed ? (["airport-unknown"] as const) : []),
+        ],
       },
       { freshness: FRESHNESS, now: new Date(meta.fetchedAt) },
     );
@@ -332,19 +345,32 @@ export class Sepehr360Adapter implements LiveProviderAdapter<Sepehr360RawOffer> 
    * not match an airport we know, we fall back to the requested airport — but only
    * when the request had a single airport, otherwise the answer would be a guess.
    */
+  /**
+   * Resolve the airport a card claims to use.
+   *
+   * Two honest outcomes:
+   *   • the card prints a name we can map → use it (`assumed: false`);
+   *   • the card prints nothing we recognise → fall back to the requested airport **and
+   *     say so** (`assumed: true`), because the offer then carries `airport-unknown`.
+   *
+   * A fallback is only allowed when the request narrowed the city to one airport;
+   * otherwise picking one would be a coin flip between IKA and THR.
+   */
   private resolveAirport(
     label: string | null,
     candidates: string[],
     cityCode: string,
     international: boolean,
-  ): string {
+  ): { airport: string; assumed: boolean } {
     if (label) {
       const matched = matchPersianAirport(label);
-      if (matched) return matched;
+      if (matched) return { airport: matched, assumed: false };
     }
-    const fallback = candidates[0] ?? airportsForCity(cityCode, { international })[0];
+
+    const options = candidates.length > 0 ? candidates : airportsForCity(cityCode, { international });
+    const fallback = options[0];
     if (!fallback) throw new LiveNormalizationError("invalid-airport", `cannot resolve airport for ${cityCode}`);
-    return fallback;
+    return { airport: fallback, assumed: true };
   }
 }
 
@@ -434,4 +460,4 @@ function replaceOrigin(url: string, base: string): string {
   return target.toString();
 }
 
-export { cityTimeZone, getCity, buildForeignPrice, coverageError, type Sepehr360RawOffer };
+export type { Sepehr360RawOffer };
