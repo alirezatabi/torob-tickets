@@ -10,7 +10,7 @@ import { isGroupKey } from "@/dedupe/group";
 import { explainTradeoff, refundLabel, baggageLabel } from "@/ranking/explain";
 import type { FlightOffer, OfferGroup } from "@/domain/flight";
 import type { ScoredOffer } from "@/ranking/score";
-import { DemoBadge } from "@/components/demo-badge";
+import { DemoBadge } from "@/components/ui/demo-badge";
 import { cn } from "@/lib/cn";
 
 export const metadata: Metadata = {

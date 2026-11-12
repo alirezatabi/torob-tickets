@@ -3,8 +3,8 @@
 import { useRouter } from "next/navigation";
 import { useActionState, useEffect, useRef, useState, useTransition } from "react";
 import { ArrowLeft, Loader2, Sparkles, Wand2 } from "lucide-react";
-import { CitySelect, SwapButton } from "./city-select";
-import { DatePicker } from "./date-picker";
+import { CitySelect, SwapButton } from "@/components/ui/city-select";
+import { DatePicker } from "@/components/ui/date-picker";
 import { CABIN_LABELS, type CabinClass, type TripType } from "@/domain/trip";
 import { toPersianDigits } from "@/lib/format";
 import { addDays, isoToday } from "@/lib/jalali";

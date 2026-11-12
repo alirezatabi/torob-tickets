@@ -24,11 +24,11 @@ vi.mock("next/navigation", () => ({
 import { runSearch, prepareResultList } from "@/providers/search";
 import { rankOffers } from "@/ranking/score";
 import { createQuery } from "@/domain/trip";
-import { OfferCard } from "@/components/search/offer-card";
-import { RecommendationCard } from "@/components/search/recommendation-card";
-import { SortTabs } from "@/components/search/sort-tabs";
-import { FilterPanel } from "@/components/search/filter-sidebar";
-import { ResultsList } from "@/components/search/results-list";
+import { OfferCard } from "@/app/(search)/search/_components/offer-card";
+import { RecommendationCard } from "@/app/(search)/search/_components/recommendation-card";
+import { SortTabs } from "@/app/(search)/search/_components/sort-tabs";
+import { FilterPanel } from "@/app/(search)/search/_components/filter-sidebar";
+import { ResultsList } from "@/app/(search)/search/_components/results-list";
 import { groupOffers } from "@/dedupe/group";
 
 const query = createQuery({ originCode: "THR", destinationCode: "IST", departDate: "2026-11-20" });

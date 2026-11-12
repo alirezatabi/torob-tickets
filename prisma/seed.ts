@@ -5,8 +5,11 @@
  * the normalized offers, so the demo data in Postgres is byte-for-byte what the
  * app computes live — no separate fixture format to drift.
  *
- * Usage:
- *   DATABASE_URL=postgresql://... npm run db:push && npm run db:seed
+ * Usage (Windows PowerShell, local Postgres — no Docker):
+ *   $env:DATABASE_URL="postgresql://postgres:PASSWORD@localhost:5432/torob_tickets?schema=public"
+ *   npm run db:generate
+ *   npm run db:push
+ *   npm run db:seed
  */
 import { PrismaClient, BaggageState, ProviderMode } from "@prisma/client";
 import { createQuery } from "../src/domain/trip";
@@ -28,6 +31,7 @@ const DEMO_DAY_OFFSETS = [3, 7, 14, 21];
 
 async function main() {
   console.log("→ seeding providers");
+  await prisma.provider.deleteMany({ where: { mode: ProviderMode.LIVE } });
   for (const provider of listProviders()) {
     await prisma.provider.upsert({
       where: { id: provider.id },

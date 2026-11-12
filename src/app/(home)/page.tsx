@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { ArrowLeft, BadgeCheck, Layers, Sparkles, Wallet } from "lucide-react";
-import { SearchForm } from "@/components/search-form";
-import { DemoSearches } from "@/components/demo-searches";
+import { SearchForm } from "@/app/(home)/_components/search-form";
+import { DemoSearches } from "@/app/(home)/_components/demo-searches";
 import { listProviders } from "@/providers/registry";
 import { toPersianDigits } from "@/lib/format";
 

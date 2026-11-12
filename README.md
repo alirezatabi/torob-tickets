@@ -50,19 +50,34 @@ npm run build && npm start
 
 ```
 src/
-  domain/        مدل داده: money.ts · trip.ts (مستقل از وسیلهٔ سفر) · flight.ts
-  providers/     contracts.ts (ProviderAdapter) · registry.ts · normalize.ts · search.ts (pipeline)
-    flight/      pars · alibaba · flightio · mahan  ← چهار فرمت متفاوت
-  dedupe/        گروه‌بندی پرواز فیزیکی (کلید گروه + تطبیق بدون شماره پرواز)
-  ranking/       score.ts (امتیازدهی قطعی) · explain.ts (متن فارسی از روی واقعیت)
-  ai/            llm.ts · intent.ts · nlParser.ts (پارسر قطعی فارسی) · explain.ts · grounding.ts · schema.ts
-  server/        search-service.ts (façade) · intent-action.ts (Server Action)
-  app/           /  ·  /search  ·  /compare  ·  /api/{intent,search,explain}
-  components/    search/* (کارت، فیلتر، مرتب‌سازی، مقایسه) + shell
-prisma/          schema.prisma + seed.ts   (اختیاری — اجرای دمو به آن نیاز ندارد)
-tests/unit       ۹۰ تست (vitest + jsdom)
-tests/e2e        جریان کامل (playwright)
+  app/
+    (home)/                     ← route group صفحهٔ اصلی
+      page.tsx
+      _components/              کد مخصوص همین مسیر (search-form, demo-searches)
+    (search)/                   ← route group جستجو و مقایسه
+      search/
+        page.tsx
+        _components/            results-list · offer-card · filter-sidebar · sort-tabs
+                                recommendation-card · provider-strip · summary-bar …
+      compare/page.tsx
+    api/{intent,search,explain}/route.ts
+    layout.tsx · globals.css
+  components/ui/                کامپوننت‌های مشترک: brand-mark · city-select · date-picker · header/footer
+  domain/                       مدل داده: money.ts · trip.ts (مستقل از وسیلهٔ سفر) · flight.ts
+  providers/                    types.ts (ProviderAdapter) · registry.ts · normalize.ts · search.ts
+    flight/                     pars · alibaba · flightio · mahan  ← چهار فرمت متفاوت
+  dedupe/                       گروه‌بندی پرواز فیزیکی (کلید گروه + تطبیق بدون شماره پرواز)
+  ranking/                      score.ts (امتیازدهی قطعی) · explain.ts (متن فارسی از روی واقعیت)
+  ai/                           llm.ts · intent.ts · nlParser.ts · explain.ts · grounding.ts · schema.ts
+  server/                       search-service.ts · intent-action.ts · persistence.ts (اختیاری)
+  lib/                          jalali.ts · format.ts · time.ts · cities.ts · filter.ts · search-params.ts
+prisma/                         schema.prisma + seed.ts (اختیاری)
+tests/unit                      ۹۰ تست (vitest + jsdom)
+tests/e2e                       جریان کامل (playwright)
 ```
+
+**قرارداد ساختار:** هر چیزی که فقط در یک مسیر استفاده می‌شود، در `_components` همان مسیر است. هر چیزی که بین صفحه‌ها مشترک است در `components/ui`. منطق دامنه هیچ‌وقت داخل `app/` نوشته نمی‌شود.
+
 
 ### خط لولهٔ جستجو
 
@@ -116,13 +131,82 @@ export const myAdapter: ProviderAdapter<MyRawOffer> = {
 **۵. هوش مصنوعی قابل حذف**
 بدون `OPENAI_API_KEY`: پارسر قطعی فارسی/انگلیسی intent را می‌سازد و توضیح‌ها از قالب‌های قطعی می‌آیند. با کلید: مدل فقط می‌تواند بازنویسی کند؛ خروجی باید با Zod معتبر شود و از `checkGrounding` بگذرد (هر عددی که در داده نیست، هر ادعا دربارهٔ فیلد ناشناخته، هر شماره پرواز دیگر → رد و استفاده از قالب). کلید فقط سمت سرور است.
 
-**۶. ماندگاری اختیاری**
-اجرای دمو کاملاً در حافظه است. `prisma/schema.prisma` برای ذخیرهٔ snapshot پیشنهادها و لاگ جستجو هست (`docker compose up -d && DATABASE_URL=... npm run db:push && npm run db:seed`)، بدون اینکه منطق جستجو تغییری کند.
+**۶. ماندگاری اختیاری (Postgres محلی، بدون داکر)**
+اجرای دمو کاملاً در حافظه است و به دیتابیس نیاز ندارد. اگر `DATABASE_URL` ست شده باشد، هر جستجو به‌صورت best-effort ثبت می‌شود: snapshot پیشنهادهای نرمال‌شده + لاگ جستجو (intent، تعداد نتایج، بهترین پیشنهاد). خطای دیتابیس هیچ‌وقت صفحه را نمی‌شکند و پیام یک‌بار در کنسول لاگ می‌شود.
+
+Postgres خودِ ویندوز کافی است — جزئیات در بخش «اتصال به Postgres روی ویندوز».
 
 **۷. زمان و تاریخ**
 همهٔ زمان‌ها به UTC ذخیره می‌شوند؛ زمان محلی هر فرودگاه با `Intl` محاسبه می‌شود (بدون جدول offset دستی، با احتساب DST). تاریخ‌ها در UI شمسی و با ارقام فارسی‌اند؛ تقویم شمسی با الگوریتم حسابی نوشته و با تاریخ‌های مرجع تست شده است (۱ فروردین = ۲۱ مارس).
 
 ---
+
+## اتصال به Postgres روی ویندوز (بدون داکر)
+
+دیتابیس خودتان کافی است؛ هیچ container‌ای لازم نیست.
+
+### ۱) ساخت دیتابیس
+
+با pgAdmin یا `psql`:
+
+```sql
+CREATE DATABASE torob_tickets;
+```
+
+### ۲) ست کردن `DATABASE_URL`
+
+`DATABASE_URL` باید شامل **نام کاربری، رمز، هاست، پورت و نام دیتابیس** باشد. اگر رمزتان کاراکترهای خاص دارد (`@ : / ? # %`) آن را URL-encode کنید (مثلاً `@` → `%40`).
+
+**PowerShell (فقط برای همان پنجرهٔ ترمینال):**
+```powershell
+$env:DATABASE_URL="postgresql://postgres:MyPass@localhost:5432/torob_tickets?schema=public"
+```
+
+**CMD:**
+```cmd
+set DATABASE_URL=postgresql://postgres:MyPass@localhost:5432/torob_tickets?schema=public
+```
+
+**یا دائمی‌تر:** یک فایل `.env` در ریشهٔ پروژه بسازید (در `.gitignore` هست، کامیت نمی‌شود):
+```
+DATABASE_URL="postgresql://postgres:MyPass@localhost:5432/torob_tickets?schema=public"
+```
+
+> اگر پورت پیش‌فرض را عوض کرده‌اید (مثلاً نصب با EDB معمولاً 5432 است)، همان پورت را در URL بگذارید. سرویس `postgresql-x64-16` باید در `services.msc` در حال اجرا باشد.
+
+### ۳) ساخت جدول‌ها و دادهٔ نمونه
+
+```powershell
+npm run db:generate
+npm run db:push       # ساخت جدول‌ها از schema.prisma
+npm run db:seed       # پر کردن با خروجی واقعی خط لولهٔ جستجو
+npm run db:studio     # (اختیاری) مرور داده‌ها در مرورگر
+```
+
+### ۴) اجرا
+
+```powershell
+npm run dev
+```
+
+از این به بعد هر جستجو در `search_logs` و `offer_snapshots` ثبت می‌شود. برای بررسی سریع:
+
+```sql
+SELECT origin_code, destination_code, result_count, source, created_at
+FROM search_logs ORDER BY created_at DESC LIMIT 10;
+```
+
+### اگر خطا گرفتید
+
+| خطا | علت | راه‌حل |
+|---|---|---|
+| `Can't reach database server` | سرویس Postgres خاموش است یا پورت/هاست غلط است | سرویس را در `services.msc` روشن کنید، `localhost:5432` را چک کنید |
+| `password authentication failed` | رمز یا نام کاربری غلط | با pgAdmin همان رمز را تست کنید؛ کاراکترهای خاص را URL-encode کنید |
+| `database "torob_tickets" does not exist` | دیتابیس ساخته نشده | `CREATE DATABASE torob_tickets;` |
+| `@prisma/client did not initialize yet` | `prisma generate` اجرا نشده | `npm run db:generate` |
+| صفحه با خطای دیتابیس بالا نمی‌آید | نباید رخ دهد — نوشتن best-effort است | `DATABASE_URL` را بردارید؛ اپ بدون دیتابیس هم کامل کار می‌کند |
+
+> **نکته:** بدون `DATABASE_URL` هیچ‌چیز خراب نمی‌شود؛ دمو کاملاً در حافظه اجرا می‌شود. ماندگاری یک قابلیت اضافه است، نه پیش‌نیاز.
 
 ## متغیرهای محیطی
 
@@ -132,7 +216,7 @@ export const myAdapter: ProviderAdapter<MyRawOffer> = {
 |---|---|
 | `OPENAI_API_KEY` | فعال‌سازی LLM برای intent و بازنویسی توضیح |
 | `OPENAI_BASE_URL` / `OPENAI_MODEL` | سازگار با هر endpoint سازگار با OpenAI |
-| `DATABASE_URL` | ذخیرهٔ اختیاری snapshot پیشنهادها (Postgres + Prisma) |
+| `DATABASE_URL` | ذخیرهٔ اختیاری snapshot پیشنهادها و لاگ جستجو (Postgres محلی + Prisma) |
 | `PLAYWRIGHT_BASE_URL` | هدف تست e2e |
 
 ---

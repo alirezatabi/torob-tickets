@@ -7,14 +7,15 @@ import { addDays, formatJalaliFull, isoToday } from "@/lib/jalali";
 import { cityLabel } from "@/lib/cities";
 import { toPersianDigits } from "@/lib/format";
 import { searchTrips } from "@/server/search-service";
-import { ResultsList } from "@/components/search/results-list";
-import { FilterSidebar } from "@/components/search/filter-sidebar";
-import { SortTabs } from "@/components/search/sort-tabs";
-import { RecommendationCard } from "@/components/search/recommendation-card";
-import { ProviderStrip } from "@/components/search/provider-strip";
-import { SummaryBar } from "@/components/search/summary-bar";
-import { ResultsSkeleton } from "@/components/search/results-skeleton";
-import { MobileFilters } from "@/components/search/mobile-filters";
+import { recordSearch } from "@/server/persistence";
+import { ResultsList } from "@/app/(search)/search/_components/results-list";
+import { FilterSidebar } from "@/app/(search)/search/_components/filter-sidebar";
+import { SortTabs } from "@/app/(search)/search/_components/sort-tabs";
+import { RecommendationCard } from "@/app/(search)/search/_components/recommendation-card";
+import { ProviderStrip } from "@/app/(search)/search/_components/provider-strip";
+import { SummaryBar } from "@/app/(search)/search/_components/summary-bar";
+import { ResultsSkeleton } from "@/app/(search)/search/_components/results-skeleton";
+import { MobileFilters } from "@/app/(search)/search/_components/mobile-filters";
 
 interface SearchPageProps {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
@@ -58,6 +59,11 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
   const sortParam = (SORT_KEYS as readonly string[]).includes(raw.sort ?? "") ? (raw.sort as SortKeyParam) : "best";
   const view = await searchTrips(parsed.query, sortParam);
   const { outcome, groups } = view;
+
+  // Best-effort audit trail. No DATABASE_URL → no-op; a DB error never breaks the page.
+  if (process.env.DATABASE_URL) {
+    void recordSearch(outcome, outcome.ranked);
+  }
   const query = parsed.query;
 
   const hasResults = groups.length > 0;
