@@ -1,15 +1,16 @@
 import { NextResponse } from "next/server";
-import { parseSearchParams } from "@/lib/search-params";
-import { runSearch } from "@/providers/search";
+import { DEFAULT_SORT, parseSearchParams, SORT_KEYS } from "@/lib/search-params";
 import type { SortKey } from "@/ranking/score";
-import { prepareResultList } from "@/providers/search";
-import { DEFAULT_SORT, SORT_KEYS } from "@/lib/search-params";
+import { searchTrips } from "@/server/search-service";
 
 export const runtime = "nodejs";
 
 /**
  * Machine-readable version of a search (used by tests and by anyone inspecting the
  * aggregation output). The UI itself renders server-side and does not need this.
+ *
+ * The unit is a **flight**: `selection.cheapest` is the same number the card and the date
+ * strip show, because all three call `selectCheapestOffer`.
  */
 export async function GET(request: Request) {
   const url = new URL(request.url);
@@ -21,40 +22,62 @@ export async function GET(request: Request) {
   }
 
   const sort = (SORT_KEYS as readonly string[]).includes(raw.sort ?? "") ? (raw.sort as SortKey) : DEFAULT_SORT;
-  const outcome = await runSearch(parsed.query);
-  const { groups } = prepareResultList(outcome, sort);
+  const view = await searchTrips(parsed.query, sort);
+  const { outcome, flights } = view;
 
   return NextResponse.json(
     {
       query: outcome.query,
-      groups: groups.map((group) => ({
-        groupKey: group.groupKey,
-        cheapestToman: group.cheapestToman,
-        providers: group.providers.map((provider) => ({
-          name: provider.providerName,
-          priceToman: provider.priceToman,
-          original: provider.original,
+      flights: flights.map((flight) => ({
+        groupKey: flight.group.groupKey,
+        identity: flight.group.identity,
+        soldOut: flight.soldOut,
+        cheapest: flight.selection.cheapest
+          ? {
+              offerId: flight.selection.cheapest.id,
+              seller: flight.selection.cheapest.providerName,
+              pricePerPersonToman: flight.selection.cheapest.price.toman,
+              totalToman: flight.selection.totalToman,
+              seatsAvailable: flight.selection.cheapest.seatsAvailable ?? null,
+            }
+          : null,
+        seatsAvailable: flight.selection.seatsAvailable,
+        savingsToman: flight.selection.savingsToman,
+        sellers: flight.sellers.map(({ offer, deltaToman, cheapest }) => ({
+          name: offer.providerName,
+          priceToman: offer.price.toman,
+          deltaToman,
+          cheapest,
+          seatsAvailable: offer.seatsAvailable ?? null,
+          cabin: offer.cabin,
+          purchasable: flight.ineligible.every((entry) => entry.offer.id !== offer.id),
         })),
+        ineligible: flight.ineligible.map((entry) => ({ offerId: entry.offer.id, reason: entry.reason })),
         flight: {
-          airline: group.primary.airlineName,
-          flightNumber: group.primary.flightNumber,
-          departAt: group.primary.departAt,
-          arriveAt: group.primary.arriveAt,
-          durationMinutes: group.primary.durationMinutes,
-          stops: group.primary.stops,
-          baggage: group.primary.baggage,
-          refundable: group.primary.refundable,
+          airline: flight.display.airlineName,
+          airlineCode: flight.display.airlineCode,
+          flightNumber: flight.display.flightNumber,
+          departAt: flight.display.departAt,
+          arriveAt: flight.display.arriveAt,
+          durationMinutes: flight.display.durationMinutes,
+          stops: flight.display.stops,
         },
+        score: flight.score,
       })),
       health: outcome.health,
       issues: outcome.issues,
       ranking: {
-        best: outcome.ranked.best?.offer.id ?? null,
-        cheapest: outcome.ranked.cheapest?.offer.id ?? null,
-        fastest: outcome.ranked.fastest?.offer.id ?? null,
-        weights: outcome.ranked.weights,
+        best: view.results.ranked.ranked[0]?.input.groupKey ?? null,
+        weights: view.results.ranked.weights,
       },
-      meta: { demoData: true, fetchedAt: outcome.fetchedAt, totalMs: outcome.totalMs },
+      meta: {
+        demoData: true,
+        fetchedAt: outcome.fetchedAt,
+        totalMs: outcome.totalMs,
+        passengers: parsed.query.passengers,
+        cabin: parsed.query.cabin,
+        sort,
+      },
     },
     { headers: { "cache-control": "no-store" } },
   );

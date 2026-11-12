@@ -202,3 +202,43 @@ describe("live grouping (the product promise)", () => {
     expect(() => assertNoUnsafeMerge(groups)).not.toThrow();
   });
 });
+
+describe("intra-provider identity", () => {
+  it("folds a seller's own unnumbered row into its numbered twin at the same instant", async () => {
+    const { assembleOffer } = await import("@/providers/normalize");
+    const make = (flightNumber: string | null, providerId: string) =>
+      assembleOffer({
+        providerId,
+        providerName: providerId,
+        rawId: `${providerId}-${flightNumber ?? "none"}`,
+        airlineCode: "IR",
+        flightNumber,
+        segments: [
+          {
+            airlineCode: "IR",
+            flightNumber,
+            originCode: "IFN",
+            destinationCode: "KIH",
+            departAt: "2026-11-20T09:30:00.000Z",
+            arriveAt: "2026-11-20T11:15:00.000Z",
+            aircraft: null,
+          },
+        ],
+        price: { amount: 5_400_000, currency: "IRT" },
+        baggage: { checked: "included", cabinKg: 7, checkedKg: 20 },
+        refundable: false,
+        cabin: "economy",
+        offerUrl: "/search?date=2026-11-20",
+        providerUpdatedAt: "2026-11-20T08:00:00.000Z",
+        fetchedAt: "2026-11-20T08:00:00.000Z",
+        dataSource: "demo",
+      });
+
+    const groups = groupOffers([make("IR-3301", "mahan"), make(null, "mahan"), make(null, "pars")]);
+    // mahan's two rows are one flight; pars has no number and stays its own honest row.
+    expect(groups).toHaveLength(2);
+    expect(groups[0]?.offers.every((offer) => offer.providerId === "mahan")).toBe(true);
+    expect(groups[0]?.identity).toBe("flight-number");
+    expect(groups[1]?.identity).toBe("same-departure");
+  });
+});

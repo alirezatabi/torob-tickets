@@ -78,7 +78,10 @@ export default async function ComparePage({ searchParams }: ComparePageProps) {
       const offer =
         view.outcome.offers.find((candidate) => candidate.id === token.offerId) ??
         findGroupByKey(view.outcome.offers, token.groupKey);
-      const scored = offer ? view.outcome.ranked.ranked.find((entry) => entry.offer.id === offer.id) : null;
+      // The score belongs to the *flight*; the offer is its cheapest purchasable seller.
+      const scored = offer
+        ? (view.results.rankedView.ranked.find((entry) => entry.offer.groupKey === offer.groupKey) ?? null)
+        : null;
       return offer && scored ? { offer, scored } : null;
     })
     .filter((item): item is { offer: FlightOffer; scored: ScoredOffer } => item !== null);

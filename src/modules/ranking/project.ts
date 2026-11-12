@@ -7,7 +7,7 @@
  * being live, except through the three explicit live factors.
  */
 
-import type { FlightOffer } from "@/domain/flight";
+import type { FlightOffer, OfferGroup } from "@/domain/flight";
 import type { RankInput } from "@/modules/ranking/types";
 import { getLiveAirline, isKnownAirlineCode } from "@/modules/airlines/registry";
 import { getAirline } from "@/lib/airlines";
@@ -45,6 +45,34 @@ export function fromDemoOffer(offer: FlightOffer, options: { sellerCount?: numbe
     onTimeScore: null,
     sellerCount: options.sellerCount ?? 1,
   };
+}
+
+/**
+ * A whole **flight** → one row in the ranking.
+ *
+ * This is the projection the product actually ranks: the flight a user would board, priced
+ * at its cheapest purchasable seller, with the real number of sellers as a competition
+ * signal. `sellerCount` here is no longer "1 per offer" — that was the bug that made the
+ * competition factor meaningless.
+ */
+export function fromGroup(
+  group: OfferGroup,
+  cheapest: FlightOffer,
+  options: { sellerCount?: number; sellerFloor?: number } = {},
+): RankInput {
+  const sellers = Math.max(
+    options.sellerCount ?? group.providers.length,
+    options.sellerFloor ?? group.knownSellers,
+    group.providers.length,
+  );
+  const base: RankInput = {
+    ...fromDemoOffer(cheapest),
+    groupKey: group.groupKey,
+    // The *flight's* identity and price, not the cheapest seller's raw row.
+    priceToman: cheapest.price.toman,
+    sellerCount: sellers,
+  };
+  return base;
 }
 
 /**

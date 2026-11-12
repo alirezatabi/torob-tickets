@@ -95,6 +95,21 @@ export function groupOffers(offers: FlightOffer[]): OfferGroup[] {
 
     for (const offer of unnumbered) {
       const departAtMs = new Date(offer.departAt).getTime();
+
+      // One seller publishing the same instant twice — once with a number, once without —
+      // is provable identity (same source, same route, same carrier, same minute), so the
+      // unnumbered row joins its numbered twin instead of becoming a phantom second card.
+      const sameSeller = clusters.find(
+        (cluster) =>
+          cluster.flightNumber !== null &&
+          Math.abs(cluster.departAtMs - departAtMs) === 0 &&
+          cluster.offers.some((member) => member.providerId === offer.providerId),
+      );
+      if (sameSeller) {
+        sameSeller.offers.push(offer);
+        continue;
+      }
+
       // Only unnumbered clusters are candidates: an offer with no number may be the same
       // flight as a numbered one, but we do not claim that — it stays its own row.
       const match = clusters.find(
