@@ -38,14 +38,14 @@ export function CompareTray({
   params.set("groups", selected.map((entry) => `${entry.groupKey}:${entry.offerId}`).join(","));
 
   return (
-    <div data-compare-tray className="fixed inset-x-0 bottom-0 z-40 border-t border-ink-200 bg-white/95 backdrop-blur-md">
+    <div data-compare-tray className="glass animate-rise fixed inset-x-0 bottom-0 z-40 border-t border-ink-200 shadow-[0_-8px_30px_-20px_rgb(11_20_36/0.45)]">
       <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-3 px-4 py-3 sm:px-6">
         <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
           <span className="text-[0.7rem] font-semibold text-ink-600">مقایسه ({toPersianDigits(items.length)} از ۳)</span>
           {items.map(({ group, offer }) => (
             <span
               key={offer.id}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-ink-200 bg-white px-2 py-1 text-[0.65rem] text-ink-700"
+              className="inline-flex items-center gap-1.5 rounded-full border border-ink-200 bg-white px-2.5 py-1 text-[0.65rem] text-ink-700 shadow-sm"
             >
               <span className="font-medium">{offer.airlineName}</span>
               <span className="nums text-ink-500">{formatToman(group.cheapestToman)}</span>

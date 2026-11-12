@@ -134,7 +134,7 @@ export function FilterPanel({ query, groups, totalOffers }: FilterPanelProps) {
               onClick={() => apply({ stops: option.value })}
               aria-pressed={String(activeStops ?? "") === (option.value ?? "")}
               className={cn(
-                "rounded-lg border px-2.5 py-1 text-[0.7rem] transition-colors",
+                "rounded-full border px-2.5 py-1 text-[0.7rem] transition-colors",
                 String(activeStops ?? "") === (option.value ?? "")
                   ? "border-teal-600 bg-teal-50 font-semibold text-teal-700"
                   : "border-ink-200 text-ink-600 hover:border-ink-300",
@@ -176,7 +176,7 @@ export function FilterPanel({ query, groups, totalOffers }: FilterPanelProps) {
               onClick={() => apply({ time: activeTime === part.key ? null : part.key })}
               aria-pressed={activeTime === part.key}
               className={cn(
-                "rounded-lg border px-2.5 py-1 text-[0.68rem] transition-colors",
+                "rounded-full border px-2.5 py-1 text-[0.68rem] transition-colors",
                 activeTime === part.key
                   ? "border-teal-600 bg-teal-50 font-semibold text-teal-700"
                   : "border-ink-200 text-ink-600 hover:border-ink-300",
@@ -217,8 +217,8 @@ export function FilterPanel({ query, groups, totalOffers }: FilterPanelProps) {
 
 function FilterSection({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <section className="mt-4 border-t border-ink-100 pt-3">
-      <h3 className="mb-2 text-[0.7rem] font-semibold text-ink-600">{title}</h3>
+    <section className="mt-4 border-t border-ink-100 pt-3.5">
+      <h3 className="mb-2 text-[0.7rem] font-bold uppercase tracking-wide text-ink-500">{title}</h3>
       {children}
     </section>
   );

@@ -39,9 +39,10 @@ export async function RecommendationCard({
   return (
     <section
       aria-labelledby="recommendation-heading"
-      className="relative overflow-hidden rounded-[var(--radius-card)] border border-teal-600/25 bg-gradient-to-bl from-teal-50 via-white to-white p-4 shadow-[var(--shadow-soft)] animate-rise"
+      className="animate-rise relative overflow-hidden rounded-[var(--radius-card)] border border-teal-600/25 bg-gradient-to-bl from-teal-50 via-white to-white p-4 shadow-[var(--shadow-lifted)] sm:p-5"
     >
-      <div aria-hidden="true" className="absolute -left-10 -top-10 size-32 rounded-full bg-teal-500/10 blur-2xl" />
+      <div aria-hidden="true" className="absolute -left-10 -top-10 size-40 rounded-full bg-teal-400/15 blur-3xl" />
+      <div aria-hidden="true" className="absolute inset-x-0 top-0 h-px bg-gradient-to-l from-transparent via-teal-500/50 to-transparent" />
 
       <div className="relative flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
@@ -50,7 +51,7 @@ export async function RecommendationCard({
             بهترین تطابق برای سفر شما
           </h2>
 
-          <p className="mt-2 max-w-2xl text-[0.82rem] leading-7 text-ink-700" data-testid="recommendation-text">
+          <p className="mt-2 max-w-2xl text-[0.86rem] leading-8 text-ink-700" data-testid="recommendation-text">
             {explanation}
           </p>
 
@@ -77,7 +78,7 @@ export async function RecommendationCard({
 
         <div className="shrink-0 text-left">
           <p className="text-[0.65rem] text-ink-400">قیمت این گزینه</p>
-          <p className="mt-0.5 text-lg font-extrabold text-ink-900 nums">{formatToman(offer.price.toman)}</p>
+          <p className="mt-0.5 text-xl font-black text-ink-900 nums">{formatToman(offer.price.toman)}</p>
           <Link
             href={`/compare?${compareParams.toString()}`}
             className="btn-ghost mt-2 text-[0.7rem]"

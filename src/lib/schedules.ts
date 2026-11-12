@@ -73,7 +73,7 @@ function toMinutes(hhmm: string): number {
 }
 
 /** Build deterministic pattern ids so prices and dedupe stay stable per flight. */
-function patternId(from: string, to: string, airline: string, number: number): string {
+function patternId(from: string, to: string, airline: string, number: string | number): string {
   return `${from}-${to}-${airline}-${number}`.toLowerCase();
 }
 
@@ -387,6 +387,84 @@ const REGIONAL: RouteSpec[] = [
     to: "ARN",
     legs: daily({ airlineCode: "TK", number: 814, depart: "03:55", minutes: 545, aircraft: "Airbus A321neo", price: 20_300_000, checkedKg: 23, cabinKg: 8, refundable: true, stops: 1, via: "IST", layover: 100 }),
   },
+
+  // ——— Non-Tehran connectivity: the Gulf ⇄ Iran and Iran ⇄ Türkiye markets.
+  // Without these, only Tehran could sell tickets; every other city was a dead end.
+  {
+    from: "DXB",
+    to: "MHD",
+    legs: daily({ airlineCode: "FZ", number: 251, depart: "10:15", minutes: 145, aircraft: "Boeing 737 MAX 8", price: 6_400_000, checkedKg: 20, cabinKg: 7, refundable: true }),
+  },
+  {
+    from: "DXB",
+    to: "SYZ",
+    legs: daily({ airlineCode: "G9", number: 903, depart: "09:40", minutes: 135, aircraft: "Airbus A320", price: 5_900_000, checkedKg: 20, cabinKg: 7, refundable: false }),
+  },
+  {
+    from: "DXB",
+    to: "IST",
+    legs: daily({ airlineCode: "EK", number: 121, depart: "13:30", minutes: 300, aircraft: "Boeing 777-300ER", price: 14_200_000, checkedKg: 30, cabinKg: 7, refundable: true }),
+  },
+  {
+    from: "IST",
+    to: "DXB",
+    legs: daily({ airlineCode: "TK", number: 762, depart: "08:25", minutes: 275, aircraft: "Airbus A321neo", price: 12_800_000, checkedKg: 25, cabinKg: 8, refundable: true }),
+  },
+  {
+    from: "IST",
+    to: "MHD",
+    legs: daily({ airlineCode: "TK", number: 894, depart: "06:50", minutes: 220, aircraft: "Airbus A321", price: 8_600_000, checkedKg: 25, cabinKg: 8, refundable: true }),
+  },
+  {
+    from: "IST",
+    to: "NJF",
+    legs: daily({ airlineCode: "TK", number: 806, depart: "07:15", minutes: 190, aircraft: "Boeing 737-800", price: 7_900_000, checkedKg: 25, cabinKg: 8, refundable: false }),
+  },
+  {
+    from: "IST",
+    to: "IKA",
+    legs: daily({ airlineCode: "PC", number: 512, depart: "05:40", minutes: 195, aircraft: "Airbus A320neo", price: 4_850_000, checkedKg: 20, cabinKg: 8, refundable: false }),
+  },
+  {
+    from: "MHD",
+    to: "IST",
+    legs: daily({ airlineCode: "TK", number: 895, depart: "14:10", minutes: 225, aircraft: "Airbus A321", price: 8_900_000, checkedKg: 25, cabinKg: 8, refundable: true }),
+  },
+  {
+    from: "MHD",
+    to: "DXB",
+    legs: daily({ airlineCode: "FZ", number: 252, depart: "15:20", minutes: 150, aircraft: "Boeing 737 MAX 8", price: 6_600_000, checkedKg: 20, cabinKg: 7, refundable: true }),
+  },
+  {
+    from: "SYZ",
+    to: "DXB",
+    legs: daily({ airlineCode: "G9", number: 904, depart: "14:05", minutes: 140, aircraft: "Airbus A320", price: 6_100_000, checkedKg: 20, cabinKg: 7, refundable: false }),
+  },
+  {
+    from: "MHD",
+    to: "DOH",
+    legs: daily({ airlineCode: "QR", number: 495, depart: "04:30", minutes: 170, aircraft: "Airbus A320", price: 9_200_000, checkedKg: 30, cabinKg: 7, refundable: true }),
+  },
+  {
+    from: "DXB",
+    to: "DOH",
+    legs: daily({ airlineCode: "QR", number: 1013, depart: "11:00", minutes: 65, aircraft: "Airbus A350-900", price: 4_300_000, checkedKg: 25, cabinKg: 7, refundable: true }),
+  },
+  {
+    from: "IKA",
+    to: "DXB",
+    legs: daily({ airlineCode: "FZ", number: 44, depart: "09:55", minutes: 130, aircraft: "Boeing 737-800", price: 5_100_000, checkedKg: 20, cabinKg: 7, refundable: false }),
+  },
+  {
+    from: "IKA",
+    to: "IST",
+    legs: daily({ airlineCode: "TK", number: 879, depart: "12:30", minutes: 190, aircraft: "Airbus A321", price: 5_400_000, checkedKg: 25, cabinKg: 8, refundable: true }),
+  },
+  {
+    from: "NJF",
+    to: "IST",
+    legs: daily({ airlineCode: "TK", number: 807, depart: "16:40", minutes: 185, aircraft: "Boeing 737-800", price: 8_100_000, checkedKg: 25, cabinKg: 8, refundable: false }),
+  },
   {
     from: "THR",
     to: "FCO",
@@ -421,7 +499,29 @@ function buildPatterns(): FlightPattern[] {
       });
     }
   }
-  return patterns;
+  // Every served route flies both ways in real life. Rather than hand-writing
+  // 60+ return legs, mirror any one-directional route with a deterministic
+  // inverse rotation (later departure, same duration, a small fare difference).
+  const keys = new Set(patterns.map((pattern) => `${pattern.originCode}-${pattern.destinationCode}`));
+  const generated: FlightPattern[] = [];
+  for (const pattern of patterns) {
+    const reverseKey = `${pattern.destinationCode}-${pattern.originCode}`;
+    if (keys.has(reverseKey)) continue;
+    keys.add(reverseKey);
+    // Keep the return leg inside civil daylight so it never wraps past midnight.
+    let departMinutes = (pattern.departMinutes + 660) % 1440;
+    if (departMinutes < 300) departMinutes += 360;
+    if (departMinutes > 1290) departMinutes -= 360;
+    generated.push({
+      ...pattern,
+      id: patternId(pattern.destinationCode, pattern.originCode, pattern.airlineCode, pattern.flightNumber),
+      originCode: pattern.destinationCode,
+      destinationCode: pattern.originCode,
+      departMinutes,
+      basePriceToman: Math.round((pattern.basePriceToman * 1.02) / 10_000) * 10_000,
+    });
+  }
+  return [...patterns, ...generated];
 }
 
 export const FLIGHT_PATTERNS: FlightPattern[] = buildPatterns();
@@ -540,6 +640,33 @@ export function availableRoutes(): { originCode: string; destinationCode: string
 /** Routes departing from a given origin (for "where can I fly from here?"). */
 export function destinationsFrom(originCode: string): string[] {
   return [...new Set(FLIGHT_PATTERNS.filter((p) => p.originCode === originCode).map((p) => p.destinationCode))];
+}
+
+/** How many distinct routes the demo data covers in total. */
+export function routeCount(): number {
+  return availableRoutes().length;
+}
+
+/** Cities reachable from an origin, with how many weekly flights serve each route. */
+export function destinationsWithCounts(originCode: string): { code: string; patterns: number }[] {
+  const counts = new Map<string, number>();
+  for (const pattern of FLIGHT_PATTERNS) {
+    if (pattern.originCode !== originCode) continue;
+    counts.set(pattern.destinationCode, (counts.get(pattern.destinationCode) ?? 0) + 1);
+  }
+  return [...counts.entries()]
+    .map(([code, patterns]) => ({ code, patterns }))
+    .sort((a, b) => b.patterns - a.patterns || a.code.localeCompare(b.code));
+}
+
+/** Every city that is either a served origin or a served destination. */
+export function servedCities(): string[] {
+  const codes = new Set<string>();
+  for (const pattern of FLIGHT_PATTERNS) {
+    codes.add(pattern.originCode);
+    codes.add(pattern.destinationCode);
+  }
+  return [...codes].sort();
 }
 
 /** Deterministic "is there demand" signal used for the homepage route suggestions. */

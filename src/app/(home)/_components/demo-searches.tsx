@@ -50,15 +50,16 @@ export function DemoSearches() {
           <Link
             key={sample.href}
             href={sample.href}
-            className="group flex items-start gap-2.5 rounded-xl border border-ink-200 bg-white px-3 py-2.5 transition-all hover:-translate-y-0.5 hover:border-teal-300 hover:shadow-[var(--shadow-soft)]"
+            className="group card card-hover flex items-start gap-2.5 px-3.5 py-3"
           >
             <span
               className={
-                sample.accent === "saffron"
-                  ? "mt-0.5 grid size-7 shrink-0 place-items-center rounded-lg bg-saffron-50 text-saffron-600"
+                "mt-0.5 grid size-8 shrink-0 place-items-center rounded-xl transition-transform group-hover:-translate-x-0.5 " +
+                (sample.accent === "saffron"
+                  ? "bg-saffron-50 text-saffron-600"
                   : sample.accent === "teal"
-                    ? "mt-0.5 grid size-7 shrink-0 place-items-center rounded-lg bg-teal-50 text-teal-600"
-                    : "mt-0.5 grid size-7 shrink-0 place-items-center rounded-lg bg-ink-100 text-ink-600"
+                    ? "bg-teal-50 text-teal-600"
+                    : "bg-ink-100 text-ink-600")
               }
             >
               {sample.accent === "saffron" ? (
@@ -68,8 +69,8 @@ export function DemoSearches() {
               )}
             </span>
             <span className="flex flex-col">
-              <span className="text-xs font-semibold text-ink-800 group-hover:text-teal-700">{sample.title}</span>
-              <span className="mt-0.5 text-[0.68rem] leading-4 text-ink-400">{sample.subtitle}</span>
+              <span className="text-xs font-bold text-ink-800 group-hover:text-teal-700">{sample.title}</span>
+              <span className="mt-1 text-[0.68rem] leading-4 text-ink-400">{sample.subtitle}</span>
             </span>
           </Link>
         ))}

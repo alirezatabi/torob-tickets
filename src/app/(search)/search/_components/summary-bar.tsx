@@ -17,20 +17,22 @@ export function SummaryBar({
   fetchedAt: string;
 }) {
   return (
-    <div className="card flex flex-wrap items-center justify-between gap-3 px-4 py-3">
+    <div className="card flex flex-wrap items-center justify-between gap-3 px-4 py-3.5">
       <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1.5">
-        <h1 className="flex items-center gap-2 text-sm font-bold text-ink-900">
+        <h1 className="flex items-center gap-2 text-[0.95rem] font-extrabold text-ink-900">
           <span>{cityLabel(query.originCode)}</span>
-          <ArrowLeft className="size-4 text-teal-600" aria-hidden="true" />
+          <span className="grid size-6 place-items-center rounded-full bg-teal-50 text-teal-600">
+            <ArrowLeft className="size-3.5" aria-hidden="true" />
+          </span>
           <span>{cityLabel(query.destinationCode)}</span>
         </h1>
-        <span className="inline-flex items-center gap-1.5 rounded-full bg-ink-100 px-2.5 py-1 text-[0.7rem] text-ink-600">
+        <span className="inline-flex items-center gap-1.5 rounded-full bg-ink-100 px-2.5 py-1 text-[0.7rem] font-medium text-ink-600">
           <CalendarDays className="size-3.5" aria-hidden="true" />
           {query.tripType === "roundtrip" && query.returnDate
             ? `${formatJalaliFull(query.departDate)} — ${formatJalaliFull(query.returnDate)}`
             : formatJalaliFull(query.departDate)}
         </span>
-        <span className="inline-flex items-center gap-1.5 rounded-full bg-ink-100 px-2.5 py-1 text-[0.7rem] text-ink-600">
+        <span className="inline-flex items-center gap-1.5 rounded-full bg-ink-100 px-2.5 py-1 text-[0.7rem] font-medium text-ink-600">
           <Users className="size-3.5" aria-hidden="true" />
           {toPersianDigits(query.passengers)} مسافر · {CABIN_LABELS[query.cabin]}
         </span>

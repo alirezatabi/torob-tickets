@@ -49,6 +49,10 @@ export function airlineLabel(code: string): string {
  * codes such as "pc" or "ia") must match on a word boundary — otherwise "airport"
  * would resolve to an airline and silently filter every result.
  */
+export function airlineCount(): number {
+  return AIRLINES.length;
+}
+
 export function findAirlineInText(text: string, options: { strict?: boolean } = {}): string | null {
   const haystack = text.toLowerCase();
   for (const airline of AIRLINES) {

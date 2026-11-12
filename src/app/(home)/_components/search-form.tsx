@@ -101,16 +101,17 @@ export function SearchForm({ initialOrigin = "THR", initialDestination = "IST" }
   const busy = pending || intentPending;
 
   return (
-    <div className="card p-4 sm:p-5">
+    <div className="card relative overflow-hidden p-4 shadow-[var(--shadow-float)] sm:p-6">
+      <div aria-hidden="true" className="absolute inset-x-0 top-0 h-px bg-gradient-to-l from-transparent via-teal-400/60 to-transparent" />
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <div className="inline-flex rounded-xl bg-ink-100 p-1" role="tablist" aria-label="نوع جستجو">
+        <div className="inline-flex rounded-2xl bg-ink-100/90 p-1" role="tablist" aria-label="نوع جستجو">
           <button
             type="button"
             role="tab"
             aria-selected={mode === "form"}
             onClick={() => setMode("form")}
             className={cn(
-              "rounded-lg px-3.5 py-1.5 text-xs font-semibold transition-colors",
+              "rounded-xl px-3.5 py-1.5 text-xs font-bold transition-all",
               mode === "form" ? "bg-white text-ink-900 shadow-sm" : "text-ink-500 hover:text-ink-700",
             )}
           >
@@ -122,8 +123,10 @@ export function SearchForm({ initialOrigin = "THR", initialDestination = "IST" }
             aria-selected={mode === "nl"}
             onClick={() => setMode("nl")}
             className={cn(
-              "inline-flex items-center gap-1.5 rounded-lg px-3.5 py-1.5 text-xs font-semibold transition-colors",
-              mode === "nl" ? "bg-white text-teal-700 shadow-sm" : "text-ink-500 hover:text-ink-700",
+              "inline-flex items-center gap-1.5 rounded-xl px-3.5 py-1.5 text-xs font-bold transition-all",
+              mode === "nl"
+                ? "bg-gradient-to-l from-teal-600 to-teal-500 text-white shadow-sm"
+                : "text-ink-500 hover:text-ink-700",
             )}
           >
             <Wand2 className="size-3.5" aria-hidden="true" />
@@ -131,14 +134,14 @@ export function SearchForm({ initialOrigin = "THR", initialDestination = "IST" }
           </button>
         </div>
 
-        <div className="inline-flex rounded-xl border border-ink-200 p-0.5 text-xs" role="group" aria-label="نوع سفر">
+        <div className="inline-flex rounded-2xl border border-ink-200 bg-white p-0.5 text-xs" role="group" aria-label="نوع سفر">
           <button
             type="button"
             onClick={() => setTripType("oneway")}
             aria-pressed={tripType === "oneway"}
             className={cn(
-              "rounded-lg px-3 py-1.5 font-medium transition-colors",
-              tripType === "oneway" ? "bg-teal-600 text-white" : "text-ink-500 hover:text-ink-800",
+              "rounded-xl px-3.5 py-1.5 font-semibold transition-colors",
+              tripType === "oneway" ? "bg-ink-900 text-white" : "text-ink-500 hover:text-ink-800",
             )}
           >
             یک‌طرفه
@@ -148,8 +151,8 @@ export function SearchForm({ initialOrigin = "THR", initialDestination = "IST" }
             onClick={() => setTripType("roundtrip")}
             aria-pressed={tripType === "roundtrip"}
             className={cn(
-              "rounded-lg px-3 py-1.5 font-medium transition-colors",
-              tripType === "roundtrip" ? "bg-teal-600 text-white" : "text-ink-500 hover:text-ink-800",
+              "rounded-xl px-3.5 py-1.5 font-semibold transition-colors",
+              tripType === "roundtrip" ? "bg-ink-900 text-white" : "text-ink-500 hover:text-ink-800",
             )}
           >
             رفت‌وبرگشت
@@ -170,11 +173,11 @@ export function SearchForm({ initialOrigin = "THR", initialDestination = "IST" }
             onChange={(event) => setText(event.target.value)}
             rows={3}
             placeholder="مثلاً: ارزان‌ترین پرواز تهران به استانبول جمعه آینده، با بار و بدون توقف"
-            className="field resize-none leading-7 placeholder:text-ink-400"
+            className="field resize-none text-[0.95rem] leading-8 placeholder:text-ink-400"
           />
           <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
             <p className="text-[0.7rem] leading-5 text-ink-400">
-              مبدأ، مقصد، تاریخ و ترجیحات (بار، تعداد توقف، ساعت پرواز، بودجه) استخراج می‌شود.
+              مبدأ، مقصد، تاریخ، تعداد مسافر و ترجیحات (بار، توقف، ساعت، بودجه، ایرلاین) استخراج می‌شود.
             </p>
             <button type="submit" disabled={busy} className="btn-primary text-sm">
               {intentPending ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />}
@@ -237,7 +240,7 @@ export function SearchForm({ initialOrigin = "THR", initialDestination = "IST" }
             <p className="text-[0.7rem] leading-5 text-ink-400">
               قیمت‌ها از ارائه‌دهندگان نمونه جمع‌آوری می‌شوند و قیمت لحظه‌ای واقعی نیستند.
             </p>
-            <button type="button" onClick={submitForm} disabled={busy} className="btn-primary min-w-[10rem] text-sm">
+            <button type="button" onClick={submitForm} disabled={busy} className="btn-primary min-w-[11rem] text-sm">
               {pending ? <Loader2 className="size-4 animate-spin" /> : <ArrowLeft className="size-4" />}
               جستجوی پرواز
             </button>
@@ -249,7 +252,7 @@ export function SearchForm({ initialOrigin = "THR", initialDestination = "IST" }
         <p
           role={formError || intentState.error ? "alert" : "status"}
           className={cn(
-            "mt-3 rounded-lg px-3 py-2 text-xs leading-5",
+            "mt-4 rounded-xl px-3 py-2.5 text-xs leading-6",
             formError || intentState.error ? "bg-berry-50 text-berry-600" : "bg-teal-50 text-teal-700",
           )}
         >

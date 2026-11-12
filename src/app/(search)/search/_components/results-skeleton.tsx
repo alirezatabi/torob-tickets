@@ -5,7 +5,7 @@ export function ResultsSkeleton() {
       {Array.from({ length: 4 }).map((_, index) => (
         <div key={index} className="card p-4">
           <div className="flex items-center gap-2">
-            <div className="skeleton size-8 rounded-lg" />
+            <div className="skeleton size-9 rounded-xl" />
             <div className="flex-1 space-y-1.5">
               <div className="skeleton h-3 w-28" />
               <div className="skeleton h-2 w-20" />

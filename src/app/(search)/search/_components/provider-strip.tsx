@@ -19,7 +19,7 @@ export function ProviderStrip({
   const totalReturned = health.reduce((sum, item) => sum + item.returned, 0);
 
   return (
-    <div className="rounded-2xl border border-ink-200 bg-white px-4 py-3">
+    <div className="rounded-2xl border border-ink-200 bg-white/70 px-4 py-3 backdrop-blur-sm">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-[0.7rem] text-ink-500">
           <span className="font-semibold text-ink-700">
@@ -31,7 +31,7 @@ export function ProviderStrip({
         <span className="text-[0.62rem] text-ink-400">همهٔ منابع، دادهٔ نمونه</span>
       </div>
 
-      <ul className="mt-2 flex flex-wrap gap-x-4 gap-y-1.5">
+      <ul className="mt-2.5 flex flex-wrap gap-x-4 gap-y-2">
         {health.map((item) => (
           <li key={item.id} className="inline-flex items-center gap-1.5 text-[0.68rem] text-ink-600">
             {item.ok ? (

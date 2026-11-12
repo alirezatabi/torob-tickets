@@ -31,7 +31,7 @@ export function SortTabs({ current }: { current: SortKey }) {
   return (
     <div
       className={cn(
-        "inline-flex items-center gap-1 rounded-xl border border-ink-200 bg-white p-1",
+        "inline-flex items-center gap-1 rounded-2xl border border-ink-200 bg-white p-1 shadow-sm",
         pending && "opacity-70",
       )}
       role="tablist"
@@ -45,8 +45,8 @@ export function SortTabs({ current }: { current: SortKey }) {
           aria-selected={current === key}
           onClick={() => select(key)}
           className={cn(
-            "inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors",
-            current === key ? "bg-ink-900 text-white" : "text-ink-600 hover:bg-ink-50",
+            "inline-flex items-center gap-1.5 rounded-xl px-3.5 py-1.5 text-xs font-semibold transition-all",
+            current === key ? "bg-ink-900 text-white shadow-sm" : "text-ink-600 hover:bg-ink-50",
           )}
         >
           {ICONS[key]}

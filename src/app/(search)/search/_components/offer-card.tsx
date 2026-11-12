@@ -52,19 +52,26 @@ export function OfferCard({
   return (
     <article
       className={cn(
-        "card relative overflow-hidden transition-all hover:shadow-[var(--shadow-lifted)]",
-        selected && "ring-2 ring-teal-500/60",
-        muted && "opacity-80",
+        "card card-hover group relative overflow-hidden",
+        selected && "border-teal-500/70 ring-2 ring-teal-500/40",
+        muted && "opacity-75 hover:opacity-95",
       )}
       style={{ animationDelay: `${Math.min(index, 6) * 40}ms` }}
       data-testid="offer-card"
       data-group-key={group.groupKey}
     >
+      <div
+        aria-hidden="true"
+        className={cn(
+          "absolute inset-y-0 right-0 w-1 transition-colors",
+          selected ? "bg-teal-500" : "bg-transparent group-hover:bg-teal-500/40",
+        )}
+      />
       <div className="flex flex-col gap-4 p-4 sm:flex-row sm:items-stretch">
         {/* ——— Airline + timeline ——— */}
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
-            <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-ink-100 text-[0.6rem] font-bold text-ink-700">
+            <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-ink-900 text-[0.62rem] font-bold text-white shadow-sm">
               {offer.airlineCode}
             </span>
             <div className="min-w-0">
@@ -158,7 +165,7 @@ export function OfferCard({
             {group.providers.length > 1 && (
               <p className="text-[0.6rem] text-ink-400">ارزان‌ترین از {toPersianDigits(group.providers.length)} ارائه‌دهنده</p>
             )}
-            <p className="text-[1.05rem] font-extrabold text-ink-900 nums" data-testid="offer-price">
+            <p className="text-[1.15rem] font-black tracking-tight text-ink-900 nums" data-testid="offer-price">
               {formatToman(group.cheapestToman)}
             </p>
             {scored && (

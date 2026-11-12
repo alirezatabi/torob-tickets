@@ -119,7 +119,7 @@ export default async function ComparePage({ searchParams }: ComparePageProps) {
       </div>
 
       {rows.length > 1 ? (
-        <div className="mb-4 flex items-start gap-2 rounded-xl border border-teal-600/20 bg-teal-50 px-3 py-2.5">
+        <div className="mb-4 flex items-start gap-2 rounded-2xl border border-teal-600/20 bg-gradient-to-l from-teal-50 to-white px-4 py-3 shadow-sm">
         <GitCompareArrows className="mt-0.5 size-4 shrink-0 text-teal-700" aria-hidden="true" />
         <p className="text-[0.74rem] leading-6 text-teal-900">
           <span className="font-semibold">تفاوت اصلی: </span>
@@ -151,10 +151,10 @@ export default async function ComparePage({ searchParams }: ComparePageProps) {
               </th>
               {rows.map(({ offer }) => (
                 <th key={offer.id} scope="col" className="pb-2 align-bottom">
-                  <div className="card p-3">
-                    <p className="text-[0.8rem] font-bold text-ink-900">{offer.airlineName}</p>
+                  <div className="card card-hover p-3">
+                    <p className="text-[0.8rem] font-extrabold text-ink-900">{offer.airlineName}</p>
                     <p className="mt-0.5 text-[0.62rem] text-ink-400">{offer.flightNumber ?? "شماره نامشخص"}</p>
-                    <p className="mt-1.5 text-[0.95rem] font-extrabold text-ink-900 nums">{formatToman(offer.price.toman)}</p>
+                    <p className="mt-1.5 text-[1.05rem] font-black text-ink-900 nums">{formatToman(offer.price.toman)}</p>
                     <p className="text-[0.6rem] text-ink-400">از {offer.providerName}</p>
                   </div>
                 </th>
