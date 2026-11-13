@@ -43,11 +43,23 @@ describe("3D orientation", () => {
         rotationMatrix({ yaw: lon, pitch: lat }),
         toVec(lon, lat),
       );
-      // The camera looks down +y, so the centre of the disc is (0, 1, 0).
+      // The camera looks down −y, so the centre of the disc is (0, −1, 0).
       expect(v.x).toBeCloseTo(0, 6);
-      expect(v.y).toBeCloseTo(1, 6);
+      expect(v.y).toBeCloseTo(-1, 6);
       expect(v.z).toBeCloseTo(0, 6);
     }
+  });
+
+  it("keeps east to the right and north at the top (not mirrored)", () => {
+    const camera = rotationMatrix({ yaw: 51, pitch: 30 });
+    const center = rotate(camera, toVec(51, 30));
+    const east = rotate(camera, toVec(52, 30));
+    const west = rotate(camera, toVec(50, 30));
+    const north = rotate(camera, toVec(51, 31));
+    expect(center.y).toBeCloseTo(-1, 6);
+    expect(east.x).toBeGreaterThan(center.x);
+    expect(west.x).toBeLessThan(center.x);
+    expect(north.z).toBeGreaterThan(center.z);
   });
 
   it("keeps rotation an isometry (lengths and angles are preserved)", () => {
@@ -65,7 +77,7 @@ describe("3D orientation", () => {
   it("has the far side facing away from the camera", () => {
     const m = rotationMatrix({ yaw: TEHRAN[0], pitch: TEHRAN[1] });
     const antipode = rotate(m, toVec(TEHRAN[0] - 180, -TEHRAN[1]));
-    expect(antipode.y).toBeLessThan(0);
+    expect(antipode.y).toBeGreaterThan(0);
   });
 });
 
@@ -242,8 +254,8 @@ describe("the flight arc", () => {
 
 describe("lighting", () => {
   it("brightens the side facing the light and never goes black", () => {
-    const near = lightAt({ x: -0.4, y: 0.7, z: 0.4 });
-    const far = lightAt({ x: 0.4, y: -0.7, z: -0.4 });
+    const near = lightAt({ x: -0.4, y: -0.7, z: 0.4 });
+    const far = lightAt({ x: 0.4, y: 0.7, z: -0.4 });
     expect(near).toBeGreaterThan(far);
     expect(far).toBeGreaterThanOrEqual(0.18);
     expect(near).toBeLessThanOrEqual(1);

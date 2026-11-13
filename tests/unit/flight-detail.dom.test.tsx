@@ -78,6 +78,8 @@ describe("/flight — the per-ticket page", () => {
     // The globe is a real drawing, not a placeholder: it projects the great-circle route.
     const globe = screen.getByTestId("route-globe");
     expect(globe.querySelectorAll("circle").length).toBeGreaterThan(1);
+    expect(within(globe).getByTestId("globe-zoom-in")).toBeTruthy();
+    expect(within(globe).getByTestId("globe-zoom-out")).toBeTruthy();
     expect(globe.textContent).toContain("کیلومتر");
     // Unknown values are labelled, never guessed.
     expect(text).toMatch(/نامشخص|اعلام نشده|شامل|ندارد|استرداد/);

@@ -53,18 +53,19 @@ export interface Orientation {
  * Rotation matrix, built once per frame.
  *
  * Three turns, composed:
- *   1. `Rz(90° − yaw)` — spin the planet so the requested longitude faces the viewer. The extra
- *      90° is the camera convention: +y is *towards the viewer*, +x right, +z up.
- *   2. `Rx(pitch)` — tilt the sphere so the requested latitude is at the centre of the disc.
+ *   1. `Rz(−90° − yaw)` — spin the planet so the requested longitude faces the camera. The
+ *      camera looks along −y; +x is screen-right (east) and +z is screen-up (north).
+ *   2. Tilt the sphere so the requested latitude is at the centre of the disc and north stays up.
  *   3. `Rz(roll)` — lean the whole disc on screen, a few degrees, so the sphere reads as an object
  *      in orbit rather than a diagram.
  *
- * With this composition `toVec(lon, lat)` mapped by the matrix is exactly `(0, 1, 0)` — the point
- * on the sphere nearest the camera — which is what the unit test asserts.
+ * With this composition `toVec(lon, lat)` mapped by the matrix is exactly `(0, -1, 0)` — the point
+ * on the sphere nearest the camera. Positive longitude moves right and positive latitude moves up,
+ * matching the familiar north-up map convention rather than a mirrored globe.
  */
 export function rotationMatrix(orientation: Orientation): number[] {
-  const spin = (90 - orientation.yaw) * RAD;
-  const tilt = orientation.pitch * RAD;
+  const spin = (-90 - orientation.yaw) * RAD;
+  const tilt = -orientation.pitch * RAD;
   const lean = (orientation.roll ?? 0) * RAD;
   const cs = Math.cos(spin);
   const ss = Math.sin(spin);
@@ -73,9 +74,9 @@ export function rotationMatrix(orientation: Orientation): number[] {
   const cl = Math.cos(lean);
   const sl = Math.sin(lean);
 
-  // Rz(spin): the point at `yaw` lands on +x.
+  // Rz(spin): the point at `yaw` lands on the camera axis (−y).
   const rz = [cs, -ss, 0, ss, cs, 0, 0, 0, 1];
-  // Rx(tilt): +x stays put, the near direction becomes +y.
+  // Latitude tilt: keep north at screen-up while the near side is −y.
   const rx = [1, 0, 0, 0, ct, st, 0, -st, ct];
   // Rz(lean) on screen: same shape as the spin matrix.
   const rr = [cl, -sl, 0, sl, cl, 0, 0, 0, 1];
@@ -153,7 +154,7 @@ export function projectRing(ring: Float64Array, camera: Camera): ProjectedRing |
     const vy = cosPhi * Math.sin(lambda);
     const vz = Math.sin(phi);
     const y = camera.m[3]! * vx + camera.m[4]! * vy + camera.m[5]! * vz;
-    if (y <= 0) {
+    if (y >= 0) {
       if (runLength > 1) {
         // Close the run along the limb: a straight chord here is inside the disc by a hair, which
         // is exactly what the limb looks like at this scale.
@@ -164,7 +165,7 @@ export function projectRing(ring: Float64Array, camera: Camera): ProjectedRing |
       continue;
     }
     visible += 1;
-    depthSum += y;
+    depthSum -= y;
     const x = camera.m[0]! * vx + camera.m[1]! * vy + camera.m[2]! * vz;
     const z = camera.m[6]! * vx + camera.m[7]! * vy + camera.m[8]! * vz;
     const sx = coord(camera.cx + camera.radius * x);
@@ -196,7 +197,7 @@ export function projectRing(ring: Float64Array, camera: Camera): ProjectedRing |
  */
 const LIGHT: Vec3 = (() => {
   const x = -0.45;
-  const y = 0.75;
+  const y = -0.75;
   const z = 0.48;
   const length = Math.hypot(x, y, z);
   return { x: x / length, y: y / length, z: z / length };
@@ -281,7 +282,7 @@ export function flightArc(
     const ground = rotate(camera.m, along(t));
     // Lift along the surface normal: the arc rises radially out of the sphere.
     const v = { x: ground.x * (1 + lift), y: ground.y * (1 + lift), z: ground.z * (1 + lift) };
-    points.push({ v, ground, t, visible: v.y > 0 });
+    points.push({ v, ground, t, visible: v.y < 0 });
   }
 
   const screen = (v: Vec3): string =>
@@ -309,13 +310,13 @@ export function flightArc(
 
   return {
     points,
-    path: build((point) => point.v, (point) => point.v.y > 0),
-    groundPath: build((point) => point.ground, (point) => point.ground.y > 0),
+    path: build((point) => point.v, (point) => point.v.y < 0),
+    groundPath: build((point) => point.ground, (point) => point.ground.y < 0),
     lift,
     origin: originRotated,
     destination: destinationRotated,
-    originVisible: originRotated.y > 0,
-    destinationVisible: destinationRotated.y > 0,
+    originVisible: originRotated.y < 0,
+    destinationVisible: destinationRotated.y < 0,
   };
 }
 
@@ -327,7 +328,7 @@ export function planeAt(arc: FlightArc, t: number, camera: Camera): { at: [numbe
   const index = Math.max(1, Math.min(arc.points.length - 1, Math.round(t * (arc.points.length - 1))));
   const current = arc.points[index];
   const previous = arc.points[index - 1];
-  if (!current || !previous || !current.v.y || current.v.y <= 0) return null;
+  if (!current || !previous || !current.v.y || current.v.y >= 0) return null;
   const x = camera.cx + camera.radius * current.v.x;
   const y = camera.cy - camera.radius * current.v.z;
   const px = camera.cx + camera.radius * previous.v.x;

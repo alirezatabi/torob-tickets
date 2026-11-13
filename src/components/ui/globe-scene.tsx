@@ -130,6 +130,10 @@ export function GlobeScene({
   const [spinning, setSpinning] = useState(true);
   const [level, setLevel] = useState<CoastLevel>(initialLevel);
   const [reduced, setReduced] = useState(false);
+  const [earthTexture, setEarthTexture] = useState<EarthTexture | null>(null);
+  const [texturePainted, setTexturePainted] = useState(false);
+  const textureCanvas = useRef<HTMLCanvasElement | null>(null);
+  const cameraRef = useRef<Camera | null>(null);
   /** Server and first client paint are identical; this flips once if the visitor asked for less motion. */
 
   const drag = useRef<{
@@ -266,6 +270,81 @@ export function GlobeScene({
     [yaw, pitch, zoom, radius, cx, cy, planet],
   );
 
+  cameraRef.current = camera;
+
+  // Local NASA Blue Marble texture: no tile requests, API keys, or third-party runtime calls.
+  useEffect(() => {
+    let cancelled = false;
+    const image = new Image();
+    image.onload = () => {
+      if (cancelled) return;
+      const source = document.createElement("canvas");
+      source.width = image.naturalWidth;
+      source.height = image.naturalHeight;
+      const context = source.getContext("2d", { willReadFrequently: true });
+      if (!context) return;
+      context.drawImage(image, 0, 0);
+      const data = context.getImageData(0, 0, source.width, source.height);
+      setEarthTexture({
+        pixels: data.data,
+        width: source.width,
+        height: source.height,
+      });
+    };
+    image.src = "/globe/earth-blue-marble.jpg";
+    return () => {
+      cancelled = true;
+      image.onload = null;
+    };
+  }, []);
+
+  // Reproject the equirectangular satellite/terrain map onto the rotating sphere. The canvas
+  // updates at 30 fps (the vector route and country outlines remain crisp at the SVG frame rate).
+  useEffect(() => {
+    if (!earthTexture) return;
+    const canvas = textureCanvas.current;
+    const context = canvas?.getContext("2d", { alpha: true });
+    if (!canvas || !context) return;
+    const dpr = Math.min(window.devicePixelRatio || 1, 1.2);
+    canvas.width = Math.round(size * dpr);
+    canvas.height = Math.round(size * dpr);
+    let frame = 0;
+    let last = 0;
+    const draw = (now: number) => {
+      if (reduced || now - last >= 33) {
+        const current = cameraRef.current;
+        if (current) {
+          renderEarthTexture(
+            context,
+            canvas.width,
+            canvas.height,
+            dpr,
+            earthTexture,
+            current,
+          );
+          setTexturePainted(true);
+        }
+        last = now;
+      }
+      if (!reduced) frame = requestAnimationFrame(draw);
+    };
+    frame = requestAnimationFrame(draw);
+    return () => cancelAnimationFrame(frame);
+  }, [earthTexture, size, reduced]);
+
+  // When a visitor zooms past a detail threshold, fetch that coast tier before drawing it.
+  useEffect(() => {
+    const needed = coastLevel(zoom);
+    if (needed <= level) return;
+    let cancelled = false;
+    void loadCoast(needed).then((rings) => {
+      if (!cancelled && rings.length > 0) setLevel(needed);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [zoom, level]);
+
   const rings = COAST[level];
   const land = useMemo(() => projectLand(rings, camera), [rings, camera]);
   const graticule = useMemo(() => projectGraticule(camera), [camera]);
@@ -311,14 +390,27 @@ export function GlobeScene({
       const deltaPitch = ((event.clientY - current.y) / (radius * 2)) * 130;
       current.x = event.clientX;
       current.y = event.clientY;
-      current.vx = deltaYaw;
+      current.vx = -deltaYaw;
       current.vy = -deltaPitch;
-      current.yaw += deltaYaw;
+      // The globe follows the hand: dragging right brings eastern longitudes into view.
+      current.yaw -= deltaYaw;
       current.pitch = clamp(current.pitch + deltaPitch, -70, 70);
       setYaw(current.yaw);
       setPitch(current.pitch);
     },
     [radius],
+  );
+
+  const zoomBy = useCallback((factor: number) => {
+    setZoom((value) => clamp(value * factor, 1, 8));
+  }, []);
+
+  const onWheel = useCallback(
+    (event: React.WheelEvent<SVGSVGElement>) => {
+      event.preventDefault();
+      zoomBy(Math.exp(-event.deltaY * 0.0012));
+    },
+    [zoomBy],
   );
 
   const onPointerUp = useCallback(() => {
@@ -355,6 +447,11 @@ export function GlobeScene({
           className="absolute inset-[2%] rounded-full bg-sky-400/25 blur-2xl"
           style={{ opacity: 0.55 }}
         />
+        <canvas
+          ref={textureCanvas}
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 h-full w-full"
+        />
         <svg
           viewBox={`0 0 ${size} ${size}`}
           className={
@@ -372,6 +469,7 @@ export function GlobeScene({
           onPointerMove={onPointerMove}
           onPointerUp={onPointerUp}
           onPointerCancel={onPointerUp}
+          onWheel={onWheel}
         >
           <title>
             {route
@@ -454,7 +552,7 @@ export function GlobeScene({
             cx={cx}
             cy={cy}
             r={radius}
-            fill={`url(#${gradientId}-ocean)`}
+            fill={texturePainted ? "none" : `url(#${gradientId}-ocean)`}
           />
 
           <g clipPath={`url(#${clipId})`}>
@@ -469,12 +567,16 @@ export function GlobeScene({
 
             {/* Land, far rings first: the depth sort is what makes overlapping coastlines read as
                 surfaces rather than as one flat sticker. */}
-            <g stroke="#0d4b45" strokeOpacity="0.16" strokeWidth="0.6">
+            <g
+              stroke={texturePainted ? "#183b43" : "#0d4b45"}
+              strokeOpacity={texturePainted ? 0.48 : 0.16}
+              strokeWidth={texturePainted ? 0.55 : 0.6}
+            >
               {land.map((ring, index) => (
                 <path
                   key={index}
                   d={ring.path}
-                  fill={`url(#${gradientId}-land)`}
+                  fill={texturePainted ? "none" : `url(#${gradientId}-land)`}
                   fillOpacity={0.62 + 0.38 * Math.min(1, ring.depth * 1.3)}
                 />
               ))}
@@ -551,22 +653,40 @@ export function GlobeScene({
           />
         </svg>
 
-        {controls && !reduced && (
+        {controls && (
           <div className="absolute bottom-0 left-0 flex items-center gap-1.5">
             <GlobeButton
-              onClick={() => setSpinning((value) => !value)}
-              label={spinning ? "توقف چرخش" : "چرخش خودکار"}
-              testId="globe-spin"
+              onClick={() => zoomBy(1.35)}
+              label="بزرگ‌نمایی کره"
+              testId="globe-zoom-in"
             >
-              {spinning ? <PauseIcon /> : <PlayIcon />}
+              <ZoomInIcon />
             </GlobeButton>
             <GlobeButton
-              onClick={reset}
-              label="بازگشت به نمای مسیر"
-              testId="globe-reset"
+              onClick={() => zoomBy(1 / 1.35)}
+              label="کوچک‌نمایی کره"
+              testId="globe-zoom-out"
             >
-              <ResetIcon />
+              <ZoomOutIcon />
             </GlobeButton>
+            {!reduced && (
+              <>
+                <GlobeButton
+                  onClick={() => setSpinning((value) => !value)}
+                  label={spinning ? "توقف چرخش" : "چرخش خودکار"}
+                  testId="globe-spin"
+                >
+                  {spinning ? <PauseIcon /> : <PlayIcon />}
+                </GlobeButton>
+                <GlobeButton
+                  onClick={reset}
+                  label="بازگشت به نمای مسیر"
+                  testId="globe-reset"
+                >
+                  <ResetIcon />
+                </GlobeButton>
+              </>
+            )}
           </div>
         )}
       </div>
@@ -632,7 +752,7 @@ function projectGraticule(camera: Camera): string {
   const project = (lon: number, lat: number): [number, number] | null => {
     const v = toVec(lon, lat);
     const y = camera.m[3]! * v.x + camera.m[4]! * v.y + camera.m[5]! * v.z;
-    if (y <= 0) return null;
+    if (y >= 0) return null;
     const x = camera.m[0]! * v.x + camera.m[1]! * v.y + camera.m[2]! * v.z;
     const z = camera.m[6]! * v.x + camera.m[7]! * v.y + camera.m[8]! * v.z;
     return [camera.cx + camera.radius * x, camera.cy - camera.radius * z];
@@ -732,6 +852,86 @@ function Plane({ at, angle }: { at: [number, number]; angle: number }) {
   );
 }
 
+interface EarthTexture {
+  pixels: Uint8ClampedArray;
+  width: number;
+  height: number;
+}
+
+/** Inverse-project NASA's equirectangular Blue Marble pixels onto the current orthographic view. */
+function renderEarthTexture(
+  context: CanvasRenderingContext2D,
+  canvasWidth: number,
+  canvasHeight: number,
+  dpr: number,
+  texture: EarthTexture,
+  camera: Camera,
+): void {
+  const image = context.createImageData(canvasWidth, canvasHeight);
+  const output = image.data;
+  const input = texture.pixels;
+  const radius = camera.radius * dpr;
+  const cx = camera.cx * dpr;
+  const cy = camera.cy * dpr;
+  const light = { x: -0.42, y: -0.78, z: 0.48 };
+  const lightLength = Math.hypot(light.x, light.y, light.z);
+  light.x /= lightLength;
+  light.y /= lightLength;
+  light.z /= lightLength;
+
+  for (let py = 0; py < canvasHeight; py += 1) {
+    const nz = (cy - py - 0.5) / radius;
+    for (let px = 0; px < canvasWidth; px += 1) {
+      const nx = (px + 0.5 - cx) / radius;
+      const r2 = nx * nx + nz * nz;
+      if (r2 >= 1) continue;
+      const ny = -Math.sqrt(1 - r2);
+      // The globe matrix is orthonormal, so its inverse is its transpose.
+      const m = camera.m;
+      const wx = m[0]! * nx + m[3]! * ny + m[6]! * nz;
+      const wy = m[1]! * nx + m[4]! * ny + m[7]! * nz;
+      const wz = m[2]! * nx + m[5]! * ny + m[8]! * nz;
+      const longitude = Math.atan2(wy, wx);
+      const latitude = Math.asin(Math.max(-1, Math.min(1, wz)));
+      const tx =
+        ((longitude / (2 * Math.PI) + 0.5) * texture.width) % texture.width;
+      const ty = Math.max(
+        0,
+        Math.min(
+          texture.height - 1,
+          (0.5 - latitude / Math.PI) * texture.height,
+        ),
+      );
+      const x0 = Math.floor(tx);
+      const y0 = Math.floor(ty);
+      const x1 = (x0 + 1) % texture.width;
+      const y1 = Math.min(texture.height - 1, y0 + 1);
+      const fx = tx - x0;
+      const fy = ty - y0;
+      const a = (y0 * texture.width + x0) * 4;
+      const b = (y0 * texture.width + x1) * 4;
+      const c = (y1 * texture.width + x0) * 4;
+      const d = (y1 * texture.width + x1) * 4;
+      const dot = Math.max(0, nx * light.x + ny * light.y + nz * light.z);
+      const shade = 0.5 + dot * 0.5;
+      const rim = Math.pow(r2, 7) * 0.12;
+      const out = (py * canvasWidth + px) * 4;
+      for (let channel = 0; channel < 3; channel += 1) {
+        const top = input[a + channel]! * (1 - fx) + input[b + channel]! * fx;
+        const bottom =
+          input[c + channel]! * (1 - fx) + input[d + channel]! * fx;
+        const color = (top * (1 - fy) + bottom * fy) * shade;
+        output[out + channel] = Math.min(
+          255,
+          color * (1 - rim) + [50, 155, 230][channel]! * rim,
+        );
+      }
+      output[out + 3] = 255;
+    }
+  }
+  context.putImageData(image, 0, 0);
+}
+
 function GlobeButton({
   onClick,
   label,
@@ -754,6 +954,34 @@ function GlobeButton({
     >
       {children}
     </button>
+  );
+}
+
+function ZoomInIcon() {
+  return (
+    <svg viewBox="0 0 20 20" className="size-4" fill="none" aria-hidden="true">
+      <circle cx="8.5" cy="8.5" r="5" stroke="currentColor" strokeWidth="1.6" />
+      <path
+        d="M12.2 12.2 17 17M8.5 6v5M6 8.5h5"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+function ZoomOutIcon() {
+  return (
+    <svg viewBox="0 0 20 20" className="size-4" fill="none" aria-hidden="true">
+      <circle cx="8.5" cy="8.5" r="5" stroke="currentColor" strokeWidth="1.6" />
+      <path
+        d="M12.2 12.2 17 17M6 8.5h5"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+      />
+    </svg>
   );
 }
 
