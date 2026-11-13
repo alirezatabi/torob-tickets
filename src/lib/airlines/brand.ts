@@ -1,13 +1,15 @@
 /**
- * Visual identity for each airline in the demo.
+ * **Fallback** identity for an airline we have no real logo for.
  *
  * A price comparison is scanned by *carrier* before it is read: the eye finds “the Iran Air
- * one” long before it parses a flight number. So every row carries a badge in that carrier's
- * own livery colours, with a distinct emblem, instead of the two grey letters we had.
+ * one” long before it parses a flight number. The 23 carriers in the demo each ship their own
+ * real logo (`./logos.ts` + `./logos/`), so this file is *not* their primary identity any more.
  *
- * Honesty note: these are **hand-drawn marks built for this demo**, not the airlines'
- * registered logos (those are trademarks and are not shipped here). They are labelled as such
- * in the UI, and they never carry a price or a claim — only identity.
+ * What is left here is the safety net: for a code that has no bundled logo — a carrier added
+ * to the dataset later, or a typo — `airlineBrand()` derives a stable livery-coloured badge
+ * with a drawn emblem. It renders (`data-logo="drawn"`) deliberately unlike a real logo, so a
+ * stand-in is never mistaken for a brand asset. These are **hand-drawn marks built for this
+ * demo**, not registered trademarks.
  */
 
 export type Emblem =

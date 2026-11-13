@@ -197,8 +197,11 @@ describe("the flight row leads with the carrier's badge", () => {
       const flight = results.flights[index]!;
       expect(logo.getAttribute("data-airline")).toBe(flight.display.airlineCode);
       expect(logo.getAttribute("aria-label")).toContain(flight.display.airlineName);
-      // A drawn mark, not an empty box.
-      expect(logo.querySelectorAll("path").length).toBeGreaterThan(1);
+      // The airline's own bundled logo, in a fixed box — not an empty placeholder.
+      expect(logo.getAttribute("data-logo")).toBe("real");
+      const img = logo.querySelector("img");
+      expect(img?.getAttribute("src")).toBe(`/airline-logos/${flight.display.airlineCode}.svg`);
+      expect(logo.getAttribute("style")).toContain("width: 36px");
     }
   });
 });
