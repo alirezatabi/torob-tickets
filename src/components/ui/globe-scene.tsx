@@ -1165,7 +1165,8 @@ function projectNetwork(
     const arc = flightArc(origin, destination, angle, camera, 96);
     // Raise these decorative air lanes a little more than ticket-route arcs, so they read as
     // elegant, separate flight corridors instead of short straight joins between map pins.
-    const lift = Math.min(0.15, 0.035 + (angle / 180) * 0.09 + (routeIndex % 3) * 0.006);
+    const maxLift = Math.min(0.18, 0.06 + (angle / 180) * 0.11 + (routeIndex % 3) * 0.006);
+    const liftAt = (t: number) => maxLift * Math.sin(Math.PI * t);
     let path = "";
     let run: string[] = [];
     const flush = () => {
@@ -1173,6 +1174,7 @@ function projectNetwork(
       run = [];
     };
     for (const point of arc.points) {
+      const lift = liftAt(point.t);
       const x = point.ground.x * (1 + lift);
       const y = point.ground.y * (1 + lift);
       const z = point.ground.z * (1 + lift);
@@ -1189,20 +1191,23 @@ function projectNetwork(
     let plane: { at: [number, number]; angle: number } | undefined;
     if (routeIndex % 4 === 0) {
       const pointIndex = Math.round(arc.points.length * 0.44);
-      const previous = arc.points[Math.max(0, pointIndex - 1)]!.ground;
-      const current = arc.points[pointIndex]!.ground;
-      const next = arc.points[Math.min(arc.points.length - 1, pointIndex + 1)]!.ground;
-      if (current.y * (1 + lift) < -0.08) {
-        const screenPoint = (point: Vec3): [number, number] => [
-          camera.cx + camera.radius * point.x * (1 + lift),
-          camera.cy - camera.radius * point.z * (1 + lift),
-        ];
+      const previous = arc.points[Math.max(0, pointIndex - 1)]!;
+      const current = arc.points[pointIndex]!;
+      const next = arc.points[Math.min(arc.points.length - 1, pointIndex + 1)]!;
+      if (current.ground.y * (1 + liftAt(current.t)) < -0.08) {
+        const screenPoint = (point: (typeof arc.points)[number]): [number, number] => {
+          const lift = liftAt(point.t);
+          return [
+            camera.cx + camera.radius * point.ground.x * (1 + lift),
+            camera.cy - camera.radius * point.ground.z * (1 + lift),
+          ];
+        };
         const [x0, y0] = screenPoint(previous);
         const [x, y] = screenPoint(current);
         const [x1, y1] = screenPoint(next);
         plane = {
           at: [Math.round(x), Math.round(y)],
-          angle: (Math.atan2(y1 - y0, x1 - x0) * 180) / Math.PI,
+          angle: Math.round(((Math.atan2(y1 - y0, x1 - x0) * 180) / Math.PI) * 10) / 10,
         };
       }
     }
@@ -1277,7 +1282,7 @@ function AirplaneMarker({
 }) {
   const color = accent === "gold" ? "#f1bd63" : "#62c6ff";
   return (
-    <g transform={`translate(${at[0]} ${at[1]}) rotate(${angle})`} aria-hidden="true">
+    <g transform={`translate(${at[0]} ${at[1]}) rotate(${angle.toFixed(1)})`} aria-hidden="true">
       <circle r="11" fill={color} fillOpacity="0.18" />
       <path
         d="M10 0-6 3-2.1 0-6-3Z"
