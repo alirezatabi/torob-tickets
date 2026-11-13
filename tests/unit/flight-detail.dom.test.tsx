@@ -67,14 +67,18 @@ describe("/flight — the per-ticket page", () => {
     expect(within(page).getByTestId("flight-cheapest").textContent).toBe(rowPrice);
   });
 
-  it("shows the facts the results list no longer shows: baggage, refund, segments", async () => {
+  it("shows the facts the results list no longer shows: globe, baggage, refund, segments", async () => {
     const flight = await firstFlight();
     await renderFor(flight.selection.cheapest?.id ?? flight.display.id);
 
     const text = screen.getByTestId("flight-page").textContent ?? "";
     expect(text).toContain("بار همراه");
     expect(text).toContain("شرایط استرداد");
-    expect(text).toContain("مسیر پرواز");
+    expect(text).toContain("پله‌های پرواز");
+    // The globe is a real drawing, not a placeholder: it projects the great-circle route.
+    const globe = screen.getByTestId("route-globe");
+    expect(globe.querySelectorAll("circle").length).toBeGreaterThan(1);
+    expect(globe.textContent).toContain("کیلومتر");
     // Unknown values are labelled, never guessed.
     expect(text).toMatch(/نامشخص|اعلام نشده|شامل|ندارد|استرداد/);
     // And the honesty note is there.

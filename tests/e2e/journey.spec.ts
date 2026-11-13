@@ -93,7 +93,8 @@ test.describe("Torob Tickets journey", () => {
     await expect(page.getByText("بهترین تطابق")).toHaveCount(0);
 
     const card = page.getByTestId("offer-card").first();
-    await card.getByTestId("flight-details").click();
+    // The whole row is the link, so a tap anywhere on it opens the ticket.
+    await card.click();
     await page.waitForURL(/\/flight\?/);
     await expect(page.getByTestId("flight-page")).toBeVisible();
     await expect(page.getByTestId("flight-page")).toContainText("فروشنده‌های همین پرواز");

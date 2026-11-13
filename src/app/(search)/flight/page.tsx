@@ -19,6 +19,8 @@ import { searchTrips } from "@/server/search-service";
 import { baggageLabel, refundLabel } from "@/ranking/explain";
 import { INELIGIBLE_LABELS, LOW_SEATS_THRESHOLD } from "@/modules/pricing/select-cheapest";
 import { DemoBadge } from "@/components/ui/demo-badge";
+import { AirlineLogo } from "@/components/ui/airline-logo";
+import { Globe } from "./_components/route-globe";
 import { NO_SOURCE_REASON_FA } from "@/modules/catalog/demo-link";
 import { cn } from "@/lib/cn";
 
@@ -105,37 +107,42 @@ export default async function FlightPage({ searchParams }: FlightPageProps) {
         <DemoBadge />
       </nav>
 
-      {/* ——— identity ——— */}
+      {/* ——— identity: who flies it, the two clocks, and the route on the globe ——— */}
       <header className="card overflow-hidden">
-        <div className="flex flex-wrap items-start justify-between gap-4 border-b border-ink-100 p-4 sm:p-5">
-          <div className="min-w-0">
-            <h1 className="text-base font-bold text-ink-900" data-testid="flight-title">
-              {offer.airlineName}
-              {offer.flightNumber ? ` · پرواز ${offer.flightNumber}` : " · شمارهٔ پرواز اعلام نشده"}
-            </h1>
-            <p className="mt-1 text-[0.75rem] text-ink-500">
-              {cityLabel(offer.originCode)} به {cityLabel(offer.destinationCode)}
-              <span className="mx-1.5 text-ink-300">·</span>
-              {formatJalaliFull(query.departDate)}
-              <span className="mx-1.5 text-ink-300">·</span>
-              {toPersianDigits(query.passengers)} مسافر · {CABIN_LABELS[query.cabin]}
-            </p>
-            <p className="mt-1 text-[0.68rem] text-ink-400">
-              {offer.segments[0]?.aircraft ?? "نوع هواپیما اعلام نشده"} · {formatStopsShort(offer.stops)} ·{" "}
-              {formatDuration(offer.durationMinutes)}
-            </p>
+        <div className="flex flex-wrap items-start justify-between gap-4 p-4 sm:p-5">
+          <div className="flex min-w-0 items-start gap-3">
+            <AirlineLogo code={offer.airlineCode} name={offer.airlineName} size={46} />
+            <div className="min-w-0">
+              <h1 className="text-base font-bold text-ink-900" data-testid="flight-title">
+                {offer.airlineName}
+                {offer.flightNumber ? ` · پرواز ${offer.flightNumber}` : " · شمارهٔ پرواز اعلام نشده"}
+              </h1>
+              <p className="mt-1 text-[0.75rem] text-ink-500">
+                {cityLabel(offer.originCode)} به {cityLabel(offer.destinationCode)}
+                <span className="mx-1.5 text-ink-300">·</span>
+                {formatJalaliFull(query.departDate)}
+              </p>
+              <p className="mt-1 text-[0.68rem] text-ink-400">
+                {offer.segments[0]?.aircraft ?? "نوع هواپیما اعلام نشده"} · {formatStopsShort(offer.stops)} ·{" "}
+                {formatDuration(offer.durationMinutes)} · {toPersianDigits(query.passengers)} مسافر ·{" "}
+                {CABIN_LABELS[query.cabin]}
+              </p>
+            </div>
           </div>
-          <div className="text-left">
-            <p className="text-[0.65rem] text-ink-400">ارزان‌ترین قیمت این پرواز</p>
-            <p className="nums text-xl font-black text-ink-900" data-testid="flight-cheapest">
+
+          <div className="rounded-xl border border-teal-600/20 bg-teal-50/50 px-3.5 py-2.5 text-left">
+            <p className="text-[0.62rem] text-ink-500">ارزان‌ترین قیمت این پرواز</p>
+            <p className="nums text-xl font-black leading-7 text-ink-900" data-testid="flight-cheapest">
               {flight?.selection.cheapest ? formatToman(flight.selection.cheapest.price.toman) : "تکمیل ظرفیت"}
             </p>
-            {query.passengers > 1 && flight?.selection.totalToman != null && (
-              <p className="mt-0.5 text-[0.65rem] text-ink-500">
-                مجموع {toPersianDigits(query.passengers)} مسافر: {formatToman(flight.selection.totalToman)}
+            {query.passengers > 1 && flight?.selection.totalToman != null ? (
+              <p className="nums mt-0.5 text-[0.64rem] text-ink-500">
+                مجموع {toPersianDigits(query.passengers)} نفر: {formatToman(flight.selection.totalToman)}
               </p>
+            ) : (
+              <p className="mt-0.5 text-[0.64rem] text-ink-400">برای هر نفر</p>
             )}
-            <p className="mt-1 inline-flex items-center gap-1 text-[0.65rem] text-ink-500">
+            <p className="mt-1 inline-flex items-center gap-1 text-[0.64rem] text-ink-500">
               <Users className="size-3" aria-hidden="true" />
               {flight?.selection.seatsAvailable != null
                 ? `${toPersianDigits(flight.selection.seatsAvailable)} صندلی`
@@ -144,33 +151,48 @@ export default async function FlightPage({ searchParams }: FlightPageProps) {
           </div>
         </div>
 
-        {/* ——— clock ——— */}
-        <div className="flex items-center gap-3 p-4 sm:p-5">
-          <div className="text-center">
-            <p className="nums text-base font-extrabold text-ink-900">{formatTimeInZone(offer.departAt, originTz)}</p>
-            <p className="mt-0.5 text-[0.65rem] text-ink-500">{origin?.fa ?? offer.originCode}</p>
-            <p className="text-[0.6rem] text-ink-400">{origin?.airportFa ?? ""}</p>
+        {/* the two clocks, side by side with the duration between them */}
+        <div className="flex items-center gap-3 border-t border-ink-100 px-4 py-3.5 sm:px-5">
+          <div className="min-w-0 flex-1">
+            <p className="nums text-lg font-extrabold text-ink-900">{formatTimeInZone(offer.departAt, originTz)}</p>
+            <p className="mt-0.5 truncate text-[0.66rem] text-ink-500">{origin?.fa ?? offer.originCode}</p>
+            <p className="truncate text-[0.6rem] text-ink-400">{origin?.airportFa ?? ""}</p>
           </div>
-          <div className="flex min-w-0 flex-1 flex-col items-center gap-1">
-            <span className="inline-flex items-center gap-1 text-[0.65rem] text-ink-500">
+          <div className="flex min-w-0 flex-[1.4] flex-col items-center gap-1">
+            <span className="inline-flex items-center gap-1 text-[0.64rem] text-ink-500">
               <Timer className="size-3" aria-hidden="true" />
               {formatDuration(offer.durationMinutes)}
             </span>
-            <span className="h-px w-full border-t border-dashed border-ink-300" aria-hidden="true" />
-            <span className="inline-flex items-center gap-1 text-[0.62rem] text-ink-400">
-              <Plane className="size-3" aria-hidden="true" />
-              {formatStopsShort(offer.stops)}
+            <span className="flex w-full items-center" aria-hidden="true">
+              <span className="size-1.5 rounded-full bg-ink-300" />
+              <span className="h-px flex-1 border-t border-dashed border-ink-300" />
+              <Plane className="mx-1 size-3.5 -scale-x-100 text-ink-300" />
+              <span className="h-px flex-1 border-t border-dashed border-ink-300" />
+              <span className="size-1.5 rounded-full bg-teal-500" />
             </span>
+            <span className="text-[0.62rem] text-ink-400">{formatStopsShort(offer.stops)}</span>
           </div>
-          <div className="text-center">
-            <p className="nums text-base font-extrabold text-ink-900">
+          <div className="min-w-0 flex-1 text-left">
+            <p className="nums text-lg font-extrabold text-ink-900">
               {formatTimeInZone(offer.arriveAt, destinationTz)}
               {arrivalNextDay && <span className="mr-0.5 align-super text-[0.6rem] text-saffron-600">+۱ روز</span>}
             </p>
-            <p className="mt-0.5 text-[0.65rem] text-ink-500">{destination?.fa ?? offer.destinationCode}</p>
-            <p className="text-[0.6rem] text-ink-400">{destination?.airportFa ?? ""}</p>
+            <p className="mt-0.5 truncate text-[0.66rem] text-ink-500">{destination?.fa ?? offer.destinationCode}</p>
+            <p className="truncate text-[0.6rem] text-ink-400">{destination?.airportFa ?? ""}</p>
           </div>
         </div>
+
+        {/* ——— the route on the planet ——— */}
+        {origin?.lat != null && destination?.lat != null && origin?.lon != null && destination?.lon != null && (
+          <div className="border-t border-ink-100 bg-gradient-to-b from-ink-50/80 to-white px-4 py-4 sm:px-5">
+            <Globe
+              origin={[origin.lon, origin.lat]}
+              destination={[destination.lon, destination.lat]}
+              originLabel={origin.fa}
+              destinationLabel={destination.fa}
+            />
+          </div>
+        )}
       </header>
 
       <div className="mt-4 grid gap-4 lg:grid-cols-[1fr_20rem] lg:items-start">
@@ -245,7 +267,8 @@ export default async function FlightPage({ searchParams }: FlightPageProps) {
           {/* ——— segments ——— */}
           <section className="card p-4" aria-labelledby="segments-heading">
             <h2 id="segments-heading" className="text-[0.8rem] font-bold text-ink-900">
-              مسیر پرواز
+              پله‌های پرواز
+              <span className="mr-1.5 text-[0.65rem] font-medium text-ink-400">({toPersianDigits(offer.segments.length)} پاره)</span>
             </h2>
             <ol className="mt-3 space-y-3">
               {offer.segments.map((segment, index) => (

@@ -12,7 +12,6 @@ import { recordSearch } from "@/server/persistence";
 import { ResultsList } from "@/app/(search)/search/_components/results-list";
 import { FilterSidebar } from "@/app/(search)/search/_components/filter-sidebar";
 import { SortTabs } from "@/app/(search)/search/_components/sort-tabs";
-import { ProviderStrip } from "@/app/(search)/search/_components/provider-strip";
 import { SummaryBar } from "@/app/(search)/search/_components/summary-bar";
 import { ResultsSkeleton } from "@/app/(search)/search/_components/results-skeleton";
 import { MobileFilters } from "@/app/(search)/search/_components/mobile-filters";
@@ -81,8 +80,10 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
       </div>
 
       <div className="mt-4 grid gap-4 lg:grid-cols-[17rem_1fr] lg:items-start">
-        <aside className="hidden lg:block lg:sticky lg:top-20">
-          <FilterSidebar query={query} groups={view.groups} totalOffers={outcome.offers.length} />
+        <aside className="hidden lg:sticky lg:top-20 lg:block">
+          <div className="max-h-[calc(100vh-6rem)] overflow-y-auto rounded-[var(--radius-card)] pb-2 pr-0.5">
+            <FilterSidebar query={query} groups={view.groups} totalOffers={outcome.offers.length} />
+          </div>
         </aside>
 
         <div className="min-w-0">
@@ -91,10 +92,25 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
             <MobileFilters query={query} groups={view.groups} totalOffers={outcome.offers.length} />
           </div>
 
-          <div className="mt-4 space-y-4">
+          <div className="mt-3 space-y-3">
             {hasResults ? (
               <>
-                <ProviderStrip health={outcome.health} providersOk={providersOk} issues={outcome.issues.length} />
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="nums text-[0.7rem] text-ink-500">
+                    <span className="font-semibold text-ink-700">{toPersianDigits(flights.length)} پرواز</span>
+                    {outcome.offers.length > 0 && (
+                      <>
+                        <span className="mx-1.5 text-ink-300">·</span>
+                        {toPersianDigits(outcome.offers.length)} نرخ از {toPersianDigits(providersOk)} منبع
+                      </>
+                    )}
+                    <span className="mx-1.5 text-ink-300">·</span>
+                    ارزان‌ترین اول
+                  </p>
+                  <p className="text-[0.62rem] text-ink-400" title="قیمت‌ها از دادهٔ نمونهٔ درون‌برنامه ساخته می‌شوند، نه از منبع زنده.">
+                    دادهٔ نمونه
+                  </p>
+                </div>
 
                 <Suspense fallback={<ResultsSkeleton />}>
                   <ResultsList query={query} flights={flights} />

@@ -6,6 +6,7 @@ import { RotateCcw, SlidersHorizontal } from "lucide-react";
 import type { OfferGroup } from "@/domain/flight";
 import type { TripQuery } from "@/domain/trip";
 import { airlineOptions, priceBounds, type DisplayFilters } from "@/lib/filter";
+import { AirlineLogo } from "@/components/ui/airline-logo";
 import { formatTomanCompact, toPersianDigits } from "@/lib/format";
 import { cn } from "@/lib/cn";
 
@@ -203,6 +204,7 @@ export function FilterPanel({ query, groups, totalOffers }: FilterPanelProps) {
                     onChange={() => toggleAirline(airline.code)}
                     className="size-3.5 accent-teal-600"
                   />
+                  <AirlineLogo code={airline.code} name={airline.name} size={18} />
                   {airline.name}
                 </span>
                 <span className="text-[0.62rem] text-ink-400">{toPersianDigits(airline.count)}</span>

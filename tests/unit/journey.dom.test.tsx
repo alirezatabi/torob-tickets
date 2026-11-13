@@ -178,3 +178,27 @@ describe("search → results journey", () => {
     expect(price).toContain("تومان");
   });
 });
+
+describe("the flight row leads with the carrier's badge", () => {
+  const query = createQuery({ originCode: "IFN", destinationCode: "KIH", departDate: "2026-11-20" });
+
+  it("renders an airline logo per row, with the airline's name as its accessible label", async () => {
+    const outcome = await runSearch(query);
+    const results = buildFlightResults(groupOffers(outcome.offers), query, {
+      passengers: 1,
+      cabin: "economy",
+      sort: "cheapest",
+    });
+    render(createElement(ResultsList, { query, flights: results.flights }));
+
+    const logos = screen.getAllByTestId("airline-logo");
+    expect(logos.length).toBe(results.flights.length);
+    for (const [index, logo] of logos.entries()) {
+      const flight = results.flights[index]!;
+      expect(logo.getAttribute("data-airline")).toBe(flight.display.airlineCode);
+      expect(logo.getAttribute("aria-label")).toContain(flight.display.airlineName);
+      // A drawn mark, not an empty box.
+      expect(logo.querySelectorAll("path").length).toBeGreaterThan(1);
+    }
+  });
+});

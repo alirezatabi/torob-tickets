@@ -64,12 +64,15 @@ test.describe("Isfahan → Kish, no date chosen", () => {
     await expect(page.getByTestId("recommendation-text")).toHaveCount(0);
     await expect(page.getByText("بهترین تطابق")).toHaveCount(0);
 
+    // Each row leads with the carrier's own badge.
+    await expect(cards.first().getByTestId("airline-logo")).toBeVisible();
+
     // Every row carries the six facts of the brief.
     for (const card of await cards.all()) {
       await expect(card.getByTestId("offer-price")).toContainText("تومان");
       await expect(card.getByTestId("flight-capacity")).toContainText("صندلی");
       await expect(card.getByTestId("flight-aircraft")).not.toBeEmpty();
-      await expect(card.getByTestId("flight-details")).toBeVisible();
+      await expect(card.getByTestId("flight-details")).toBeAttached();
       // Origin → destination cities are both on the row.
       await expect(card).toContainText("اصفهان");
       await expect(card).toContainText("کیش");
@@ -92,6 +95,8 @@ test.describe("Isfahan → Kish, no date chosen", () => {
     await expect(detail.getByTestId("seller-list").getByText("کمترین")).toHaveCount(1);
     await expect(detail).toContainText("شرایط استرداد");
     await expect(detail).toContainText("بار همراه");
+    // …and the flight is drawn on the planet.
+    await expect(detail.getByTestId("route-globe")).toBeVisible();
   });
 
   test("changing the day keeps every other parameter and reloads the list", async ({ page }) => {
