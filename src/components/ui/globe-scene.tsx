@@ -665,19 +665,15 @@ export function GlobeScene({
                 </g>
               </>
             )}
-            {planet
-              ? network.map((link, index) => (
-                  <path
-                    key={`network-${index}`}
-                    d={link.path}
-                    fill="none"
-                    stroke={index % 3 === 0 ? "#e9b85e" : "#36aaff"}
-                    strokeOpacity={index % 3 === 0 ? "0.78" : "0.64"}
-                    strokeWidth="1.45"
-                    strokeDasharray="4 8"
-                  />
-                ))
-              : null}
+            {planet && network.map((link, index) => {
+              const color = link.accent === "gold" ? "#efbd63" : "#43baff";
+              return (
+                <g key={`network-${index}`} fill="none" stroke={color} strokeLinecap="round">
+                  <path d={link.path} strokeOpacity="0.12" strokeWidth="4" />
+                  <path d={link.path} strokeOpacity="0.76" strokeWidth="1.25" strokeDasharray="3 7" />
+                </g>
+              );
+            })}
             {planet && serviceMarkers.map((marker, index) => (
               <NetworkNode key={`service-${index}`} marker={marker} glowId={`${gradientId}-glow`} />
             ))}
@@ -994,12 +990,14 @@ const MOUNTAIN_RANGES: Point[][] = [
 type ServiceMarkerData = { x: number; y: number; accent: "cyan" | "gold" };
 
 const SERVICE_LOCATIONS: { point: Point; accent: "cyan" | "gold" }[] = [
+  { point: [-0.12, 51.5], accent: "cyan" },
   { point: [-74, 40.7], accent: "cyan" },
   { point: [-46.6, -23.5], accent: "gold" },
   { point: [8.68, 50.1], accent: "gold" },
   { point: [55.3, 25.2], accent: "cyan" },
   { point: [103.8, 1.35], accent: "gold" },
   { point: [139.7, 35.7], accent: "cyan" },
+  { point: [151.2, -33.8], accent: "gold" },
 ];
 
 const CITY_LIGHT_CENTERS: Point[] = [
@@ -1097,14 +1095,20 @@ function projectRelief(camera: Camera): string[] {
 }
 
 
-function projectNetwork(camera: Camera): { path: string }[] {
-  const hub = NETWORK_LOCATIONS[3]!;
-  return NETWORK_LOCATIONS.flatMap((location, index) => {
-    if (index === 3) return [];
-    const km = distanceKm(hub, location);
+const NETWORK_ROUTES: [number, number][] = [
+  [3, 0], [3, 1], [3, 2], [3, 4], [3, 5], [3, 6], [3, 7],
+  [1, 0], [1, 2], [0, 2], [4, 5], [5, 6], [5, 7], [6, 7],
+];
+
+function projectNetwork(camera: Camera): { path: string; accent: "gold" | "cyan" }[] {
+  return NETWORK_ROUTES.flatMap(([fromIndex, toIndex], index) => {
+    const origin = NETWORK_LOCATIONS[fromIndex]!;
+    const destination = NETWORK_LOCATIONS[toIndex]!;
+    const km = distanceKm(origin, destination);
     const angle = Math.min((km / 6371) * (180 / Math.PI), 175);
-    const arc = flightArc(hub, location, angle, camera, 56);
-    return arc.path ? [{ path: arc.path }] : [];
+    const arc = flightArc(origin, destination, angle, camera, 56);
+    const accent = index % 4 === 0 ? "gold" : "cyan";
+    return arc.path ? [{ path: arc.path, accent }] : [];
   });
 }
 
