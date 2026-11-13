@@ -3,7 +3,7 @@
 import { motion, useReducedMotion } from "motion/react";
 import type { ReactNode } from "react";
 
-import { SpinningEarth } from "@/components/ui/spinning-earth";
+import { GlobeScene } from "@/components/ui/globe-scene";
 
 /**
  * The homepage hero: one sentence, one field, and a planet that is actually turning.
@@ -71,7 +71,7 @@ export function Hero({
         transition={{ duration: 1.4, ease: EASE }}
       >
         <div className="absolute inset-6 -z-10 rounded-full bg-teal-400/10 blur-3xl" />
-        <SpinningEarth className="animate-float" />
+        <GlobeScene planet size={380} period={110} />
       </motion.div>
     </div>
   );

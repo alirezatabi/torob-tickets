@@ -1,15 +1,21 @@
 #!/usr/bin/env node
 /**
- * Rebuilds `src/lib/map/land-1deg.json` — the land rings the interactive globe rotates in the
- * browser, thinned so 291 rings fit in a few hundred kilobytes instead of a megabyte.
+ * Rebuilds `src/lib/map/land-{1,2,3}.json` — the coastlines the 3D globe rotates in the browser.
  *
- * Why a second copy of the coastlines: the ticket page's globe is now drawn **on the client** so it
- * can spin. Shipping the full 1:50m rings (~1.1 MB, 77k vertices) to every visitor to move a 300 px
- * disc is not defensible, so the client gets a thinned 1°-grade coastline (Visvalingam-style
- * point dropping plus Ramer–Douglas–Peucker), and the *server* keeps using the full file for the
- * static fallback.
+ * Three detail tiers, because a globe is read at three scales:
  *
- *   node scripts/build-land.mjs [--tolerance 0.12]
+ *   tier   tolerance   where it is used
+ *   1      ~0.18°      the whole planet on screen (1° ≈ 2.6 px, so 0.18° is half a pixel)
+ *   2      ~0.05°      a continent filling the disc
+ *   3      ~0.02°      a short domestic hop, where the disc is magnified up to ~8×
+ *
+ * Shipping three plain JSON arrays would cost about 1.2 MB, so the rings are quantised to a
+ * 0.02° grid and delta-encoded as printable ASCII (the same idea as Google's polyline encoding:
+ * zig-zag varint in 5-bit chunks, mapped onto a 64-character alphabet that needs no escaping in
+ * JSON). Most consecutive vertices differ by one or two grid steps, so a vertex costs ~2 bytes
+ * instead of ~24 — the highest tier comes out around 80 KB, which gzips to ~35 KB.
+ *
+ *   node scripts/build-land.mjs
  *
  * Deterministic and dependency-free: same input, same output. Run it only when the source map
  * changes; the result is committed.
@@ -20,13 +26,23 @@ import path from "node:path";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const SOURCE = path.join(root, "src/lib/map/countries-50m.json");
-const TARGET = path.join(root, "src/lib/map/land-1deg.json");
 
-const args = process.argv.slice(2);
-const toleranceArg = args.indexOf("--tolerance");
-const TOLERANCE = toleranceArg >= 0 ? Number(args[toleranceArg + 1]) : 0.12;
+/** Grid steps per degree: 50 → 0.02° ≈ 2.2 km at the equator, below one pixel at maximum zoom. */
+const SCALE = 50;
 
-const round = (value) => Math.round(value * 10) / 10;
+const TIERS = [
+  { name: "coast1", tolerance: 0.18, minArea: 1.2 },
+  { name: "coast2", tolerance: 0.05, minArea: 0.2 },
+  { name: "coast3", tolerance: 0.02, minArea: 0.02 },
+];
+
+
+/** One file per tier: only level 1 is imported eagerly by the browser. */
+const OUTPUTS = [
+  { tier: TIERS[0], file: "land-1.json" },
+  { tier: TIERS[1], file: "land-2.json" },
+  { tier: TIERS[2], file: "land-3.json" },
+];
 
 /** Ramer–Douglas–Peucker on lon/lat pairs (degrees). */
 function simplify(points, tolerance) {
@@ -66,7 +82,7 @@ function simplify(points, tolerance) {
   return points.filter((_, index) => keep[index] === 1);
 }
 
-/** A ring is kept only if it encloses enough area to be visible at globe scale. */
+/** Shoelace area in square degrees. */
 function area(ring) {
   let sum = 0;
   for (let index = 0; index < ring.length; index += 1) {
@@ -81,10 +97,10 @@ function area(ring) {
  * Cut a ring at the antimeridian.
  *
  * Natural Earth stores rings in [-180, 180], so a country that spans the date line (Russia, Fiji)
- * jumps from +179 to −179 between two neighbouring vertices. Drawn as one polygon that jump
- * becomes a straight chord across the whole planet, and once a view is centred near the seam the
- * chord encloses half the disc as "land" — a very visible bug on a globe you can spin. Splitting
- * the ring where it crosses the seam (and inserting the crossing point) keeps every ring local.
+ * jumps from +179 to −179 between neighbouring vertices. Drawn as one polygon that jump becomes a
+ * straight chord across the whole planet, and once a view is centred near the seam the chord
+ * encloses half the disc as "land" — a very visible bug on a globe you can spin. Splitting the ring
+ * where it crosses the seam (and inserting the crossing point) keeps every ring local.
  */
 function splitAtAntimeridian(ring) {
   const pieces = [];
@@ -94,8 +110,6 @@ function splitAtAntimeridian(ring) {
 
   for (const [lon, lat] of ring) {
     if (previousLon !== null && Math.abs(lon - previousLon) > 180) {
-      // The ring crossed the seam: finish the current piece exactly at ±180 and resume on the
-      // other side, so no polygon ever spans more than 180° of longitude.
       const target = lon > previousLon ? -180 : 180;
       const shifted = lon > previousLon ? lon - 360 : lon + 360;
       const t = (target - previousLon) / (shifted - previousLon);
@@ -111,27 +125,77 @@ function splitAtAntimeridian(ring) {
   return pieces.filter((piece) => piece.length >= 4);
 }
 
-const source = JSON.parse(readFileSync(SOURCE, "utf8"));
-const rings = [];
+// ————— the packed alphabet —————
+// 64 printable characters, none of which needs escaping inside a JSON string, ordered so that
+// neighbouring values map to neighbouring characters (the output is meant to be gzipped anyway).
+const ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
+const CHUNK = 5;
 
-for (const country of source.countries) {
-  for (const ring of country.rings) {
-    if (ring.length < 4 || area(ring) < 0.6) continue;
-    for (const piece of splitAtAntimeridian(ring)) {
-      if (piece.length < 4 || area(piece) < 0.6) continue;
-      const simplified = simplify(piece, TOLERANCE);
-      if (simplified.length < 4) continue;
-      // Closed ring: the browser draws them as a single path per country, so keep them as pairs.
-      rings.push(simplified.map(([lon, lat]) => [round(lon), round(lat)]));
+function encodeValues(values) {
+  let out = "";
+  for (const raw of values) {
+    // Zig-zag: small negatives stay small.
+    let value = raw < 0 ? ~(raw << 1) : raw << 1;
+    while (value >= 0x20) {
+      out += ALPHABET[(0x20 | (value & 0x1f)) % 64];
+      value >>>= CHUNK;
     }
+    out += ALPHABET[value % 64];
   }
+  return out;
 }
 
-const vertices = rings.reduce((total, ring) => total + ring.length, 0);
-const output = { source: "Natural Earth 1:50m (public domain)", tolerance: TOLERANCE, rings };
-const json = JSON.stringify(output);
-writeFileSync(TARGET, `${json}\n`);
+/** One ring → `{ n, p }`: vertex count and the packed pair stream (lat then lon, both delta). */
+function packRing(ring) {
+  const values = [];
+  let previousLat = 0;
+  let previousLon = 0;
+  for (const [lon, lat] of ring.slice(0, -1)) {
+    // The closing duplicate vertex is implied: every ring is treated as closed.
+    const qLat = Math.round(lat * SCALE);
+    const qLon = Math.round(lon * SCALE);
+    values.push(qLat - previousLat, qLon - previousLon);
+    previousLat = qLat;
+    previousLon = qLon;
+  }
+  return { n: ring.length - 1, p: encodeValues(values) };
+}
 
-console.log(
-  `land-1deg.json: ${rings.length} rings, ${vertices} vertices, ${Math.round(json.length / 1024)} KB`,
-);
+const source = JSON.parse(readFileSync(SOURCE, "utf8"));
+
+/** One pass over the source at a given tolerance. */
+function buildTier(tolerance, minArea) {
+  const rings = [];
+  for (const country of source.countries) {
+    // Country boundaries are *not* drawn: political borders on a route map are noise, and the
+    // coastlines of neighbouring countries already meet. One ring per coast piece is enough.
+    for (const ring of country.rings) {
+      if (ring.length < 4 || area(ring) < minArea) continue;
+      for (const piece of splitAtAntimeridian(ring)) {
+        if (piece.length < 4 || area(piece) < minArea) continue;
+        const simplified = simplify(piece, tolerance);
+        if (simplified.length < 4) continue;
+        rings.push(packRing(simplified));
+      }
+    }
+  }
+  return rings;
+}
+
+const describe = (label, rings) =>
+  `${label}: ${rings.length} rings / ${rings.reduce((total, ring) => total + ring.n, 0)} vertices`;
+
+let total = 0;
+for (const [index, output] of OUTPUTS.entries()) {
+  const rings = buildTier(output.tier.tolerance, output.tier.minArea);
+  const json = JSON.stringify({
+    source: "Natural Earth 1:50m (public domain)",
+    scale: SCALE,
+    level: index + 1,
+    rings,
+  });
+  writeFileSync(path.join(root, "src/lib/map", output.file), `${json}\n`);
+  total += json.length;
+  console.log(`  ${describe(output.file, rings)} — ${Math.round(json.length / 1024)} KB`);
+}
+console.log(`land: three tiers, ${Math.round(total / 1024)} KB in total`);
