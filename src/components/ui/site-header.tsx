@@ -13,7 +13,7 @@ export function SiteHeader() {
     <header
       className={
         isHome
-          ? "sticky top-0 z-30 border-b border-sky-300/10 bg-[#030811] text-white"
+          ? "absolute inset-x-0 top-0 z-30 border-b border-transparent bg-transparent text-white"
           : "glass sticky top-0 z-30 border-b border-ink-200/70"
       }
     >
