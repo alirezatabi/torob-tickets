@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 
 import { distanceKm, type Point } from "@/lib/geo";
 import globeDots from "@/lib/map/globe-dots.json";
@@ -406,7 +406,7 @@ export function GlobeScene({
     setZoom(zoomTarget.current);
   }, [baseZoom, planet]);
 
-  const gradientId = useId("globe");
+  const gradientId = `globe-${useId().replace(/:/g, "")}`;
   const clipId = `${gradientId}-clip`;
   const landClipId = `${gradientId}-land-clip`;
 
@@ -613,7 +613,7 @@ export function GlobeScene({
               d={graticule}
               fill="none"
               stroke={planet ? "#3978aa" : "#eafaf7"}
-              strokeOpacity={planet ? "0.22" : "0.13"}
+              strokeOpacity={planet ? "0.14" : "0.13"}
               strokeWidth={0.6}
               vectorEffect="non-scaling-stroke"
             />
@@ -631,10 +631,10 @@ export function GlobeScene({
                 <path
                   d={dottedLand.lights}
                   fill="none"
-                  stroke="#f1bd63"
-                  strokeWidth="1.65"
+                  stroke="#ffd17a"
+                  strokeWidth="1.9"
                   strokeLinecap="round"
-                  strokeOpacity="0.8"
+                  strokeOpacity="0.92"
                 />
               </>
             ) : (
@@ -670,20 +670,28 @@ export function GlobeScene({
               const opacity = link.accent === "gold" ? 0.7 : 0.5;
               return (
                 <g key={`network-${index}`} fill="none" stroke={color} strokeLinecap="round">
-                  {link.accent === "gold" && (
-                    <path
-                      d={link.path}
-                      strokeOpacity="0.16"
-                      strokeWidth="4"
-                      filter={`url(#${gradientId}-glow)`}
-                    />
-                  )}
-                  <path d={link.path} strokeOpacity={opacity} strokeWidth="1.15" strokeDasharray="2 7" />
+                  <path
+                    d={link.path}
+                    strokeOpacity={link.accent === "gold" ? "0.2" : "0.1"}
+                    strokeWidth="4"
+                    filter={`url(#${gradientId}-glow)`}
+                  />
+                  <path d={link.path} strokeOpacity={Math.min(0.92, opacity + 0.12)} strokeWidth="1.4" strokeDasharray="2 5" />
                 </g>
               );
             })}
             {planet && serviceMarkers.map((marker, index) => (
               <NetworkNode key={`service-${index}`} marker={marker} glowId={`${gradientId}-glow`} />
+            ))}
+            {planet && network.map((link, index) => (
+              link.plane ? (
+                <AirplaneMarker
+                  key={`plane-${index}`}
+                  at={link.plane.at}
+                  angle={link.plane.angle}
+                  accent={link.accent}
+                />
+              ) : null
             ))}
             {arc && (
               <g filter={`url(#${gradientId}-glow)`}>
@@ -1042,7 +1050,7 @@ function projectDottedLand(camera: Camera): { land: string; lights: string } {
     const y = (camera.cy - camera.radius * point.z).toFixed(1);
     const cityLit = CITY_LIGHT_CENTERS.some(([cityLon, cityLat]) => {
       const lonDistance = Math.abs(((lon - cityLon + 540) % 360) - 180);
-      return lonDistance < 7.5 && Math.abs(lat - cityLat) < 6;
+      return lonDistance < 10 && Math.abs(lat - cityLat) < 8;
     });
     if (cityLit) lights += `M${x} ${y}h0.01`;
     else land += `M${x} ${y}h0.01`;
@@ -1055,8 +1063,8 @@ function projectServiceMarkers(camera: Camera): ServiceMarkerData[] {
     const surface = rotate(camera.m, toVec(lon, lat));
     if (surface.y >= -0.08) return [];
     return [{
-      x: camera.cx + camera.radius * surface.x,
-      y: camera.cy - camera.radius * surface.z,
+      x: Number((camera.cx + camera.radius * surface.x).toFixed(1)),
+      y: Number((camera.cy - camera.radius * surface.z).toFixed(1)),
       accent,
     }];
   });
@@ -1146,7 +1154,9 @@ const NETWORK_ROUTES: { from: number; to: number; accent: "gold" | "cyan" }[] = 
   { from: 10, to: 4, accent: "cyan" }, // Cape Town–Dubai
 ];
 
-function projectNetwork(camera: Camera): { path: string; accent: "gold" | "cyan" }[] {
+function projectNetwork(
+  camera: Camera,
+): { path: string; accent: "gold" | "cyan"; plane?: { at: [number, number]; angle: number } }[] {
   return NETWORK_ROUTES.flatMap(({ from, to, accent }, routeIndex) => {
     const origin = NETWORK_LOCATIONS[from]!;
     const destination = NETWORK_LOCATIONS[to]!;
@@ -1175,7 +1185,28 @@ function projectNetwork(camera: Camera): { path: string; accent: "gold" | "cyan"
       );
     }
     flush();
-    return path ? [{ path, accent }] : [];
+
+    let plane: { at: [number, number]; angle: number } | undefined;
+    if (routeIndex % 4 === 0) {
+      const pointIndex = Math.round(arc.points.length * 0.44);
+      const previous = arc.points[Math.max(0, pointIndex - 1)]!.ground;
+      const current = arc.points[pointIndex]!.ground;
+      const next = arc.points[Math.min(arc.points.length - 1, pointIndex + 1)]!.ground;
+      if (current.y * (1 + lift) < -0.08) {
+        const screenPoint = (point: Vec3): [number, number] => [
+          camera.cx + camera.radius * point.x * (1 + lift),
+          camera.cy - camera.radius * point.z * (1 + lift),
+        ];
+        const [x0, y0] = screenPoint(previous);
+        const [x, y] = screenPoint(current);
+        const [x1, y1] = screenPoint(next);
+        plane = {
+          at: [Math.round(x), Math.round(y)],
+          angle: (Math.atan2(y1 - y0, x1 - x0) * 180) / Math.PI,
+        };
+      }
+    }
+    return path ? [{ path, accent, ...(plane ? { plane } : {}) }] : [];
   });
 }
 
@@ -1227,10 +1258,34 @@ function NetworkNode({ marker, glowId }: { marker: ServiceMarkerData; glowId: st
   const color = marker.accent === "gold" ? "#f1bd63" : "#62c6ff";
   return (
     <g aria-hidden="true">
-      <circle cx={marker.x} cy={marker.y} r="24" fill="none" stroke={color} strokeOpacity="0.11" strokeWidth="1" />
-      <circle cx={marker.x} cy={marker.y} r="12" fill="none" stroke={color} strokeOpacity="0.38" strokeWidth="0.9" />
-      <circle cx={marker.x} cy={marker.y} r="5" fill={color} fillOpacity="0.2" />
-      <circle cx={marker.x} cy={marker.y} r="2.6" fill={color} filter={`url(#${glowId})`} />
+      <circle cx={marker.x} cy={marker.y} r="30" fill="none" stroke={color} strokeOpacity="0.12" strokeWidth="1" />
+      <circle cx={marker.x} cy={marker.y} r="15" fill="none" stroke={color} strokeOpacity="0.42" strokeWidth="0.9" />
+      <circle cx={marker.x} cy={marker.y} r="6" fill={color} fillOpacity="0.24" />
+      <circle cx={marker.x} cy={marker.y} r="3" fill={color} filter={`url(#${glowId})`} />
+    </g>
+  );
+}
+
+function AirplaneMarker({
+  at,
+  angle,
+  accent,
+}: {
+  at: [number, number];
+  angle: number;
+  accent: "gold" | "cyan";
+}) {
+  const color = accent === "gold" ? "#f1bd63" : "#62c6ff";
+  return (
+    <g transform={`translate(${at[0]} ${at[1]}) rotate(${angle})`} aria-hidden="true">
+      <circle r="11" fill={color} fillOpacity="0.18" />
+      <path
+        d="M10 0-6 3-2.1 0-6-3Z"
+        fill="#eaf6ff"
+        stroke={color}
+        strokeWidth="0.9"
+        strokeLinejoin="round"
+      />
     </g>
   );
 }
@@ -1394,13 +1449,5 @@ function ResetIcon() {
       <path d="M3 8a5 5 0 1 0 1.7-3.8" />
       <path d="M3 2.8V5.4h2.6" />
     </svg>
-  );
-}
-
-/** Tiny wrapper so the ids are unique even with several globes on a page. */
-function useId(prefix: string): string {
-  return useMemo(
-    () => `${prefix}-${Math.random().toString(36).slice(2, 8)}`,
-    [prefix],
   );
 }
