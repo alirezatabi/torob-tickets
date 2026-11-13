@@ -115,7 +115,7 @@ export function GlobeScene({
   /** Keep short domestic routes at globe scale; see routeZoom() and docs/REPORT-02 §۱۴. */
   const baseZoom = useMemo(() => (route ? routeZoom(km) : 1), [route, km]);
 
-  const [yaw, setYaw] = useState(planet ? -32 : centre[0]);
+  const [yaw, setYaw] = useState(planet ? 18 : centre[0]);
   const [pitch, setPitch] = useState(planet ? 22 : centre[1]);
   /**
    * The server's first paint is the whole planet with the whole route, drawn from the one tier that
@@ -147,7 +147,7 @@ export function GlobeScene({
   const touched = useRef(false);
   const phase = useRef(Math.random() * Math.PI * 2);
   const frame = useRef<number | null>(null);
-  const startYaw = useRef(planet ? -32 : centre[0]);
+  const startYaw = useRef(planet ? 18 : centre[0]);
   const startPitch = useRef(planet ? 22 : centre[1]);
 
   /**
@@ -667,10 +667,18 @@ export function GlobeScene({
             )}
             {planet && network.map((link, index) => {
               const color = link.accent === "gold" ? "#efbd63" : "#43baff";
+              const opacity = link.accent === "gold" ? 0.7 : 0.5;
               return (
                 <g key={`network-${index}`} fill="none" stroke={color} strokeLinecap="round">
-                  <path d={link.path} strokeOpacity="0.12" strokeWidth="4" />
-                  <path d={link.path} strokeOpacity="0.76" strokeWidth="1.25" strokeDasharray="3 7" />
+                  {link.accent === "gold" && (
+                    <path
+                      d={link.path}
+                      strokeOpacity="0.16"
+                      strokeWidth="4"
+                      filter={`url(#${gradientId}-glow)`}
+                    />
+                  )}
+                  <path d={link.path} strokeOpacity={opacity} strokeWidth="1.15" strokeDasharray="2 7" />
                 </g>
               );
             })}
@@ -990,25 +998,36 @@ const MOUNTAIN_RANGES: Point[][] = [
 type ServiceMarkerData = { x: number; y: number; accent: "cyan" | "gold" };
 
 const SERVICE_LOCATIONS: { point: Point; accent: "cyan" | "gold" }[] = [
+  { point: [-118.24, 34.05], accent: "cyan" },
   { point: [-0.12, 51.5], accent: "cyan" },
   { point: [-74, 40.7], accent: "cyan" },
   { point: [-46.6, -23.5], accent: "gold" },
+  { point: [2.35, 48.86], accent: "gold" },
   { point: [8.68, 50.1], accent: "gold" },
+  { point: [28.98, 41.01], accent: "cyan" },
   { point: [55.3, 25.2], accent: "cyan" },
+  { point: [72.88, 19.08], accent: "gold" },
+  { point: [31.02, -29.86], accent: "gold" },
   { point: [103.8, 1.35], accent: "gold" },
+  { point: [114.17, 22.3], accent: "cyan" },
   { point: [139.7, 35.7], accent: "cyan" },
   { point: [151.2, -33.8], accent: "gold" },
 ];
 
 const CITY_LIGHT_CENTERS: Point[] = [
+  [-118, 34],
   [-74, 40],
-  [-122, 37],
   [-47, -23],
+  [-79, 44],
+  [2, 49],
   [8, 50],
-  [30, 30],
+  [29, 41],
+  [31, -30],
   [55, 25],
-  [78, 23],
-  [105, 30],
+  [73, 19],
+  [104, 1],
+  [114, 22],
+  [127, 38],
   [139, 36],
 ];
 
@@ -1052,6 +1071,14 @@ const NETWORK_LOCATIONS: Point[] = [
   [103.8, 1.35], // Singapore
   [139.7, 35.7], // Tokyo
   [151.2, -33.8], // Sydney
+  [-118.24, 34.05], // Los Angeles
+  [-79.38, 43.65], // Toronto
+  [31.02, -29.86], // Cape Town
+  [72.88, 19.08], // Mumbai
+  [114.17, 22.3], // Hong Kong
+  [2.35, 48.86], // Paris
+  [28.98, 41.01], // Istanbul
+  [126.98, 37.56], // Seoul
 ];
 
 function projectBiomes(camera: Camera): ProjectedBiome[] {
@@ -1095,20 +1122,60 @@ function projectRelief(camera: Camera): string[] {
 }
 
 
-const NETWORK_ROUTES: [number, number][] = [
-  [3, 0], [3, 1], [3, 2], [3, 4], [3, 5], [3, 6], [3, 7],
-  [1, 0], [1, 2], [0, 2], [4, 5], [5, 6], [5, 7], [6, 7],
+const NETWORK_ROUTES: { from: number; to: number; accent: "gold" | "cyan" }[] = [
+  { from: 1, to: 0, accent: "gold" }, // New York–London
+  { from: 0, to: 13, accent: "cyan" }, // London–Paris
+  { from: 0, to: 10, accent: "cyan" }, // London–Cape Town
+  { from: 1, to: 9, accent: "cyan" }, // New York–Toronto
+  { from: 1, to: 8, accent: "gold" }, // New York–Los Angeles
+  { from: 1, to: 2, accent: "cyan" }, // New York–São Paulo
+  { from: 2, to: 10, accent: "gold" }, // São Paulo–Cape Town
+  { from: 3, to: 13, accent: "cyan" }, // Frankfurt–Paris
+  { from: 3, to: 4, accent: "gold" }, // Frankfurt–Dubai
+  { from: 3, to: 14, accent: "cyan" }, // Frankfurt–Istanbul
+  { from: 3, to: 11, accent: "gold" }, // Frankfurt–Mumbai
+  { from: 4, to: 11, accent: "cyan" }, // Dubai–Mumbai
+  { from: 4, to: 5, accent: "gold" }, // Dubai–Singapore
+  { from: 5, to: 12, accent: "cyan" }, // Singapore–Hong Kong
+  { from: 5, to: 7, accent: "gold" }, // Singapore–Sydney
+  { from: 12, to: 6, accent: "cyan" }, // Hong Kong–Tokyo
+  { from: 6, to: 15, accent: "gold" }, // Tokyo–Seoul
+  { from: 6, to: 7, accent: "cyan" }, // Tokyo–Sydney
+  { from: 8, to: 6, accent: "cyan" }, // Los Angeles–Tokyo
+  { from: 9, to: 3, accent: "gold" }, // Toronto–Frankfurt
+  { from: 10, to: 4, accent: "cyan" }, // Cape Town–Dubai
 ];
 
 function projectNetwork(camera: Camera): { path: string; accent: "gold" | "cyan" }[] {
-  return NETWORK_ROUTES.flatMap(([fromIndex, toIndex], index) => {
-    const origin = NETWORK_LOCATIONS[fromIndex]!;
-    const destination = NETWORK_LOCATIONS[toIndex]!;
+  return NETWORK_ROUTES.flatMap(({ from, to, accent }, routeIndex) => {
+    const origin = NETWORK_LOCATIONS[from]!;
+    const destination = NETWORK_LOCATIONS[to]!;
     const km = distanceKm(origin, destination);
     const angle = Math.min((km / 6371) * (180 / Math.PI), 175);
-    const arc = flightArc(origin, destination, angle, camera, 56);
-    const accent = index % 4 === 0 ? "gold" : "cyan";
-    return arc.path ? [{ path: arc.path, accent }] : [];
+    const arc = flightArc(origin, destination, angle, camera, 96);
+    // Raise these decorative air lanes a little more than ticket-route arcs, so they read as
+    // elegant, separate flight corridors instead of short straight joins between map pins.
+    const lift = Math.min(0.15, 0.035 + (angle / 180) * 0.09 + (routeIndex % 3) * 0.006);
+    let path = "";
+    let run: string[] = [];
+    const flush = () => {
+      if (run.length > 1) path += `M${run.join("L")}`;
+      run = [];
+    };
+    for (const point of arc.points) {
+      const x = point.ground.x * (1 + lift);
+      const y = point.ground.y * (1 + lift);
+      const z = point.ground.z * (1 + lift);
+      if (y >= 0) {
+        flush();
+        continue;
+      }
+      run.push(
+        `${Math.round(camera.cx + camera.radius * x)} ${Math.round(camera.cy - camera.radius * z)}`,
+      );
+    }
+    flush();
+    return path ? [{ path, accent }] : [];
   });
 }
 
