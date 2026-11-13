@@ -418,3 +418,56 @@ body:has([data-compare-tray]) main {
   white-space: nowrap;
   border-width: 0;
 }
+
+/* The homepage search sits over the dark hero, so keep its surface in that palette. */
+@layer utilities {
+  .home-search-panel {
+    background: linear-gradient(145deg, rgb(14 34 56 / 94%), rgb(7 20 36 / 96%));
+    border-color: rgb(125 211 252 / 20%);
+    box-shadow: 0 20px 54px -28px rgb(0 0 0 / 76%), inset 0 1px 0 rgb(226 242 255 / 7%);
+    color: #eef5ff;
+    backdrop-filter: blur(18px) saturate(135%);
+  }
+
+  .home-search-panel .segmented,
+  .home-trip-type {
+    background-color: rgb(2 12 24 / 55%);
+    border-color: rgb(148 186 216 / 22%);
+  }
+
+  .home-search-panel .label,
+  .home-search-panel .text-ink-400,
+  .home-search-panel .text-ink-500 {
+    color: #b4c4d8;
+  }
+
+  .home-search-panel .field,
+  .home-search-panel .input {
+    background-color: rgb(226 240 255 / 7%);
+    border-color: rgb(148 186 216 / 27%);
+    color: #f3f8ff;
+    box-shadow: inset 0 1px 0 rgb(255 255 255 / 3%);
+  }
+
+  .home-search-panel .field::placeholder,
+  .home-search-panel .input::placeholder {
+    color: #91a9c5;
+  }
+
+  .home-search-panel .field:hover,
+  .home-search-panel .input:hover {
+    border-color: rgb(125 211 252 / 55%);
+  }
+
+  .home-search-panel .field:focus,
+  .home-search-panel .input:focus {
+    background-color: rgb(226 240 255 / 10%);
+    border-color: #49a9f1;
+    box-shadow: 0 0 0 4px rgb(73 169 241 / 18%);
+  }
+
+  .home-search-panel select option {
+    background-color: #0e2238;
+    color: #eef5ff;
+  }
+}

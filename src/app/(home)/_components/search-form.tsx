@@ -104,7 +104,7 @@ export function SearchForm({ initialOrigin = "", initialDestination = "" }: { in
   const busy = pending || intentPending;
 
   return (
-    <div className="card relative overflow-hidden p-4 sm:p-5">
+    <div className="card home-search-panel relative overflow-hidden p-4 sm:p-5">
       <div aria-hidden="true" className="absolute inset-x-0 top-0 h-px bg-gradient-to-l from-transparent via-teal-400/60 to-transparent" />
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div className="segmented" role="tablist" aria-label="نوع جستجو">
@@ -116,8 +116,8 @@ export function SearchForm({ initialOrigin = "", initialDestination = "" }: { in
             className={cn(
               "rounded-full px-3.5 py-1.5 text-xs font-bold transition-all",
               mode === "form"
-                ? "bg-white text-ink-900 shadow-[0_1px_2px_rgba(15,23,42,0.10)]"
-                : "text-ink-500 hover:text-ink-700",
+                ? "bg-sky-400/15 text-sky-50 shadow-[inset_0_0_0_1px_rgba(125,211,252,0.18)]"
+                : "text-slate-300 hover:text-white",
             )}
           >
             جستجوی فرمی
@@ -131,7 +131,7 @@ export function SearchForm({ initialOrigin = "", initialDestination = "" }: { in
               "inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-bold transition-all",
               mode === "nl"
                 ? "bg-teal-600 text-white shadow-[0_1px_2px_rgba(15,23,42,0.12)]"
-                : "text-ink-500 hover:text-ink-700",
+                : "text-slate-300 hover:text-white",
             )}
           >
             <Wand2 className="size-3.5" aria-hidden="true" />
@@ -139,14 +139,14 @@ export function SearchForm({ initialOrigin = "", initialDestination = "" }: { in
           </button>
         </div>
 
-        <div className="inline-flex items-center gap-0.5 rounded-full border border-ink-200 bg-white p-0.5 text-xs" role="group" aria-label="نوع سفر">
+        <div className="home-trip-type inline-flex items-center gap-0.5 rounded-full border p-0.5 text-xs" role="group" aria-label="نوع سفر">
           <button
             type="button"
             aria-pressed
             disabled
             className={cn(
               "rounded-full px-3.5 py-1.5 font-semibold transition-colors",
-              "bg-ink-900 text-white",
+              "bg-teal-600 text-white",
             )}
           >
             یک‌طرفه

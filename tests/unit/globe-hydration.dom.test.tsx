@@ -30,8 +30,8 @@ describe("globe hydration", () => {
     const serverHtml = renderToString(globe);
     container.innerHTML = serverHtml;
     document.body.appendChild(container);
-    expect(container.querySelectorAll('[data-land-layer="planet"] path[fill]').length).toBeGreaterThan(0);
-    expect(container.querySelector('[data-land-layer="planet"] path[stroke]')).toBeNull();
+    expect(container.querySelector("[data-globe-land-dots]")).not.toBeNull();
+    expect(container.querySelector('[data-land-layer="planet"]')).toBeNull();
     const networkLanes = [...container.querySelectorAll<SVGGElement>("[data-network-flight]")];
     expect(networkLanes.length).toBeGreaterThan(0);
     expect(networkLanes.every((lane) => lane.getAttribute("stroke") === "#43baff")).toBe(true);
@@ -39,16 +39,14 @@ describe("globe hydration", () => {
     expect(flightExtensions.length).toBeGreaterThan(0);
     for (const extension of flightExtensions) {
       const path = extension.querySelector("path")?.getAttribute("d") ?? "";
-      const segments = [...path.matchAll(/M(-?\d+(?:\.\d+)?) (-?\d+(?:\.\d+)?)L(-?\d+(?:\.\d+)?) (-?\d+(?:\.\d+)?)/g)];
-      expect(segments.length).toBeGreaterThan(0);
-      for (const segment of segments) {
-        const coordinates = segment.slice(1).map(Number);
-        const radii = [0, 2].map((index) =>
-          Math.hypot(coordinates[index]! - 110, coordinates[index + 1]! - 110),
-        );
-        expect(Math.max(...radii)).toBeGreaterThan(98);
-        expect(Math.max(...radii)).toBeLessThanOrEqual(118);
-      }
+      const coordinates = path.match(/-?\d+(?:\.\d+)?/g)?.map(Number) ?? [];
+      expect(coordinates.length).toBeGreaterThan(0);
+      expect(coordinates.length % 2).toBe(0);
+      const radii = Array.from({ length: coordinates.length / 2 }, (_, index) =>
+        Math.hypot(coordinates[index * 2]! - 110, coordinates[index * 2 + 1]! - 110),
+      );
+      expect(Math.min(...radii)).toBeGreaterThan(98);
+      expect(Math.max(...radii)).toBeLessThanOrEqual(109);
     }
 
     // SVG transform attributes must use a canonical precision, not the raw result of atan2

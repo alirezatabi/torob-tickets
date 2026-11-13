@@ -312,10 +312,11 @@ export function GlobeScene({
   }, [zoom, level]);
 
   const rings = COAST[level];
-  const land = useMemo(() => projectLand(rings, camera), [rings, camera]);
-  const planetLandPath = useMemo(() => land.map((ring) => ring.path).join(""), [land]);
+  // The hero uses point-projected land dots instead of horizon-clipped country polygons: the
+  // latter can close across the polar limb and briefly paint ocean as land while the globe spins.
+  const land = useMemo(() => (planet ? [] : projectLand(rings, camera)), [rings, camera, planet]);
   const graticule = useMemo(() => projectGraticule(camera), [camera]);
-  const biomes = useMemo(() => projectBiomes(camera), [camera]);
+  const biomes = useMemo(() => (planet ? [] : projectBiomes(camera)), [camera, planet]);
   const relief = useMemo(() => projectRelief(camera), [camera]);
   const dottedLand = useMemo(
     () => (planet ? projectDottedLand(camera) : { land: "", lights: "" }),
@@ -498,17 +499,6 @@ export function GlobeScene({
               <stop offset="48%" stopColor="#081a31" />
               <stop offset="82%" stopColor="#041020" />
               <stop offset="100%" stopColor="#020711" />
-            </radialGradient>
-            <radialGradient
-              id={`${gradientId}-planet-land`}
-              gradientUnits="userSpaceOnUse"
-              cx={cx - radius * 0.34}
-              cy={cy - radius * 0.42}
-              r={radius * 1.55}
-            >
-              <stop offset="0%" stopColor="#28465a" />
-              <stop offset="58%" stopColor="#142c40" />
-              <stop offset="100%" stopColor="#091724" />
             </radialGradient>
             <radialGradient id={`${gradientId}-city-glow`}>
               <stop offset="0%" stopColor="#fff4c3" stopOpacity="0.9" />
@@ -713,16 +703,8 @@ export function GlobeScene({
 
             {planet ? (
               <>
-                {/* One seamless land silhouette: no political-border strokes or per-country shading. */}
-                <g data-land-layer="planet">
-                  <path
-                    d={planetLandPath}
-                    fill={`url(#${gradientId}-planet-land)`}
-                    fillOpacity="1"
-                    fillRule="nonzero"
-                  />
-                </g>
-                <g clipPath={`url(#${landClipId})`}>
+                {/* Land is a set of geodetic samples, so horizon rotation cannot close a polygon over the ocean. */}
+                <g>
                   {relief.map((ridge, index) => (
                     <path
                       key={`planet-relief-${index}`}
@@ -748,11 +730,12 @@ export function GlobeScene({
                 ))}
                 <path
                   d={dottedLand.land}
+                  data-globe-land-dots="true"
                   fill="none"
                   stroke="#72caff"
-                  strokeWidth="0.8"
+                  strokeWidth="1.15"
                   strokeLinecap="round"
-                  strokeOpacity="0.24"
+                  strokeOpacity="0.58"
                 />
                 <path
                   d={dottedLand.lights}
@@ -1324,12 +1307,13 @@ function projectNetwork(
     const liftAt = (t: number) => maxLift * Math.sin(Math.PI * t);
     let path = "";
     let run: string[] = [];
+    let visiblePoints: [number, number][] = [];
     let outerPath = "";
-    let previous: [number, number] | null = null;
-    let previousOutside = false;
     const flush = () => {
       if (run.length > 1) path += `M${run.join("L")}`;
+      if (visiblePoints.length > 1) outerPath += projectFlightLimb(visiblePoints, camera);
       run = [];
+      visiblePoints = [];
     };
     for (const point of arc.points) {
       const lift = liftAt(point.t);
@@ -1338,22 +1322,12 @@ function projectNetwork(
       const z = point.ground.z * (1 + lift);
       if (y >= 0) {
         flush();
-        previous = null;
-        previousOutside = false;
         continue;
       }
       const screenX = camera.cx + camera.radius * x;
       const screenY = camera.cy - camera.radius * z;
-      const current: [number, number] = [screenX, screenY];
+      visiblePoints.push([screenX, screenY]);
       run.push(`${Math.round(screenX)} ${Math.round(screenY)}`);
-      const outsideGlobe = (screenX - camera.cx) ** 2 + (screenY - camera.cy) ** 2 > camera.radius ** 2;
-      if (outsideGlobe && !previousOutside) {
-        outerPath += flightLimbExtension(previous, current, camera);
-      } else if (!outsideGlobe && previousOutside && previous) {
-        outerPath += flightLimbExtension(current, previous, camera);
-      }
-      previous = current;
-      previousOutside = outsideGlobe;
     }
     flush();
 
@@ -1384,48 +1358,72 @@ function projectNetwork(
   });
 }
 
-/** Extend a lifted lane just beyond the limb so a route to the far side reads as a flight. */
-function flightLimbExtension(
-  inside: [number, number] | null,
-  outside: [number, number],
-  camera: Camera,
-): string {
-  const outerRadius = camera.radius + 18;
-  let edge: [number, number];
-  let tip: [number, number];
-  if (inside) {
-    edge = pointAtScreenRadius(inside, outside, camera, camera.radius) ?? outside;
-    tip = pointAtScreenRadius(inside, outside, camera, outerRadius) ?? outside;
-  } else {
-    const dx = outside[0] - camera.cx;
-    const dy = outside[1] - camera.cy;
-    const distance = Math.hypot(dx, dy) || 1;
-    edge = [camera.cx + (dx * camera.radius) / distance, camera.cy + (dy * camera.radius) / distance];
-    const tipRadius = Math.min(distance, outerRadius);
-    tip = [camera.cx + (dx * tipRadius) / distance, camera.cy + (dy * tipRadius) / distance];
+/** Keep only the first short shell outside the disc, following the real arc tangent. */
+function projectFlightLimb(points: [number, number][], camera: Camera): string {
+  const innerRadius = camera.radius;
+  const outerRadius = innerRadius * 1.085;
+  const innerSquared = innerRadius * innerRadius;
+  const outerSquared = outerRadius * outerRadius;
+  let path = "";
+  let run: string[] = [];
+  const flush = () => {
+    if (run.length > 1) path += `M${run.join("L")}`;
+    run = [];
+  };
+  const formatPoint = (point: [number, number]) =>
+    `${Math.round(point[0])} ${Math.round(point[1])}`;
+
+  for (let index = 1; index < points.length; index += 1) {
+    const from = points[index - 1]!;
+    const to = points[index]!;
+    const cuts = [0, 1, ...circleIntersections(from, to, camera, innerRadius), ...circleIntersections(from, to, camera, outerRadius)]
+      .sort((a, b) => a - b)
+      .filter((value, cutIndex, values) => cutIndex === 0 || value - values[cutIndex - 1]! > 1e-8);
+    let keptSegment = false;
+    for (let cutIndex = 1; cutIndex < cuts.length; cutIndex += 1) {
+      const t0 = cuts[cutIndex - 1]!;
+      const t1 = cuts[cutIndex]!;
+      const middle = (t0 + t1) / 2;
+      const mx = from[0] + (to[0] - from[0]) * middle - camera.cx;
+      const my = from[1] + (to[1] - from[1]) * middle - camera.cy;
+      const radiusSquared = mx * mx + my * my;
+      if (radiusSquared < innerSquared || radiusSquared > outerSquared) continue;
+      const start: [number, number] = [from[0] + (to[0] - from[0]) * t0, from[1] + (to[1] - from[1]) * t0];
+      const end: [number, number] = [from[0] + (to[0] - from[0]) * t1, from[1] + (to[1] - from[1]) * t1];
+      const startText = formatPoint(start);
+      const endText = formatPoint(end);
+      if (run.length === 0) run.push(startText, endText);
+      else if (run[run.length - 1] === startText) run.push(endText);
+      else {
+        flush();
+        run.push(startText, endText);
+      }
+      keptSegment = true;
+    }
+    if (!keptSegment) flush();
   }
-  return `M${Math.round(edge[0])} ${Math.round(edge[1])}L${Math.round(tip[0])} ${Math.round(tip[1])}`;
+  flush();
+  return path;
 }
 
-function pointAtScreenRadius(
+function circleIntersections(
   from: [number, number],
   to: [number, number],
   camera: Camera,
   radius: number,
-): [number, number] | null {
+): number[] {
   const dx = to[0] - from[0];
   const dy = to[1] - from[1];
   const ox = from[0] - camera.cx;
   const oy = from[1] - camera.cy;
   const a = dx * dx + dy * dy;
-  if (a === 0) return null;
+  if (a === 0) return [];
   const b = 2 * (ox * dx + oy * dy);
   const c = ox * ox + oy * oy - radius * radius;
   const discriminant = b * b - 4 * a * c;
-  if (discriminant < 0) return null;
-  const t = (-b + Math.sqrt(discriminant)) / (2 * a);
-  if (t < 0 || t > 1) return null;
-  return [from[0] + t * dx, from[1] + t * dy];
+  if (discriminant <= 0) return [];
+  const root = Math.sqrt(discriminant);
+  return [(-b - root) / (2 * a), (-b + root) / (2 * a)].filter((t) => t > 0 && t < 1);
 }
 
 /** Graticule: 20° meridians and parallels, clipped by the horizon like everything else. */

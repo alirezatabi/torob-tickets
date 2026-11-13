@@ -15,6 +15,11 @@ function nearestLandDotDistance([lon, lat]: [number, number]): number {
 }
 
 describe("homepage globe land dots", () => {
+  it("keeps offshore ocean samples clear instead of filling them as land", () => {
+    // Gulf of Guinea is several degrees west of the African coast and should stay open water.
+    expect(nearestLandDotDistance([0, 0])).toBeGreaterThan(4);
+  });
+
   it("keeps the Siberian land belt continuous across the Russia polygon's dateline wrap", () => {
     // These interior points used to have multi-degree gaps because each half of the dateline
     // split ring was scan-converted independently, losing the pair spanning most of Siberia.
