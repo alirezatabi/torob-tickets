@@ -34,13 +34,13 @@ export default function HomePage() {
         badge={`${toPersianDigits(providers.length)} منبع قیمت · ${toPersianDigits(airlineCount())} ایرلاین · بدون قیمت ساختگی`}
       >
         <SearchForm />
-        <DemoSearches />
       </Hero>
 
       <div className="mx-auto max-w-6xl px-4 pb-6 sm:px-6">
+        <DemoSearches />
 
         {/* Numbers, not prose: the coverage claim is the metric itself. */}
-        <dl className="mx-auto mt-10 grid max-w-3xl grid-cols-2 gap-px overflow-hidden rounded-2xl border border-ink-200 bg-ink-200 sm:grid-cols-4">
+        <dl className="mx-auto mt-8 grid max-w-3xl grid-cols-2 gap-px overflow-hidden rounded-2xl border border-ink-200 bg-ink-200 sm:grid-cols-4">
           <Metric value={toPersianDigits(providers.length)} label="منبع قیمت" />
           <Metric value={toPersianDigits(routeCount())} label="مسیر" />
           <Metric value={toPersianDigits(servedCities().length)} label="شهر" />

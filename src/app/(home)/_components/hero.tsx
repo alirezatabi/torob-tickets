@@ -18,14 +18,14 @@ export function Hero({
   const reduce = useReducedMotion();
 
   return (
-    <section className="relative isolate overflow-hidden bg-[#030811] text-[#eef5ff]">
+    <section className="relative isolate overflow-hidden bg-[#030811] text-[#eef5ff] lg:h-[100svh]">
       <div
         aria-hidden="true"
         className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_72%_42%,rgba(11,71,125,0.34)_0%,rgba(3,15,31,0.52)_38%,transparent_72%)]"
       />
-      <div className="relative mx-auto max-w-[1500px] px-0 pt-[4.75rem] sm:pt-20 lg:px-8">
-        <div dir="ltr" className="grid items-center gap-0 lg:min-h-[580px] lg:grid-cols-[minmax(25rem,0.8fr)_minmax(0,1.2fr)]">
-          <div dir="rtl" className="relative z-10 order-1 px-5 pt-3 text-center sm:px-8 lg:order-none lg:pl-8 lg:pr-0 lg:text-right">
+      <div className="relative mx-auto max-w-[1500px] px-0 pt-[4.75rem] sm:pt-20 lg:h-full lg:px-8 lg:pt-0">
+        <div dir="ltr" className="grid items-center gap-0 lg:h-full lg:grid-cols-[minmax(25rem,0.8fr)_minmax(0,1.2fr)] lg:items-start lg:pt-24">
+          <div dir="rtl" className="relative z-10 order-1 px-5 pt-3 text-center sm:px-8 lg:order-none lg:mt-10 lg:pl-8 lg:pr-0 lg:text-right">
             <motion.h1
               initial={reduce ? false : { opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
@@ -48,10 +48,10 @@ export function Hero({
           </div>
 
           {/* The search card below intentionally overlaps the lower edge of the illuminated globe. */}
-          <div className="relative order-2 h-[min(390px,96vw)] overflow-hidden sm:h-[480px] lg:order-none lg:h-[580px] lg:overflow-visible">
+          <div className="relative order-2 h-[min(390px,96vw)] overflow-hidden sm:h-[480px] lg:order-none lg:h-full lg:overflow-visible">
             <motion.div
               aria-hidden="true"
-              className="pointer-events-none absolute left-1/2 top-0 w-[min(660px,120vw)] -translate-x-1/2 lg:left-auto lg:right-[-52px] lg:top-[-74px] lg:w-[900px] lg:max-w-none lg:translate-x-0"
+              className="pointer-events-none absolute left-1/2 top-0 w-[min(660px,120vw)] -translate-x-1/2 lg:left-auto lg:right-[100px] lg:top-[-70px] lg:w-[900px] lg:max-w-none lg:translate-x-0"
               initial={reduce ? false : { opacity: 0, scale: 0.96, y: 16 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               transition={{ duration: 1.1, delay: 0.12, ease: EASE }}
@@ -61,7 +61,7 @@ export function Hero({
           </div>
         </div>
 
-        <div dir="rtl" className="relative z-20 mx-auto -mt-5 max-w-5xl px-4 pb-9 sm:-mt-10 sm:px-6 lg:-mt-24">
+        <div dir="rtl" className="relative z-20 mx-auto -mt-5 max-w-5xl px-4 pb-9 sm:-mt-10 sm:px-6 lg:absolute lg:bottom-4 lg:left-1/2 lg:mt-0 lg:w-full lg:max-w-5xl lg:-translate-x-1/2 lg:px-0 lg:pb-2">
           {children}
         </div>
       </div>
