@@ -3,57 +3,64 @@
 This document is the contract the code is held to. If a future change conflicts with
 anything here, the change is wrong — not this file.
 
+> **Scope note (current build).** The real-data layer has been removed on purpose: there is
+> no HTTP client, no scraper, no provider key and no `TOROB_SEARCH_MODE`. Every number the
+> app shows comes from the demo dataset in `src/lib/schedules.ts` + `src/providers/*`, and
+> every screen says so. The rules below are kept because they still describe how that demo
+> data is *represented* (and what must be true again if a real source is ever added back).
+
 ## 1. What we may and may not do
+
+The app in this repository does **none** of the following — it makes no outbound request at
+all. The table is the standing policy for any future connector.
 
 | Allowed | Not allowed |
 | --- | --- |
 | One HTTPS GET per user search against a public, server-rendered results page | Crawling, pagination sweeps, or scheduled bulk scraping of a site |
-| Reading `robots.txt` and honouring it (implemented in `HttpClient`) | Working around a `Disallow` rule |
+| Reading `robots.txt` and honouring it | Working around a `Disallow` rule |
 | Using an official, documented API with the operator's own key | Using undocumented endpoints as if they were stable |
 | Sending a truthful `User-Agent` with a contact route | Impersonating a browser (TLS/header fingerprint spoofing) |
 | Reporting a block/CAPTCHA as an error and stopping | Solving, outsourcing, or retrying a CAPTCHA |
 | Caching responses in-process to reduce load | Distributed scraping with rotating IPs/proxies |
 
-Concrete consequences in this repo:
+Consequences that outlived the removal of the connectors, and must hold in any future one:
 
-- **Alibaba is excluded.** Its internal `ws.alibaba.ir` endpoint requires TLS
-  impersonation (a browser-fingerprint bypass). Their public API is contract-only with
-  no self-serve access. Neither is acceptable, so Alibaba is **not** a live provider.
-  It remains a *demo* adapter (clearly labelled sample data).
-- **Sepehr360 is used read-only**: `GET /Flight/B2c/Search?origin=&destination=&departureDate=`
-  exactly once per search, with a token bucket (2 requests / 6 s) and a 90 s result cache.
-  Its `robots.txt` disallows only `/systemuser`, `/controlpanel`, `/core`; the search path
-  is not disallowed — and the client re-checks at runtime instead of assuming.
-- **Rejected second sources** (documented, not silently dropped):
-  `flytoday.ir` (`Disallow: /*/search?*`), `snapptrip.com` (`Disallow: *?`),
-  `charter724.com` (domain now serves `kish4.ir`). None of them were worked around.
+- **Alibaba is excluded as a source.** Its internal `ws.alibaba.ir` endpoint requires TLS
+  impersonation (a browser-fingerprint bypass), and its public API is contract-only. It
+  remains a *demo* adapter with clearly labelled sample data.
+- **No fabricated availability.** A seller that does not publish seat counts says
+  "unknown"; the demo dataset states its own seat counts explicitly (see §2.6).
+- **No "buy" link.** In this build no offer has a page anywhere, so no card renders an
+  outbound link at all. The one action offered is "run this route/date as a search here".
 
 ## 2. Honesty rules (data integrity)
 
 1. **No fabricated values.** Unknown facts are `null` / `"unknown"`, never a plausible
-   default. Baggage is `unknown` unless the source states it. Refundability is `null`
-   unless stated. A flight number is absent unless published.
+   default. Baggage is `unknown` unless stated. Refundability is `null` unless stated. A
+   flight number is absent unless published.
 2. **Money is integer.** Toman prices are integers (`BigInt` in Postgres). Rial→toman is
    `/10` with integer rounding, applied **once**, and disclosed (`price-converted`).
    Ambiguous unit combinations throw instead of guessing (`toTomanExact`).
-3. **Foreign currency is not "converted".** Amadeus prices stay in EUR/USD with
-   `price.comparable = false` and are excluded from toman rankings and history lines.
-   No FX rate is invented.
-4. **Duration is either stated or arithmetic.** If the source omits it, it is computed
-   from departure/arrival and flagged `duration-inferred`.
-5. **Freshness is a claim about the price, not the website.** `fresh` → `possibly-stale`
-   → `unverified`, per provider policy, computed from `priceObservedAt`.
-   Availability is claimed only when the source states it (`numberOfBookableSeats > 0`).
-6. **Demo data never masquerades as live.** Every offer carries `dataSource`, every
-   provider has a `mode` (`LIVE`/`DEMO`) stored in the DB, and the UI badge changes with
-   the mode.
-7. **Amadeus test ≠ production.** Separate env vars, separate hosts, and test responses
-   are labelled in the API payload and on every card.
+3. **Foreign currency is not "converted".** A price in EUR/USD stays in EUR/USD with
+   `price.comparable = false` and is excluded from toman rankings and history lines. No FX
+   rate is invented.
+4. **Duration is either stated or arithmetic.** If a source omits it, it is computed from
+   departure/arrival and flagged `duration-inferred`.
+5. **Freshness is a claim about the price, not the website.** `fresh` → `possibly-stale` →
+   `unverified`, computed from `priceObservedAt`. Demo prices are labelled `demo` and are
+   never described as fresh.
+6. **Demo data never masquerades as live.** Every offer carries `dataSource: "demo"`, the
+   search payload carries `mode: "demo"`, the database stores `mode = DEMO`, and the badge
+   in the header is constant.
+7. **One pricing rule.** The number on the card, the date-strip chip, the top suggestion
+   and `/api/search` all come from `selectCheapestOffer`. If two surfaces disagree, that is
+   a bug in the shared rule, not a rounding difference.
 
 ## 3. Identity rules (dedupe & history)
 
 - **Price-history identity** = route (airports) + departure date + airline + flight number
-  + cabin + fare class + baggage + ticket type. Encoded as `offerKey`.
+  + cabin + fare class + baggage + ticket type. Encoded as `offerKey`
+  (`src/modules/catalog/offer-identity.ts`).
   Consequence: a 30 kg fare and a hand-baggage-only fare for the *same* flight are two
   separate lines. They are never merged and never plotted together.
 - **Display identity** = the same physical flight (airline + flight number + local day +
@@ -61,53 +68,33 @@ Concrete consequences in this repo:
 - **Offers without a flight number never merge across providers** (they would be a guess);
   they are shown as separate rows.
 - **Offer ids are derived**, not random: `${providerId}:${offerKey}`. Re-seeing a product
-  updates one row (`upsert` on `(providerId, offerKey)`), so double submits, retries and
-  cache misses cannot create duplicates.
+  updates one row (`upsert` on `(providerId, offerKey)`), so double submits and retries
+  cannot create duplicates.
 
 ## 4. Failure rules
 
-- One provider's failure **never** blocks another: the orchestrator converts every throw
-  into a `ProviderRunReport` with a taxonomy code (`timeout`, `network`, `http-4xx`,
-  `http-5xx`, `rate-limited`, `prohibited`, `parse`, `schema`, `not-configured`,
-  `coverage`).
-- Retries: **once**, and only for `timeout` / `network` / `http-5xx` / `429`.
-  `prohibited` (403, CAPTCHA, robots, redirect-to-login) is **never retried**.
-- A parser that finds nothing while the page declares results fails loudly (`parse`)
-  instead of returning "no flights".
-- A database failure never breaks a search: the payload reports
-  `persistence.reasonFa` and still shows prices.
+- A demo generator that throws is isolated: the search reports that provider as failed and
+  still returns the other sellers' prices (`ProviderRunReport` with `ok: false`).
+- A day with no flights yields `cheapestToman: null` and a 「—」 chip — never `۰`.
+- A database failure never breaks a search: the payload reports `persistence.reasonFa` and
+  still shows prices. Price history is an optional feature, not a prerequisite.
 
 ## 5. What is verified, and what is not
 
-Verified **in this environment** (fixtures + unit tests, no live calls):
+- **Verified by tests** (`npm test`, 26 files): money/unit conversion, offer identity,
+  dedupe law, ranking, `selectCheapestOffer` and capacity, the 8-day strip and the Jalali
+  calendar, local departure days, the four sorts, filtering, the LLM routes' limits, the
+  UI's honesty labels, and the numbers in this README.
+- **Not verified here:** end-to-end Playwright runs (the browser binary cannot be
+  downloaded in this sandbox; the specs are written and listed) and any real provider
+  connection (there is no connector to connect).
 
-- Sepehr360 parser against a captured real page shape (4 cards → 4 offers, Persian digits,
-  Persian separators, empty duration, CAPTCHA page, empty page).
-- Amadeus response parsing against official-schema fixtures (offers, errors-only payload,
-  re-pricing success/price-change/unavailable).
-- Money, identity, dedupe, orchestration isolation, concurrency cap, persistence
-  invariants, ranking determinism — 250+ unit tests.
+## 6. Secrets
 
-Verified **only on the operator's machine** (network egress is blocked in the build
-sandbox):
-
-- `npm run provider:check sepehr360` — a real HTTP round-trip and parse.
-- `npm run search:live THR MHD <date>` — end-to-end search, ranking and persistence.
-- `npm run db:doctor` / `npm run db:history` — Postgres schema and history reads.
-
-Anything in the second list that has not been run must be reported as *unverified*, not
-as "working".
-
-## Secrets (S1)
-
-- **No `.env` is tracked in this repository.** `git ls-files` lists only `.env.example`, and
-  `.gitignore` ignores `.env*` except that example. The README and every doc use placeholders
-  (`PASSWORD`, `sk-...`), never real values.
-- **Action still required by the operator:** the archived copy of this project that circulated
-  earlier contained a real `.env` with an `OPENAI_API_KEY` and a `DATABASE_URL`. Those two
-  credentials must be treated as leaked: revoke the OpenAI key in the dashboard and rotate the
-  Postgres password. Nothing in the code can do that for you, and this repository intentionally
-  contains no copy of the values.
-- API routes that can spend money (`/api/intent`, `/api/explain`) are bounded in input size and
-  rate limited per client in-process (see `src/modules/api/rate-limit.ts`); the limitation of
-  an in-memory limiter on multi-instance deployments is documented in the README.
+- No `.env` file is committed; only `.env.example`, whose provider keys are all commented
+  out and now irrelevant (there is no provider to authenticate to).
+- The only secrets that could exist are `OPENAI_API_KEY` (optional LLM refinement) and
+  `DATABASE_URL` (optional history). If either was ever shared, rotate it — the app throws
+  nothing away when they are absent.
+- Never print a key, a connection string or a full request URL with credentials in a log,
+  an error message or a test snapshot.

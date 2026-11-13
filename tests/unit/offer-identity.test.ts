@@ -7,7 +7,7 @@ import {
   routeKey,
   shortHash,
   type FareFacts,
-} from "@/modules/live/offer-identity";
+} from "@/modules/catalog/offer-identity";
 
 const base: FareFacts = {
   airlineCode: "IR",

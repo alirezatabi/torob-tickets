@@ -7,14 +7,13 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 /**
- * GET /api/live/search?origin=THR&destination=MHD&date=2026-11-20[&mode=live|demo][&sort=best]
+ * GET /api/live/search?origin=THR&destination=MHD&date=2026-11-20[&sort=best]
  *
- * The live-shaped search endpoint. It returns the same evidence the operator needs to
- * audit a run: per-provider reports, freshness per price, what could not be verified,
- * and whether the DB accepted the history write.
+ * The grouped search endpoint. It returns the same evidence the operator needs to audit a
+ * run: per-provider reports, freshness per price, what could not be verified, and whether
+ * the DB accepted the history write.
  *
- * In `demo` mode (the default) it never touches a provider — that keeps the demo
- * runnable offline and makes the difference between the two modes explicit.
+ * There is no network call: every offer comes from the demo dataset.
  */
 export async function GET(request: Request) {
   const url = new URL(request.url);
@@ -23,17 +22,15 @@ export async function GET(request: Request) {
 
   if (!parsed.ok) {
     return NextResponse.json(
-      { error: parsed.reason, missing: parsed.missing, mode: raw.mode ?? "demo" },
+      { error: parsed.reason, missing: parsed.missing, mode: "demo" },
       { status: 422, headers: { "cache-control": "no-store" } },
     );
   }
 
-  const requestedMode = raw.mode === "live" || raw.mode === "demo" ? raw.mode : undefined;
   const sort = (SORT_KEYS as readonly string[]).includes(raw.sort ?? "") ? (raw.sort as SortKeyParam) : DEFAULT_SORT;
 
   try {
     const payload = await runLiveSearch(parsed.query, {
-      mode: requestedMode,
       sort,
       persist: raw.persist !== "false",
     });

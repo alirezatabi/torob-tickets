@@ -2,7 +2,6 @@ import Link from "next/link";
 import { Plane, Sparkles } from "lucide-react";
 import { Wordmark } from "./brand-mark";
 import { DataModeBadge } from "./data-mode-badge";
-import { searchMode } from "@/modules/providers/registry-live";
 
 export function SiteHeader() {
   return (
@@ -27,13 +26,7 @@ export function SiteHeader() {
             <Sparkles className="size-3.5" aria-hidden="true" />
             جستجوهای نمونه
           </Link>
-          <Link
-            href="/live"
-            className="hidden items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium text-ink-600 transition-colors hover:bg-ink-100 hover:text-ink-900 sm:inline-flex"
-          >
-            دادهٔ واقعی
-          </Link>
-          <DataModeBadge mode={searchMode()} />
+          <DataModeBadge />
         </nav>
       </div>
     </header>

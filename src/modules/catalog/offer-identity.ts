@@ -1,5 +1,5 @@
 /**
- * Offer identity — the single most safety-critical piece of the live pipeline.
+ * Offer identity — the safety-critical piece of the pipeline.
  *
  * Two offers are the *same product* only if all of these match:
  *   route (airports) · departure day · airline · flight number · cabin ·
@@ -59,9 +59,19 @@ export function offerKey(facts: FareFacts): string {
   return parts.join("|");
 }
 
+/** A single segment's contribution: unknown stays unknown, formatting never matters. */
+function segmentOrUnknown(value: string | null | undefined, options: { strip?: boolean } = {}): string {
+  if (!value) return UNKNOWN;
+  const text = options.strip ? String(value).replace(/[^a-z0-9]/gi, "").toUpperCase() : String(value).trim();
+  return text.length > 0 ? text : UNKNOWN;
+}
+
 /**
- * Display identity: same physical flight, ignoring fare conditions.
- * Number-less offers get a `~` and therefore never merge with a numbered offer.
+ * Display identity: is this the same *physical flight*?
+ *
+ * Coarser than `offerKey` on purpose (fare conditions differ per row), but never coarse
+ * enough to merge two different flights: the number-less variant carries `~` so it can
+ * never collide with a numbered flight.
  */
 export function displayGroupKey(facts: {
   airlineCode: string;
@@ -70,50 +80,31 @@ export function displayGroupKey(facts: {
   destinationAirport: string | null;
   departDate: string;
 }): string {
-  const number = facts.flightNumber ? facts.flightNumber.replace(/[^A-Z0-9]/gi, "").toUpperCase() : "~";
-  return [
-    facts.airlineCode.toUpperCase(),
-    number,
-    facts.departDate,
-    `${facts.originAirport ?? facts.destinationAirport ?? UNKNOWN}`,
-    `${facts.destinationAirport ?? UNKNOWN}`,
-  ].join("|");
+  const number = facts.flightNumber ? facts.flightNumber.replace(/[^a-z0-9]/gi, "").toUpperCase() : "~";
+  return `${facts.airlineCode}|${number}|${facts.departDate}|${facts.originAirport ?? UNKNOWN}>${facts.destinationAirport ?? UNKNOWN}`;
 }
 
-/**
- * Route key used to partition price history queries: it is deliberately city-level
- * so "Tehran → Istanbul" history can be read even when one observation came from IKA
- * and another from THR — but each observation still carries its airport, so the
- * chart can filter. (Airport codes are part of `offerKey`, so history lines never mix.)
- */
+/** `THR>MHD`, used as a stable key for route-level aggregates. */
 export function routeKey(originAirport: string, destinationAirport: string): string {
   return `${originAirport}>${destinationAirport}`;
 }
 
-function segmentOrUnknown(value: string | null, opts: { strip?: boolean } = {}): string {
-  if (!value) return UNKNOWN;
-  const cleaned = opts.strip ? value.replace(/[^A-Z0-9]/gi, "").toUpperCase() : value.trim().toUpperCase();
-  return cleaned.length > 0 ? cleaned : UNKNOWN;
-}
-
 /**
- * Database id for an offer row.
+ * Deterministic id for an offer.
  *
- * Providers are not required to give an id, and the same flight can be scraped
- * repeatedly, so identity must be *derived*, never random:
- *   `${providerId}:${offerKey}`
- * Two different searches that see the same product produce the same id → the upsert
- * updates one row instead of duplicating it (correction #5).
+ * The id must be stable across runs and machines (the price-history chart keys on it), so
+ * it is derived from the provider plus the fare-level identity — never from a raw row
+ * index or a timestamp.
  */
 export function deterministicOfferId(providerId: string, key: string): string {
-  return `${providerId}:${key}`;
+  return `${providerId}:${shortHash(key)}`;
 }
 
-/** Stable without crypto: FNV-1a 32-bit, hex. Used for history keys in URLs. */
+/** 32-bit FNV-1a, hex. Short because it only needs to distinguish offers of one provider. */
 export function shortHash(input: string): string {
   let hash = 0x811c9dc5;
-  for (let i = 0; i < input.length; i += 1) {
-    hash ^= input.charCodeAt(i);
+  for (let index = 0; index < input.length; index += 1) {
+    hash ^= input.charCodeAt(index);
     hash = Math.imul(hash, 0x01000193) >>> 0;
   }
   return hash.toString(16).padStart(8, "0");

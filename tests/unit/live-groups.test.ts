@@ -12,13 +12,16 @@ import { LOW_SEATS_THRESHOLD, selectCheapestOffer } from "@/modules/pricing/sele
  * disagree about which source sells the flight for less.
  */
 
+/** A fixed clock: "today" must not decide what this test sees. */
+const NOW = new Date("2026-11-12T06:00:00.000Z");
+
 const payload = (passengers: number) =>
   runLiveSearch(
     {
       ...createQuery({ originCode: "IFN", destinationCode: "KIH", departDate: "2026-11-12" }),
       passengers,
     },
-    { mode: "demo", persist: false },
+    { persist: false, now: NOW },
   );
 
 describe("live group view (B15)", () => {

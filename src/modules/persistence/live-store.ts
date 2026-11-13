@@ -17,12 +17,12 @@
 
 
 import type { FlightOffer } from "@/domain/flight";
-import type { ProviderRunReport } from "@/modules/providers/contracts/provider";
+import type { ProviderRunReport } from "@/modules/catalog/demo-providers";
 import { getDb } from "@/modules/db/prisma";
 import { withTransaction } from "@/modules/db/transaction";
 import { DatabaseError, mapPrismaError } from "@/modules/db/errors";
-import { baggageFacts, localDate } from "@/modules/providers/shared/normalize-offer";
-import { offerKey, type FareFacts } from "@/modules/live/offer-identity";
+import { baggageFacts, localDate } from "@/modules/catalog/fare-facts";
+import { offerKey, type FareFacts } from "@/modules/catalog/offer-identity";
 import { departDayOf } from "@/dedupe/group";
 import type {
   FlightOfferCreateInput,
@@ -39,7 +39,8 @@ export interface PersistSearchInput {
     passengers: number;
     cabin: string;
   };
-  mode: "LIVE" | "DEMO";
+  /** There is only one data source in this build; the column is kept for history. */
+  mode: "DEMO";
   startedAt: Date;
   reports: ProviderRunReport[];
   offers: FlightOffer[];
@@ -65,7 +66,8 @@ const DEDUPE_WINDOW_MS = 20_000;
 function providerRowFromReport(report: ProviderRunReport): {
   id: string;
   name: string;
-  mode: "LIVE" | "DEMO";
+  /** There is only one data source in this build; the column is kept for history. */
+  mode: "DEMO";
   sourceKind: string;
   quotedCurrency: string;
   capabilities: JsonValue;
@@ -75,8 +77,8 @@ function providerRowFromReport(report: ProviderRunReport): {
   return {
     id: report.providerId,
     name: report.providerName,
-    mode: report.mode === "live" ? "LIVE" : "DEMO",
-    sourceKind: report.mode === "live" ? "live" : "demo",
+    mode: "DEMO",
+    sourceKind: "demo",
     quotedCurrency: "IRT",
     capabilities: { reportedAt: new Date(0).toISOString() } as JsonValue,
     complianceNote: "اعلام‌شده توسط کد منبع؛ برای جزئیات docs/COMPLIANCE.md را ببینید.",
@@ -275,7 +277,7 @@ async function persistSearchOnce(input: PersistSearchInput): Promise<PersistSear
       ? "failed"
       : okProviders.length === 0
         ? "failed"
-        : okProviders.length < input.reports.filter((report) => report.mode === "live").length || input.offers.length === 0
+        : okProviders.length < input.reports.length || input.offers.length === 0
           ? "partial"
           : "ok";
 
@@ -311,7 +313,8 @@ async function persistSearchOnce(input: PersistSearchInput): Promise<PersistSear
           searchId: search.id,
           providerId: report.providerId,
           ok: report.ok,
-          httpStatus: report.error?.httpStatus ?? null,
+          // Demo providers are in-process: there is no HTTP status to record.
+          httpStatus: null,
           latencyMs: report.latencyMs,
           retries: report.retries,
           rawCount: report.rawCount,

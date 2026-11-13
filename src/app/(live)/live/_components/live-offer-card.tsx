@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowUpLeft, BadgeCheck, Clock, ExternalLink, Info, ShieldQuestion, Timer, Users } from "lucide-react";
+import { ArrowUpLeft, BadgeCheck, Clock, Info, ShieldQuestion, Timer, Users } from "lucide-react";
 
 import type { LiveGroupView, LiveOfferView } from "@/server/live-search";
 import { WARNING_LABELS } from "@/domain/flight";
@@ -11,7 +11,7 @@ import { formatTimeInZone } from "@/lib/format";
 import { localDepartDate } from "@/lib/time";
 import { LOW_SEATS_THRESHOLD } from "@/modules/pricing/select-cheapest";
 import { cn } from "@/lib/cn";
-import { demoSearchHref, sourceRedirectFor } from "@/modules/live/source-link";
+import { demoSearchHref, NO_SOURCE_REASON_FA } from "@/modules/catalog/demo-link";
 
 const BADGE_LABELS: Record<string, string> = {
   best: "بهترین تطابق",
@@ -70,17 +70,6 @@ export function LiveOfferCard({ offer, index }: { offer: LiveOfferView | LiveGro
   const destinationTz = destination?.timezone ?? "Asia/Tehran";
   const departClock = formatTimeInZone(offer.departAt, originTz);
   const arriveClock = formatTimeInZone(offer.arriveAt, destinationTz);
-  // Never render a placeholder/relative URL as if it were the source's page.
-  const source = sourceRedirectFor({
-    offerUrl: offer.offerUrl,
-    dataSource: offer.dataSource,
-    providerId: offer.providerId,
-    originCity: offer.originCity,
-    destinationCity: offer.destinationCity,
-    departAt: offer.departAt,
-    departTime: departClock,
-    airlineCode: offer.airlineCode,
-  });
 
   return (
     <article
@@ -263,34 +252,13 @@ export function LiveOfferCard({ offer, index }: { offer: LiveOfferView | LiveGro
             </div>
           </dl>
 
-          {source.kind === "external" ? (
-            <>
-              <a
-                href={source.url}
-                target="_blank"
-                rel="noopener noreferrer nofollow"
-                className="btn-primary w-full justify-center py-1.5 text-[0.72rem]"
-                title="رفتن به صفحهٔ همین مسیر و تاریخ در منبع"
-                data-testid="source-link"
-              >
-                <ExternalLink className="size-3" aria-hidden="true" />
-                دیدن در {offer.providerName}
-              </a>
-              <p className="w-full text-[0.56rem] leading-4 text-ink-400">
-                لینک، صفحهٔ جست‌وجوی منبع است، نه همین نرخ.
-              </p>
-            </>
-          ) : (
-            <>
-              <Link href={demoSearchHref(offer)} className="btn-ghost w-full justify-center text-[0.72rem]">
-                <ArrowUpLeft className="size-3" aria-hidden="true" />
-                همین مسیر در مقایسه
-              </Link>
-              <p className="w-full text-[0.56rem] leading-4 text-ink-400" data-testid="source-link-note">
-                {source.reason}
-              </p>
-            </>
-          )}
+          <Link href={demoSearchHref(offer)} className="btn-ghost w-full justify-center text-[0.72rem]">
+            <ArrowUpLeft className="size-3" aria-hidden="true" />
+            همین مسیر در مقایسه
+          </Link>
+          <p className="w-full text-[0.56rem] leading-4 text-ink-400" data-testid="source-link-note">
+            {NO_SOURCE_REASON_FA}
+          </p>
         </div>
       </div>
 

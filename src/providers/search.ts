@@ -23,6 +23,9 @@ export interface SearchOutcome {
   offers: FlightOffer[];
   ranked: RankedResult;
   health: ProviderHealth[];
+  /** How many raw rows each demo provider produced, before normalization and before the
+   *  requested-day / on-sale filters — the audit trail the `/live` page shows. */
+  rawCounts: Record<string, number>;
   issues: NormalizationIssue[];
   /** Wall-clock of the aggregation run (ISO). */
   fetchedAt: string;
@@ -58,13 +61,13 @@ export async function runSearch(
       try {
         // `now` is passed down so demo pricing, freshness and capacity are reproducible
         // (B15): the pipeline's clock is the only clock.
-        const raw = await withTimeout(adapter.search(query, { now }), PROVIDER_TIMEOUT_MS, adapter.name);
-        const normalized = adapter.normalize(raw, query);
+        const records = await withTimeout(adapter.search(query, { now }), PROVIDER_TIMEOUT_MS, adapter.name);
+        const normalized = adapter.normalize(records, query);
         return {
           adapter,
           offers: normalized.offers,
           issues: normalized.issues,
-          rawCount: raw.length,
+          rawCount: records.length,
           latencyMs: Date.now() - t0,
           error: undefined as string | undefined,
         };
@@ -84,9 +87,11 @@ export async function runSearch(
   const offers: FlightOffer[] = [];
   const health: ProviderHealth[] = [];
   const issues: NormalizationIssue[] = [];
+  const rawCounts: Record<string, number> = {};
 
   for (const result of results) {
     offers.push(...result.offers);
+    rawCounts[result.adapter.id] = result.rawCount;
     issues.push(...result.issues);
     health.push({
       id: result.adapter.id,
@@ -114,6 +119,7 @@ export async function runSearch(
     offers: onDate,
     ranked,
     health,
+    rawCounts,
     issues,
     fetchedAt: now.toISOString(),
     totalMs: Date.now() - startedAt,

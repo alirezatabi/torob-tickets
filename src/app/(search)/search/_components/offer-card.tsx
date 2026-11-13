@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowUpLeft, Briefcase, CircleSlash, GitCompareArrows, Plane, RotateCcw, Timer, TriangleAlert, Users } from "lucide-react";
+import { Briefcase, CircleSlash, GitCompareArrows, Plane, RotateCcw, Timer, TriangleAlert, Users } from "lucide-react";
 import { WARNING_LABELS } from "@/domain/flight";
 import type { TripQuery } from "@/domain/trip";
 import type { FlightResult } from "@/modules/search/results";
@@ -15,7 +15,7 @@ import {
   toPersianDigits,
 } from "@/lib/format";
 import { cn } from "@/lib/cn";
-import { sourceLinkFor } from "@/modules/live/source-link";
+import { NO_SOURCE_REASON_FA } from "@/modules/catalog/demo-link";
 
 /**
  * One physical flight: the airline, the clock, the aircraft — and underneath it, **every
@@ -43,7 +43,6 @@ export function OfferCard({
 }) {
   const { group, selection } = flight;
   const offer = selection.cheapest ?? flight.display;
-  const source = sourceLinkFor(offer);
   const origin = getCity(offer.originCode);
   const destination = getCity(offer.destinationCode);
   const originTz = origin?.timezone ?? "Asia/Tehran";
@@ -261,19 +260,8 @@ export function OfferCard({
               <span className="btn-ghost w-full cursor-default py-2 text-[0.72rem]" title="برای این تعداد مسافر صندلی کافی نیست.">
                 فروشنده‌ای نیست
               </span>
-            ) : source.kind === "external" ? (
-              <a
-                href={source.url}
-                target="_blank"
-                rel="noopener noreferrer nofollow"
-                className="btn-primary w-full py-2 text-[0.72rem]"
-                title="صفحهٔ جست‌وجوی منبع، نه لینک اختصاصی این نرخ"
-              >
-                مشاهده در {offer.providerName}
-                <ArrowUpLeft className="size-3.5" aria-hidden="true" />
-              </a>
             ) : (
-              <span className="btn-ghost w-full cursor-default py-2 text-[0.72rem]" title={source.reason}>
+              <span className="btn-ghost w-full cursor-default py-2 text-[0.72rem]" title={NO_SOURCE_REASON_FA}>
                 دادهٔ نمونه · {offer.providerName}
               </span>
             )}

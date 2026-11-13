@@ -5,7 +5,6 @@ import { createElement } from "react";
 import { LiveOfferCard } from "@/app/(live)/live/_components/live-offer-card";
 import { HistoryChart } from "@/app/(live)/live/history/_components/history-chart";
 import type { LiveOfferView } from "@/server/live-search";
-import { assembleLiveOffer } from "@/modules/providers/shared/normalize-offer";
 import { runLiveSearch } from "@/server/live-search";
 import { createQuery } from "@/domain/trip";
 
@@ -17,7 +16,6 @@ import { createQuery } from "@/domain/trip";
  */
 
 const NOW = new Date("2026-11-12T10:00:00.000Z");
-const POLICY = { freshMs: 5 * 60_000, staleMs: 20 * 60_000, canClaimAvailability: false, noteFa: "t" };
 
 function view(overrides: Partial<LiveOfferView> = {}): LiveOfferView {
   return {
@@ -98,16 +96,11 @@ describe("LiveOfferCard honesty", () => {
     expect(card).not.toContain("تومان۳");
   });
 
-  it("sends a live Sepehr360 offer through our own redirect to the source", () => {
+  it("never renders an outbound link, even for a row that used to be 'live'", () => {
     render(createElement(LiveOfferCard, { offer: view({ dataSource: "live" }), index: 0 }));
-    const link = screen.getByTestId("source-link");
-    const href = link.getAttribute("href") ?? "";
-    expect(href.startsWith("/api/go/sepehr360?")).toBe(true);
-    const params = new URL(href, "http://x").searchParams;
-    expect(params.get("origin")).toBe("THR");
-    expect(params.get("destination")).toBe("MHD");
-    expect(params.get("date")).toBe("2026-11-13");
-    expect(link.getAttribute("target")).toBe("_blank");
+    // There is no real-data layer any more: no source link may exist at all.
+    expect(screen.queryByTestId("source-link")).toBeNull();
+    expect(screen.getByTestId("source-link-note").textContent).toContain("دادهٔ نمونه");
   });
 
   it("never links a demo offer to an external source", () => {
@@ -126,9 +119,9 @@ describe("LiveOfferCard honesty", () => {
     expect(screen.getByText(/همین مسیر در مقایسه/).getAttribute("href")).toContain("/search?");
   });
 
-  it("discloses that the source link is a search page, not this fare", () => {
+  it("discloses that the price has no page in any source", () => {
     render(createElement(LiveOfferCard, { offer: view(), index: 0 }));
-    expect(screen.getByText(/لینک، صفحهٔ جست‌وجوی منبع است/)).toBeTruthy();
+    expect(screen.getByTestId("source-link-note").textContent).toContain("صفحه‌ای در هیچ منبعی ندارد");
   });
 
   it("states excluded offers' reasons instead of hiding them", () => {
@@ -218,54 +211,5 @@ describe("live search payload in demo mode", () => {
     const payload = await runLiveSearch(query, { mode: "demo", persist: false });
     const ids = payload.offers.map((offer) => offer.id);
     expect(new Set(ids).size).toBe(ids.length);
-  });
-});
-
-describe("normalizer used by the card", () => {
-  it("keeps a sparse row sparse", () => {
-    const offer = assembleLiveOffer(
-      {
-        providerId: "sepehr360",
-        providerName: "سپهر۳۶۰",
-        sourceKind: "html",
-        endpoint: "GET /Flight/B2c/Search",
-        rawRecordId: null,
-        sellerLabel: null,
-        airlineCode: "IR",
-        flightNumber: null,
-        originAirport: "THR",
-        destinationAirport: "MHD",
-        departAt: "2026-11-13T04:00:00.000Z",
-        arriveAt: "2026-11-13T05:20:00.000Z",
-        durationMinutes: 80,
-        segments: [],
-        price: {
-          originalAmount: 5_902_000,
-          currency: "IRT",
-          currencyScale: 1,
-          declaredUnit: "toman",
-          toman: 5_902_000,
-          converted: false,
-        },
-        baggage: { checked: "unknown", cabinKg: null, checkedKg: null },
-        refundable: null,
-        cabin: "economy",
-        fareClass: null,
-        fareName: null,
-        ticketType: "unknown",
-        marketingCarrier: null,
-        offerUrl: "https://sepehr360.ir/Flight/B2c/Search?origin=THR",
-        providerUpdatedAt: NOW.toISOString(),
-        fetchedAt: NOW.toISOString(),
-        seatsAvailable: null,
-        unitConverted: false,
-      },
-      { freshness: POLICY, now: NOW },
-    );
-
-    expect(offer.flightNumber).toBeNull();
-    expect(offer.refundable).toBeNull();
-    expect(offer.baggage.checked).toBe("unknown");
-    expect(offer.warnings).toContain("availability-unverified");
   });
 });

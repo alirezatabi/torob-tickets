@@ -1,31 +1,30 @@
 /**
- * Live search entry point used by the API and the search page.
+ * Search entry point used by `/api/live/search` and the `/live` page.
+ *
+ * This build has **no real-data layer**: there is no network call, no scraper and no
+ * provider key. Every offer below is generated in-process by the demo adapters, and the
+ * payload says so (`mode: "demo"`, `dataSource: "demo"`, warning `demo-mode`).
  *
  * Responsibilities kept here (not in the route, not in the page):
- *   • run the orchestrator;
- *   • hand the raw result to the deterministic ranking core;
+ *   • run the demo providers and the deterministic ranking core;
+ *   • group offers into *physical flights* with every seller's price;
  *   • persist — but never let a persistence failure break the response;
- *   • return a payload that carries its own *evidence*: which providers answered, how
- *     fresh each price is, what could not be verified, and whether the user is looking
- *     at live or demo data.
+ *   • return a payload that carries its own *evidence*: how many rows each provider
+ *     produced, what each price's freshness state is, and what is sample data.
  */
 
 import type { FlightOffer } from "@/domain/flight";
 import type { TripQuery } from "@/domain/trip";
 import { rankAndDecide } from "@/modules/ranking/core";
-import { fromDemoOffer, fromLiveOffer } from "@/modules/ranking/project";
+import { fromDemoOffer } from "@/modules/ranking/project";
 import type { RankInput } from "@/modules/ranking/types";
-import { createOrchestrator, describeLiveProviders, searchMode, type SearchMode } from "@/modules/providers/registry-live";
-import { dedupeSameOffer, SearchOrchestrator } from "@/modules/providers/orchestrator";
+import { describeDemoProviders, SEARCH_MODE, type ProviderRunReport, type SearchMode } from "@/modules/catalog/demo-providers";
 import { groupOffers } from "@/dedupe/group";
 import { selectCheapestOffer, type CheapestSelection } from "@/modules/pricing/select-cheapest";
 import type { OfferGroup } from "@/domain/flight";
-import { AmadeusAdapter, amadeusConfigFromEnv } from "@/modules/providers/amadeus/adapter";
-import { createLogger } from "@/modules/providers/shared/logger";
-import type { ProviderRunReport } from "@/modules/providers/contracts/provider";
 import { persistSearch } from "@/modules/persistence/live-store";
 import { dbMode } from "@/modules/db/prisma";
-import { getDemoOffers } from "@/server/live-search-demo";
+import { runSearch } from "@/providers/search";
 
 export interface LiveSearchPayload {
   mode: SearchMode;
@@ -44,7 +43,7 @@ export interface LiveSearchPayload {
     fastest: string | null;
     weights: Record<string, number>;
   };
-  providers: ReturnType<typeof describeLiveProviders>;
+  providers: ReturnType<typeof describeDemoProviders>;
   warnings: string[];
   persistence: { attempted: boolean; ok: boolean; deduped: boolean; searchId: string | null; reasonFa: string | null };
   /** When an offer's price was observed at the source, i.e. "as of". */
@@ -123,45 +122,37 @@ export interface QuoteView {
 }
 
 export interface LiveSearchOptions {
+  /** Kept for API compatibility; the only accepted value is `"demo"`. */
   mode?: SearchMode;
   persist?: boolean;
   sort?: "best" | "cheapest" | "fastest" | "earliest";
+  /** Injectable clock, so tests and the date strip are reproducible. */
+  now?: Date;
 }
 
 export async function runLiveSearch(query: TripQuery, options: LiveSearchOptions = {}): Promise<LiveSearchPayload> {
   const startedAt = Date.now();
-  const mode = options.mode ?? searchMode();
-  const warnings: string[] = [];
-  let offers: FlightOffer[] = [];
-  let reports: ProviderRunReport[] = [];
+  const mode: SearchMode = SEARCH_MODE;
+  const warnings: string[] = ["demo-mode"];
 
-  if (mode === "live") {
-    const orchestrator = createOrchestrator();
-    const outcome = await orchestrator.search(query);
-    offers = outcome.offers;
-    reports = outcome.reports;
-    warnings.push(...outcome.warnings);
+  const outcome = await runSearch(query, { now: options.now });
+  const offers: FlightOffer[] = outcome.offers;
+  const reports: ProviderRunReport[] = outcome.health.map((health) => ({
+    providerId: health.id,
+    providerName: health.name,
+    mode: "demo",
+    ok: health.ok,
+    accepted: health.returned,
+    rejected: health.rejected,
+    rawCount: outcome.rawCounts[health.id] ?? 0,
+    latencyMs: health.latencyMs,
+    retries: 0,
+    error: health.error ? { code: "demo-provider-failed", summaryFa: "تولید دادهٔ نمونه برای این منبع ناموفق بود" } : null,
+    fetchedAt: outcome.fetchedAt,
+    fromCache: false,
+  }));
 
-    // Re-verify the top Amadeus offers (price + availability) when enabled. This is a
-    // billed call with a monthly quota, so it is opt-in and bounded.
-    if (process.env.AMADEUS_VERIFY_OFFERS === "true") {
-      const verification = await verifyTopAmadeusOffers(query);
-      const verifiedById = new Map(verification.offers.map((offer) => [offer.id, offer]));
-      offers = offers.map((offer) => verifiedById.get(offer.id) ?? offer);
-      warnings.push(...verification.notes);
-    }
-  } else {
-    offers = await getDemoOffers(query);
-    warnings.push("demo-mode");
-  }
-
-  // The same intra-provider dedupe for both modes: a source that lists one product
-  // twice must not show up twice in the UI (and demo data has the same rule).
-  offers = dedupeSameOffer(offers, warnings);
-
-  const inputs: RankInput[] = offers.map((offer) =>
-    offer.dataSource === "live" ? fromLiveOffer(offer) : fromDemoOffer(offer),
-  );
+  const inputs: RankInput[] = offers.map((offer) => fromDemoOffer(offer));
   const ranked = rankAndDecide(inputs, query.filters);
   const byId = new Map(offers.map((offer) => [offer.id, offer]));
 
@@ -188,21 +179,7 @@ export async function runLiveSearch(query: TripQuery, options: LiveSearchOptions
   // The list is *flights*, not offers: one row per physical flight, every source's price for
   // exactly that flight underneath. Ranked offers are folded into the group they belong to,
   // and the group's cheapest quote is the one the row displays.
-  let groupSource = offers.filter((offer) => offer.dataSource === mode);
-  if (process.env.TOROB_SIMULATE_SECOND_SOURCE === "1" && groupSource.length > 0) {
-    // DEV/TEST ONLY: a mirror of the same flights under a second provider id, so the
-    // "one flight, several sources" path can be exercised without a second live source.
-    // Never enabled by default; the offers are clones of real ones and say so in the UI.
-    const clones = groupSource.slice(0, 4).map((offer) => ({
-      ...offer,
-      id: `${offer.id}::mirror`,
-      providerId: "mirror-source",
-      providerName: "منبع دوم (شبیه‌سازی)",
-      price: { ...offer.price, toman: Math.round(offer.price.toman * 1.035) },
-    }));
-    groupSource = [...groupSource, ...clones];
-  }
-  const groups = groupOffers(groupSource);
+  const groups = groupOffers(offers);
   const selectionByGroup = new Map<string, CheapestSelection>(
     groups.map((group) => [
       group.groupKey,
@@ -242,7 +219,7 @@ export async function runLiveSearch(query: TripQuery, options: LiveSearchOptions
     // Sold out flights last, exactly like the demo list.
     .sort((a, b) => Number(a.soldOut) - Number(b.soldOut));
 
-  const persistence = await persistIfPossible(query, reports, offers, mode, options.persist ?? true);
+  const persistence = await persistIfPossible(query, reports, offers, options.persist ?? true);
 
   const badgeId = (decision: string) =>
     ranked.ranked.find((entry) => entry.badges.includes(decision as never))?.input.id ?? null;
@@ -264,40 +241,12 @@ export async function runLiveSearch(query: TripQuery, options: LiveSearchOptions
       fastest: badgeId("fastest"),
       weights: ranked.weights,
     },
-    providers: describeLiveProviders(),
+    providers: describeDemoProviders(),
     warnings,
     persistence,
     fetchedAt: offers[0]?.fetchedAt ?? new Date().toISOString(),
     totalMs: Date.now() - startedAt,
   };
-}
-
-/**
- * Re-run the Amadeus search for the top offers and re-price them.
- *
- * A separate search is needed because verification requires the *original* offer payload,
- * which we deliberately do not store in Postgres. The cost is one extra API call pair per
- * search, which is why it is behind `AMADEUS_VERIFY_OFFERS=true`.
- */
-async function verifyTopAmadeusOffers(query: TripQuery): Promise<{ offers: FlightOffer[]; notes: string[] }> {
-  const amadeus = new AmadeusAdapter(amadeusConfigFromEnv());
-  if (!amadeus.isConfigured()) return { offers: [], notes: ["amadeus-verify-skipped"] };
-
-  const orchestrator = new SearchOrchestrator({ providers: [amadeus as never], logger: createLogger("verify") });
-  const request = orchestrator.buildRequest(query);
-  try {
-    const result = await amadeus.search(request, {
-      signal: AbortSignal.timeout(10_000),
-      logger: createLogger("verify"),
-      now: () => new Date(),
-      budgetMs: 10_000,
-    });
-    const batch = amadeus.normalize(result.records, request, result.meta);
-    const outcome = await amadeus.verifyBatch(result.records, batch.offers, 3);
-    return { offers: batch.offers, notes: outcome.notes };
-  } catch {
-    return { offers: [], notes: ["amadeus-verify-failed"] };
-  }
 }
 
 function toView(
@@ -350,12 +299,7 @@ function toView(
   };
 }
 
-/**
- * The shared pricing rule, applied to a live/demo group.
- *
- * `dataSource` decides the cabin convention: live rows carry the real cabin string, while
- * demo rows always sell economy. Both then go through the one implementation.
- */
+/** The shared pricing rule, applied to this build's (demo) groups. */
 function selectCheapest(group: OfferGroup, passengers: number, cabin: string | undefined): CheapestSelection {
   return selectCheapestOffer(group, {
     passengers,
@@ -371,7 +315,6 @@ async function persistIfPossible(
   query: TripQuery,
   reports: ProviderRunReport[],
   offers: FlightOffer[],
-  mode: SearchMode,
   enabled: boolean,
 ): Promise<LiveSearchPayload["persistence"]> {
   if (!enabled) {
@@ -399,7 +342,7 @@ async function persistIfPossible(
         passengers: query.passengers ?? 1,
         cabin: String(query.cabin ?? "economy"),
       },
-      mode: mode === "live" ? "LIVE" : "DEMO",
+      mode: "DEMO",
       startedAt: new Date(),
       reports,
       offers,

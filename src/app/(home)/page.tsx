@@ -52,7 +52,7 @@ export default function HomePage() {
           <span>{toPersianDigits(CITIES.length)} شهر در کاتالوگ</span>
           <span aria-hidden="true">·</span>
           <Link href="/live" className="inline-flex items-center gap-1 font-semibold text-teal-700 hover:underline">
-            دادهٔ واقعی
+            مقایسهٔ تفصیلی یک پرواز
             <ArrowLeft className="size-3" aria-hidden="true" />
           </Link>
         </div>

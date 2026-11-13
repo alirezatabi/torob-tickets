@@ -40,7 +40,7 @@ export function SiteFooter() {
             <li>نرخ ارز ثابت، نه لحظه‌ای</li>
             <li>
               <Link href="/live" className="font-medium text-teal-700 hover:underline">
-                دادهٔ واقعی
+                مقایسهٔ تفصیلی یک پرواز
               </Link>
             </li>
           </ul>

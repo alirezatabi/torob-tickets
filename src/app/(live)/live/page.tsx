@@ -6,7 +6,7 @@ import { parseSearchParams } from "@/lib/search-params";
 import { addDays, formatJalaliFull, isoToday } from "@/lib/jalali";
 import { getCity } from "@/lib/cities";
 import { toPersianDigits } from "@/lib/format";
-import { describeLiveProviders, searchMode } from "@/modules/providers/registry-live";
+import { describeDemoProviders } from "@/modules/catalog/demo-providers";
 import { dbMode } from "@/modules/db/prisma";
 import { runLiveSearch } from "@/server/live-search";
 import { cn } from "@/lib/cn";
@@ -15,19 +15,18 @@ import { LiveOfferCard } from "./_components/live-offer-card";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "دادهٔ واقعی | ترب بلیت",
-  description: "جست‌وجوی قیمت پرواز از منابع واقعی، با زمان مشاهدهٔ قیمت و وضعیت هر منبع.",
+  title: "مقایسهٔ تفصیلی پرواز | ترب بلیت",
+  description: "همین پرواز، با نرخ هر فروشنده و زمان مشاهدهٔ هر قیمت. دادهٔ نمونه.",
 };
 
 /**
- * The live surface, deliberately a separate page.
+ * The per-flight comparison page.
  *
- * The demo experience keeps its own visual identity and its own honesty badge; this page
- * is where real (or explicitly-labelled sample) provider data lives, so the two can
- * never be confused — in the UI or in the database (`Provider.mode`).
+ * It answers a different question from the results list: *for this one flight, what does
+ * every seller ask, and what do we actually know about each price?* The data is the demo
+ * dataset — the page says so, and no link leaves the app.
  *
- * With no `origin`/`destination` it renders the provider-status dashboard instead of a
- * search, which is the most useful thing to see first.
+ * With no `origin`/`destination` it renders the provider dashboard instead of a search.
  */
 export default async function LivePage({
   searchParams,
@@ -35,24 +34,17 @@ export default async function LivePage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const raw = flatten(await searchParams);
-  const mode = searchMode();
-  const providers = describeLiveProviders();
+  const providers = describeDemoProviders();
   const hasQuery = Boolean(raw.origin && raw.destination && raw.date);
   const parsed = hasQuery ? parseSearchParams(raw, { date: addDays(isoToday(), 7) }) : null;
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6">
       <header className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-lg font-extrabold text-ink-900">دادهٔ واقعی</h1>
-        <span
-          className={
-            mode === "live"
-              ? "inline-flex items-center gap-1.5 rounded-full border border-teal-500/40 bg-teal-50 px-3 py-1.5 text-xs font-medium text-teal-700"
-              : "inline-flex items-center gap-1.5 rounded-full border border-saffron-300/60 bg-saffron-50 px-3 py-1.5 text-xs font-medium text-saffron-600"
-          }
-        >
+        <h1 className="text-lg font-extrabold text-ink-900">مقایسهٔ تفصیلی یک پرواز</h1>
+        <span className="inline-flex items-center gap-1.5 rounded-full border border-saffron-300/60 bg-saffron-50 px-3 py-1.5 text-xs font-medium text-saffron-600">
           <Radio className="size-3.5" aria-hidden="true" />
-          {mode === "live" ? "زنده" : "نمونه"}
+          نمونه
         </span>
       </header>
 
@@ -67,8 +59,8 @@ export default async function LivePage({
               <h2 className="text-sm font-bold text-ink-900">{provider.name}</h2>
               <span className="mr-auto inline-flex items-center gap-1 text-[0.62rem] text-ink-400">
                 <ShieldCheck className="size-3" aria-hidden="true" />
-                {provider.configured ? "آماده" : "بدون کلید"}
-                <span className="sr-only">{provider.complianceNoteFa}</span>
+                ساخته‌شده در برنامه
+                <span className="sr-only">این منبع یک ارائه‌دهندهٔ نمونهٔ درون‌برنامه‌ای است.</span>
               </span>
             </div>
             <p className="mt-1.5 text-[0.7rem] leading-5 text-ink-500">{provider.description}</p>
@@ -90,11 +82,9 @@ export default async function LivePage({
           {dbMode() === "postgres" ? "PostgreSQL" : "بدون دیتابیس"}
         </span>
         <span aria-hidden="true">·</span>
-        <span className="inline-flex items-center gap-1">
+        <span className="inline-flex items-center gap-1" title="این نسخه هیچ اتصالی به منبع بیرونی ندارد.">
           <PlugZap className="size-3" aria-hidden="true" />
-          <code className="font-mono" title="برای دادهٔ واقعی، این متغیر را روی live بگذارید">
-            TOROB_SEARCH_MODE=live
-          </code>
+          دادهٔ نمونه، بدون اتصال بیرونی
         </span>
       </div>
 
@@ -131,7 +121,6 @@ export default async function LivePage({
             required
           />
         </label>
-        <input type="hidden" name="mode" value={mode} />
         <button type="submit" className="btn-primary self-end text-sm">
           جست‌وجو
         </button>
@@ -147,7 +136,7 @@ export default async function LivePage({
           <p className="mt-2 text-sm font-bold">{parsed && !parsed.ok ? parsed.reason : "پارامترهای جست‌وجو نامعتبر است"}</p>
         </div>
       ) : (
-        <LiveResults parsedQuery={parsed.query} mode={mode} />
+        <LiveResults parsedQuery={parsed.query} />
       )}
 
       <p className="mt-6 flex flex-wrap items-center gap-x-3 gap-y-1 text-[0.62rem] text-ink-400">
@@ -164,14 +153,8 @@ export default async function LivePage({
   );
 }
 
-async function LiveResults({
-  parsedQuery,
-  mode,
-}: {
-  parsedQuery: Parameters<typeof runLiveSearch>[0];
-  mode: "demo" | "live";
-}) {
-  const payload = await runLiveSearch(parsedQuery, { mode, sort: "best", persist: true });
+async function LiveResults({ parsedQuery }: { parsedQuery: Parameters<typeof runLiveSearch>[0] }) {
+  const payload = await runLiveSearch(parsedQuery, { sort: "best", persist: true });
   const origin = getCity(payload.query.originCity);
   const destination = getCity(payload.query.destinationCity);
 
@@ -218,7 +201,7 @@ async function LiveResults({
         <div className="card mt-4 p-8 text-center">
           <h3 className="text-sm font-bold">نرخی پیدا نشد</h3>
           <p className="mx-auto mt-1.5 max-w-sm text-[0.7rem] leading-6 text-ink-400">
-            {payload.mode === "demo" ? "مسیر در دادهٔ نمونه نیست" : "هیچ منبعی نرخ برنگرداند"}
+            مسیر در دادهٔ نمونه نیست
           </p>
         </div>
       ) : (

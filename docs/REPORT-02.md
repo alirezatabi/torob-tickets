@@ -132,3 +132,47 @@ ALL OK   (۲۱/۲۱)
 سپس **سناریوی مرجع اصفهان→کیش بدون انتخاب تاریخ** (۸ چیپ، دو پرواز، ≥۳ فروشنده برای هر پرواز،
 «کمترین» روی ارزان‌ترین) → عوض کردن روز و sort → مسافر ۹ و «تکمیل ظرفیت» → مرزهای صداقت
 («نمونه»، «نامشخص»، لینک = صفحهٔ جست‌وجوی منبع).
+
+---
+
+## ۶. به‌روزرسانی بعدی: حذف کامل لایهٔ دادهٔ واقعی
+
+به درخواست مالک محصول، **کل سیستم دریافت دادهٔ واقعی حذف شد** و محصول فعلاً فقط با دادهٔ نمونه
+پیش می‌رود. این تغییر بخشی از فهرست باگ‌ها نیست و تصمیم محصولی است؛ اما پیامدهای فنی زیر را
+دارد و صادقانه ثبت می‌شود:
+
+**حذف شد**
+
+- `src/modules/providers/` (کانکتور سپهر۳۶۰، کانتکتور Amadeus، قرارداد ارائه‌دهنده،
+  ارکستریتور هم‌زمانی، HTTPallowlist/robots/retry، کش TTL، API-discovery، diagnostics،
+  آداپتورهای آماده‌سازی نرخ).
+- `/api/go/sepehr360` و `src/modules/live/source-link.ts` — در این نسخه هیچ کارتی لینک بیرونی
+  ندارد؛ به‌جای «دیدن در منبع»، همان مسیر به‌صورت جست‌وجوی درون‌برنامه‌ای پیشنهاد می‌شود.
+- اسکریپت‌های `provider:check`، `search:live`، `source:probe`، `fixtures:refresh`.
+- مستندات مربوط: `docs/PROVIDERS.md`، `docs/SOURCES.md`، `docs/DESIGN-LIVE.md`،
+  `docs/PHASE4-VERIFICATION.md`.
+- ۱۲ فایل تست که فقط همان کانکتورها را می‌سنجیدند.
+
+**ماند و بازنویسی شد**
+
+- `src/modules/catalog/` — `demo-providers.ts` (تنها حالت `demo` + `ProviderRunReport`)،
+  `offer-identity.ts` (هویت نرخ برای تاریخچه)، `fare-facts.ts`، `demo-link.ts`.
+- `src/server/live-search.ts` — از `runSearch` نمونه می‌خواند؛ نه ارکستریتور، نه vérification،
+  نه سوییچ محیطی. `now` تزریق‌شدنی ماند (تست‌ها و نوار تاریخ).
+- `/live`، `/api/live/search`، `/api/live/history`، `/api/health` — همه ماندند، با برچسب ثابت
+  «نمونه» و `mode: "demo"`.
+- دیتابیس و تاریخچهٔ قیمت (Prisma/Postgres) — دست‌نخورده و همچنان **اختیاری**.
+
+**تست نگهبان جدید:** `tests/unit/demo-only.test.ts` مطمئن می‌شود هیچ فایل کانکتوری، هیچ
+سوییچ محیطی و هیچ URL بیرونی به `src/` برنگردد.
+
+**خروجی gate بعد از این تغییر**
+
+```
+npm run typecheck → بدون خطا
+npm run lint      → بدون خطا
+npm test          → 27 فایل / 253 تست موفق
+npm run build     → ✓ 9/9 صفحه
+walkthrough (next start, IFN→KIH, date=2026-11-20) → 21/21 PASS
+/api/health       → {"status":"degraded","mode":"demo","dataSource":{"kind":"demo"...}}
+```
