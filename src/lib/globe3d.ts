@@ -28,7 +28,10 @@ const RAD = Math.PI / 180;
  */
 export function routeZoom(km: number): number {
   const spanDeg = Math.min((km / 6371) * (180 / Math.PI), 175);
-  const distanceZoom = Math.max(1, Math.min(8, 0.62 / Math.sin((spanDeg * Math.PI) / 360)));
+  const distanceZoom = Math.max(
+    1,
+    Math.min(8, 0.62 / Math.sin((spanDeg * Math.PI) / 360)),
+  );
   return km < 1200 ? Math.min(distanceZoom, 1.35) : distanceZoom;
 }
 
@@ -37,7 +40,11 @@ export function toVec(lon: number, lat: number): Vec3 {
   const phi = lat * RAD;
   const lambda = lon * RAD;
   const cosPhi = Math.cos(phi);
-  return { x: cosPhi * Math.cos(lambda), y: cosPhi * Math.sin(lambda), z: Math.sin(phi) };
+  return {
+    x: cosPhi * Math.cos(lambda),
+    y: cosPhi * Math.sin(lambda),
+    z: Math.sin(phi),
+  };
 }
 
 export interface Orientation {
@@ -86,7 +93,9 @@ export function rotationMatrix(orientation: Orientation): number[] {
     for (let row = 0; row < 3; row += 1) {
       for (let col = 0; col < 3; col += 1) {
         out[row * 3 + col] =
-          m[row * 3]! * n[col]! + m[row * 3 + 1]! * n[3 + col]! + m[row * 3 + 2]! * n[6 + col]!;
+          m[row * 3]! * n[col]! +
+          m[row * 3 + 1]! * n[3 + col]! +
+          m[row * 3 + 2]! * n[6 + col]!;
       }
     }
     return out;
@@ -134,7 +143,10 @@ const coord = (value: number): number => Math.round(value * 10) / 10;
  * globe, instead of a chord cutting across the disc. A ring whose centroid is on the far side is
  * skipped entirely (it cannot contribute a visible face).
  */
-export function projectRing(ring: Float64Array, camera: Camera): ProjectedRing | null {
+export function projectRing(
+  ring: Float64Array,
+  camera: Camera,
+): ProjectedRing | null {
   const count = ring.length / 2;
   if (count < 3) return null;
 
@@ -281,14 +293,21 @@ export function flightArc(
     const t = index / samples;
     const ground = rotate(camera.m, along(t));
     // Lift along the surface normal: the arc rises radially out of the sphere.
-    const v = { x: ground.x * (1 + lift), y: ground.y * (1 + lift), z: ground.z * (1 + lift) };
+    const v = {
+      x: ground.x * (1 + lift),
+      y: ground.y * (1 + lift),
+      z: ground.z * (1 + lift),
+    };
     points.push({ v, ground, t, visible: v.y < 0 });
   }
 
   const screen = (v: Vec3): string =>
     `${Math.round(camera.cx + camera.radius * v.x)} ${Math.round(camera.cy - camera.radius * v.z)}`;
 
-  const build = (pick: (point: ArcPoint) => Vec3, visible: (point: ArcPoint) => boolean): string => {
+  const build = (
+    pick: (point: ArcPoint) => Vec3,
+    visible: (point: ArcPoint) => boolean,
+  ): string => {
     let path = "";
     let run: string[] = [];
     for (const point of points) {
@@ -310,8 +329,14 @@ export function flightArc(
 
   return {
     points,
-    path: build((point) => point.v, (point) => point.v.y < 0),
-    groundPath: build((point) => point.ground, (point) => point.ground.y < 0),
+    path: build(
+      (point) => point.v,
+      (point) => point.v.y < 0,
+    ),
+    groundPath: build(
+      (point) => point.ground,
+      (point) => point.ground.y < 0,
+    ),
     lift,
     origin: originRotated,
     destination: destinationRotated,
@@ -324,8 +349,15 @@ export function flightArc(
  * Where the plane sits on the arc: the lifted point, plus the screen-space heading so the marker can
  * be rotated to follow the path. Returns null while the plane is behind the shell.
  */
-export function planeAt(arc: FlightArc, t: number, camera: Camera): { at: [number, number]; angle: number } | null {
-  const index = Math.max(1, Math.min(arc.points.length - 1, Math.round(t * (arc.points.length - 1))));
+export function planeAt(
+  arc: FlightArc,
+  t: number,
+  camera: Camera,
+): { at: [number, number]; angle: number } | null {
+  const index = Math.max(
+    1,
+    Math.min(arc.points.length - 1, Math.round(t * (arc.points.length - 1))),
+  );
   const current = arc.points[index];
   const previous = arc.points[index - 1];
   if (!current || !previous || !current.v.y || current.v.y >= 0) return null;

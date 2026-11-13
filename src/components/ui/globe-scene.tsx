@@ -14,6 +14,7 @@ import {
   flightArc,
   planeAt,
   projectRing,
+  rotate,
   rotationMatrix,
   routeZoom,
   toVec,
@@ -29,9 +30,9 @@ import {
  *   • in the hero it draws a *planet*: no route, just a slowly turning Earth.
  *
  * Both are the same three-dimensional model — the coastline is rotated in 3D and culled by the
- * horizon every frame — and both are pure SVG, so nothing has to be a canvas, a texture or a video.
+ * horizon every frame. The look is an original hand-crafted SVG illustration, not a satellite photo.
  *
- * What makes it read as a real object rather than a drawn circle:
+ * What makes it read as a designed, dimensional globe rather than a flat icon:
  *   • a real rotation matrix (yaw, pitch, and a couple of degrees of roll) applied per vertex;
  *   • per-ring depth sorting, so near coastlines sit on top of far ones;
  *   • per-ring shading from the vertex depth — the far limb darkens, the near face catches the light;
@@ -126,14 +127,11 @@ export function GlobeScene({
   const initialZoom = 1;
   const initialLevel: CoastLevel = 1;
   const [zoom, setZoom] = useState(initialZoom);
+  const zoomTarget = useRef(initialZoom);
   const [progress, setProgress] = useState(1);
   const [spinning, setSpinning] = useState(true);
   const [level, setLevel] = useState<CoastLevel>(initialLevel);
   const [reduced, setReduced] = useState(false);
-  const [earthTexture, setEarthTexture] = useState<EarthTexture | null>(null);
-  const [texturePainted, setTexturePainted] = useState(false);
-  const textureCanvas = useRef<HTMLCanvasElement | null>(null);
-  const cameraRef = useRef<Camera | null>(null);
   /** Server and first client paint are identical; this flips once if the visitor asked for less motion. */
 
   const drag = useRef<{
@@ -183,22 +181,30 @@ export function GlobeScene({
     // A domestic-route globe stays nearly full-frame, so load enough boundary detail for the
     // small country shapes instead of magnifying the low-detail whole-world tier.
     const needed = Math.max(2, coastLevel(baseZoom)) as CoastLevel;
+    zoomTarget.current = baseZoom;
 
     void loadCoast(needed).then((rings) => {
       if (cancelled || rings.length === 0) return;
       setLevel(needed);
-      setZoom(baseZoom);
+      const startZoom = zoomTarget.current;
+      setZoom(startZoom);
 
       // A visitor who asked for less motion gets the final, fully detailed frame — no zoom-in,
       // no flying plane, no idle sway.
-      if (reduced) {
+      if (reduced || touched.current) {
         setProgress(1);
         return;
       }
 
       setProgress(0);
-      setZoom(baseZoom * 0.6);
-      timers.push(window.setTimeout(() => setZoom(baseZoom), 80));
+      zoomTarget.current = startZoom * 0.6;
+      setZoom(zoomTarget.current);
+      timers.push(
+        window.setTimeout(() => {
+          zoomTarget.current = startZoom;
+          setZoom(startZoom);
+        }, 80),
+      );
 
       let begin = 0;
       const duration = 1500;
@@ -270,68 +276,6 @@ export function GlobeScene({
     [yaw, pitch, zoom, radius, cx, cy, planet],
   );
 
-  cameraRef.current = camera;
-
-  // Local NASA Blue Marble texture: no tile requests, API keys, or third-party runtime calls.
-  useEffect(() => {
-    let cancelled = false;
-    const image = new Image();
-    image.onload = () => {
-      if (cancelled) return;
-      const source = document.createElement("canvas");
-      source.width = image.naturalWidth;
-      source.height = image.naturalHeight;
-      const context = source.getContext("2d", { willReadFrequently: true });
-      if (!context) return;
-      context.drawImage(image, 0, 0);
-      const data = context.getImageData(0, 0, source.width, source.height);
-      setEarthTexture({
-        pixels: data.data,
-        width: source.width,
-        height: source.height,
-      });
-    };
-    image.src = "/globe/earth-blue-marble.jpg";
-    return () => {
-      cancelled = true;
-      image.onload = null;
-    };
-  }, []);
-
-  // Reproject the equirectangular satellite/terrain map onto the rotating sphere. The canvas
-  // updates at 30 fps (the vector route and country outlines remain crisp at the SVG frame rate).
-  useEffect(() => {
-    if (!earthTexture) return;
-    const canvas = textureCanvas.current;
-    const context = canvas?.getContext("2d", { alpha: true });
-    if (!canvas || !context) return;
-    const dpr = Math.min(window.devicePixelRatio || 1, 1.2);
-    canvas.width = Math.round(size * dpr);
-    canvas.height = Math.round(size * dpr);
-    let frame = 0;
-    let last = 0;
-    const draw = (now: number) => {
-      if (reduced || now - last >= 33) {
-        const current = cameraRef.current;
-        if (current) {
-          renderEarthTexture(
-            context,
-            canvas.width,
-            canvas.height,
-            dpr,
-            earthTexture,
-            current,
-          );
-          setTexturePainted(true);
-        }
-        last = now;
-      }
-      if (!reduced) frame = requestAnimationFrame(draw);
-    };
-    frame = requestAnimationFrame(draw);
-    return () => cancelAnimationFrame(frame);
-  }, [earthTexture, size, reduced]);
-
   // When a visitor zooms past a detail threshold, fetch that coast tier before drawing it.
   useEffect(() => {
     const needed = coastLevel(zoom);
@@ -348,6 +292,12 @@ export function GlobeScene({
   const rings = COAST[level];
   const land = useMemo(() => projectLand(rings, camera), [rings, camera]);
   const graticule = useMemo(() => projectGraticule(camera), [camera]);
+  const biomes = useMemo(() => projectBiomes(camera), [camera]);
+  const relief = useMemo(() => projectRelief(camera), [camera]);
+  const network = useMemo(
+    () => (planet ? projectNetwork(camera) : []),
+    [camera, planet],
+  );
   const arc = useMemo(
     () =>
       route
@@ -401,9 +351,26 @@ export function GlobeScene({
     [radius],
   );
 
-  const zoomBy = useCallback((factor: number) => {
-    setZoom((value) => clamp(value * factor, 1, 8));
-  }, []);
+  const zoomBy = useCallback(
+    (factor: number) => {
+      const target = clamp(zoomTarget.current * factor, 1, 8);
+      zoomTarget.current = target;
+      touched.current = true;
+      const needed = coastLevel(target);
+      if (needed <= level) {
+        setZoom(target);
+        return;
+      }
+      // Hold the camera still until the corresponding coastline tier is ready. This avoids the
+      // coarse-to-detailed pop when someone zooms quickly through a tier boundary.
+      void loadCoast(needed).then((rings) => {
+        if (rings.length === 0) return;
+        setLevel((current) => (current > needed ? current : needed));
+        setZoom(zoomTarget.current);
+      });
+    },
+    [level],
+  );
 
   const onWheel = useCallback(
     (event: React.WheelEvent<SVGSVGElement>) => {
@@ -426,17 +393,20 @@ export function GlobeScene({
     inertia.current = { yaw: 0, pitch: 0 };
     setYaw(startYaw.current);
     setPitch(startPitch.current);
-    setZoom(planet ? 1 : baseZoom);
+    zoomTarget.current = planet ? 1 : baseZoom;
+    setZoom(zoomTarget.current);
   }, [baseZoom, planet]);
 
   const gradientId = useId("globe");
   const clipId = `${gradientId}-clip`;
+  const landClipId = `${gradientId}-land-clip`;
 
   return (
     <figure
       className={className}
       data-globe={planet ? "planet" : "live"}
       data-testid={planet ? undefined : "route-globe"}
+      data-zoom={zoom.toFixed(2)}
     >
       <div
         className="relative mx-auto aspect-square w-full"
@@ -444,13 +414,8 @@ export function GlobeScene({
       >
         <div
           aria-hidden="true"
-          className="absolute inset-[2%] rounded-full bg-sky-400/25 blur-2xl"
+          className="absolute inset-[2%] rounded-full bg-gradient-to-tr from-cyan-300/30 via-blue-500/10 to-orange-400/30 blur-2xl"
           style={{ opacity: 0.55 }}
-        />
-        <canvas
-          ref={textureCanvas}
-          aria-hidden="true"
-          className="pointer-events-none absolute inset-0 h-full w-full"
         />
         <svg
           viewBox={`0 0 ${size} ${size}`}
@@ -483,16 +448,40 @@ export function GlobeScene({
               cy="28%"
               r="90%"
             >
-              <stop offset="0%" stopColor="#86d8ff" />
-              <stop offset="32%" stopColor="#398fc9" />
-              <stop offset="68%" stopColor="#145b9d" />
-              <stop offset="100%" stopColor="#071d48" />
+              <stop offset="0%" stopColor="#9ce8ff" />
+              <stop offset="28%" stopColor="#318fbd" />
+              <stop offset="66%" stopColor="#155c91" />
+              <stop offset="100%" stopColor="#102145" />
             </radialGradient>
             <radialGradient id={`${gradientId}-land`} cx="30%" cy="20%" r="95%">
-              <stop offset="0%" stopColor="#f4f2df" />
-              <stop offset="55%" stopColor="#d4dfc6" />
-              <stop offset="100%" stopColor="#9eb79f" />
+              <stop offset="0%" stopColor="#f9e4b7" />
+              <stop offset="42%" stopColor="#bad9b9" />
+              <stop offset="78%" stopColor="#70aaa0" />
+              <stop offset="100%" stopColor="#416f81" />
             </radialGradient>
+            <pattern
+              id={`${gradientId}-handmade`}
+              width="24"
+              height="20"
+              patternUnits="userSpaceOnUse"
+              patternTransform="rotate(-12)"
+            >
+              <path
+                d="M-4 5C1 1 6 1 11 5S21 9 28 4M-4 14c5-4 10-4 15 0s10 4 17-1"
+                fill="none"
+                stroke="#fff5d7"
+                strokeOpacity="0.17"
+                strokeWidth="1"
+              />
+              <circle cx="6" cy="10" r="1.1" fill="#f7c27d" fillOpacity="0.3" />
+              <circle
+                cx="20"
+                cy="17"
+                r="0.8"
+                fill="#215f64"
+                fillOpacity="0.22"
+              />
+            </pattern>
             <radialGradient
               id={`${gradientId}-shade`}
               cx="30%"
@@ -511,12 +500,24 @@ export function GlobeScene({
               x2="1"
               y2="1"
             >
-              <stop offset="0%" stopColor="#34d399" />
-              <stop offset="55%" stopColor="#0f8a78" />
-              <stop offset="100%" stopColor="#f59e0b" />
+              <stop offset="0%" stopColor="#ffcf83" />
+              <stop offset="48%" stopColor="#ff875c" />
+              <stop offset="100%" stopColor="#62d5e9" />
             </linearGradient>
             <clipPath id={clipId}>
               <circle cx={cx} cy={cy} r={radius} />
+            </clipPath>
+            <clipPath id={landClipId}>
+              <g clipPath={`url(#${clipId})`}>
+                {land.map((ring, index) => (
+                  <path
+                    key={index}
+                    d={ring.path}
+                    fill="#fff"
+                    clipRule="evenodd"
+                  />
+                ))}
+              </g>
             </clipPath>
             <filter
               id={`${gradientId}-glow`}
@@ -533,26 +534,39 @@ export function GlobeScene({
             </filter>
           </defs>
 
-          {/* Atmosphere: a ring that is a real gradient, not a stroke with `opacity`. */}
+          {/* A fine orbital loop gives the illustration a little Cloudflare-like network energy. */}
+          <ellipse
+            cx={cx}
+            cy={cy}
+            rx={radius * 1.16}
+            ry={radius * 0.36}
+            transform={`rotate(-22 ${cx} ${cy})`}
+            fill="none"
+            stroke="#ffad66"
+            strokeOpacity="0.48"
+            strokeWidth="1.25"
+            strokeDasharray="2 8"
+          />
+          {/* Atmosphere: twin cyan and amber halos, rather than a photographic glow. */}
           <circle
             cx={cx}
             cy={cy}
             r={radius * 1.035}
-            fill="#55bdff"
-            fillOpacity="0.24"
+            fill="#ff9c55"
+            fillOpacity="0.2"
           />
           <circle
             cx={cx}
             cy={cy}
             r={radius * 1.015}
-            fill="#5fc4b4"
-            fillOpacity="0.16"
+            fill="#55bdff"
+            fillOpacity="0.19"
           />
           <circle
             cx={cx}
             cy={cy}
             r={radius}
-            fill={texturePainted ? "none" : `url(#${gradientId}-ocean)`}
+            fill={`url(#${gradientId}-ocean)`}
           />
 
           <g clipPath={`url(#${clipId})`}>
@@ -567,20 +581,80 @@ export function GlobeScene({
 
             {/* Land, far rings first: the depth sort is what makes overlapping coastlines read as
                 surfaces rather than as one flat sticker. */}
-            <g
-              stroke={texturePainted ? "#183b43" : "#0d4b45"}
-              strokeOpacity={texturePainted ? 0.48 : 0.16}
-              strokeWidth={texturePainted ? 0.55 : 0.6}
-            >
+            <g>
               {land.map((ring, index) => (
                 <path
                   key={index}
                   d={ring.path}
-                  fill={texturePainted ? "none" : `url(#${gradientId}-land)`}
-                  fillOpacity={0.62 + 0.38 * Math.min(1, ring.depth * 1.3)}
+                  fill={`url(#${gradientId}-land)`}
+                  fillOpacity={0.68 + 0.32 * Math.min(1, ring.depth * 1.3)}
+                  stroke="#31585e"
+                  strokeOpacity="0.48"
+                  strokeWidth="0.62"
                 />
               ))}
             </g>
+            <g clipPath={`url(#${landClipId})`}>
+              <rect
+                x="0"
+                y="0"
+                width={size}
+                height={size}
+                fill={`url(#${gradientId}-handmade)`}
+                opacity="0.78"
+              />
+              {biomes.map((zone, index) => (
+                <path
+                  key={`biome-${index}`}
+                  d={zone.path}
+                  fill={zone.fill}
+                  fillOpacity={zone.opacity}
+                />
+              ))}
+              {relief.map((ridge, index) => (
+                <path
+                  key={`ridge-${index}`}
+                  d={ridge}
+                  fill="none"
+                  stroke="#795e46"
+                  strokeOpacity="0.68"
+                  strokeWidth="1.15"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              ))}
+            </g>
+            {network.map((link, index) => (
+              <path
+                key={`network-${index}`}
+                d={link.path}
+                fill="none"
+                stroke="#ffb45e"
+                strokeOpacity="0.68"
+                strokeWidth="1.45"
+                strokeDasharray="none"
+              />
+            ))}
+            {planet &&
+              networkNodes(camera).map((node, index) => (
+                <g key={`node-${index}`}>
+                  <circle
+                    cx={node[0]}
+                    cy={node[1]}
+                    r="8"
+                    fill="#ff9c55"
+                    fillOpacity="0.18"
+                  />
+                  <circle
+                    cx={node[0]}
+                    cy={node[1]}
+                    r="2.4"
+                    fill="#fff0cc"
+                    stroke="#ff9c55"
+                    strokeWidth="1"
+                  />
+                </g>
+              ))}
 
             {arc && (
               <g filter={`url(#${gradientId}-glow)`}>
@@ -743,6 +817,208 @@ function projectLand(rings: Ring[], camera: Camera): ProjectedLand[] {
   return out;
 }
 
+type BiomeStyle = "forest" | "desert" | "snow";
+interface ProjectedBiome {
+  path: string;
+  fill: string;
+  opacity: number;
+}
+
+const BIOME_REGIONS: { style: BiomeStyle; points: Point[] }[] = [
+  {
+    style: "desert",
+    points: [
+      [-18, 30],
+      [34, 30],
+      [39, 16],
+      [-12, 13],
+    ],
+  }, // Sahara
+  {
+    style: "desert",
+    points: [
+      [37, 31],
+      [58, 29],
+      [57, 15],
+      [42, 12],
+    ],
+  }, // Arabia
+  {
+    style: "desert",
+    points: [
+      [78, 48],
+      [112, 49],
+      [116, 39],
+      [87, 35],
+    ],
+  }, // Gobi
+  {
+    style: "desert",
+    points: [
+      [116, -18],
+      [143, -17],
+      [142, -34],
+      [121, -35],
+    ],
+  }, // Outback
+  {
+    style: "forest",
+    points: [
+      [-78, 8],
+      [-48, 10],
+      [-43, -8],
+      [-69, -16],
+    ],
+  }, // Amazon
+  {
+    style: "forest",
+    points: [
+      [10, 6],
+      [32, 5],
+      [30, -9],
+      [14, -8],
+    ],
+  }, // Congo
+  {
+    style: "forest",
+    points: [
+      [96, 16],
+      [124, 20],
+      [132, -5],
+      [108, -11],
+    ],
+  }, // Maritime SE Asia
+  {
+    style: "snow",
+    points: [
+      [-53, 83],
+      [-17, 80],
+      [-22, 60],
+      [-50, 59],
+    ],
+  }, // Greenland
+];
+
+const MOUNTAIN_RANGES: Point[][] = [
+  [
+    [-130, 60],
+    [-120, 53],
+    [-113, 46],
+    [-110, 39],
+    [-106, 32],
+  ], // Rockies
+  [
+    [-78, 9],
+    [-76, -2],
+    [-74, -16],
+    [-72, -31],
+    [-70, -47],
+    [-74, -55],
+  ], // Andes
+  [
+    [-10, 33],
+    [0, 35],
+    [10, 33],
+  ], // Atlas
+  [
+    [-5, 45],
+    [5, 46],
+    [15, 47],
+    [25, 45],
+  ], // Alps
+  [
+    [35, 39],
+    [45, 37],
+    [54, 35],
+    [64, 35],
+    [73, 34],
+    [82, 30],
+    [92, 28],
+    [103, 30],
+  ], // Zagros–Himalaya
+  [
+    [-72, 61],
+    [-50, 66],
+    [-35, 70],
+  ], // Greenland ice ridge
+];
+
+const NETWORK_LOCATIONS: Point[] = [
+  [-0.12, 51.5], // London
+  [-74, 40.7], // New York
+  [-46.6, -23.5], // Sao Paulo
+  [8.68, 50.1], // Frankfurt
+  [55.3, 25.2], // Dubai
+  [103.8, 1.35], // Singapore
+  [139.7, 35.7], // Tokyo
+  [151.2, -33.8], // Sydney
+];
+
+function projectBiomes(camera: Camera): ProjectedBiome[] {
+  const colors: Record<BiomeStyle, { fill: string; opacity: number }> = {
+    forest: { fill: "#236f5e", opacity: 0.42 },
+    desert: { fill: "#e9a95b", opacity: 0.46 },
+    snow: { fill: "#f4f8ed", opacity: 0.8 },
+  };
+  return BIOME_REGIONS.flatMap(({ style, points }) => {
+    const coordinates = new Float64Array(points.length * 2);
+    points.forEach(([lon, lat], index) => {
+      coordinates[index * 2] = lon;
+      coordinates[index * 2 + 1] = lat;
+    });
+    const projected = projectRing(coordinates, camera);
+    return projected ? [{ path: projected.path, ...colors[style] }] : [];
+  });
+}
+
+function projectRelief(camera: Camera): string[] {
+  return MOUNTAIN_RANGES.flatMap((range) => {
+    const paths: string[] = [];
+    let run: string[] = [];
+    const flush = () => {
+      if (run.length > 1) paths.push(`M${run.join("L")}`);
+      run = [];
+    };
+    for (const [lon, lat] of range) {
+      const point = rotate(camera.m, toVec(lon, lat));
+      if (point.y >= 0) {
+        flush();
+        continue;
+      }
+      run.push(
+        `${(camera.cx + camera.radius * point.x).toFixed(1)} ${(camera.cy - camera.radius * point.z).toFixed(1)}`,
+      );
+    }
+    flush();
+    return paths;
+  });
+}
+
+function networkNodes(camera: Camera): [number, number][] {
+  return NETWORK_LOCATIONS.flatMap((location) => {
+    const point = rotate(camera.m, toVec(location[0], location[1]));
+    return point.y < 0
+      ? [
+          [
+            camera.cx + camera.radius * point.x,
+            camera.cy - camera.radius * point.z,
+          ] as [number, number],
+        ]
+      : [];
+  });
+}
+
+function projectNetwork(camera: Camera): { path: string }[] {
+  const hub = NETWORK_LOCATIONS[3]!;
+  return NETWORK_LOCATIONS.flatMap((location, index) => {
+    if (index === 3) return [];
+    const km = distanceKm(hub, location);
+    const angle = Math.min((km / 6371) * (180 / Math.PI), 175);
+    const arc = flightArc(hub, location, angle, camera, 56);
+    return arc.path ? [{ path: arc.path }] : [];
+  });
+}
+
 /** Graticule: 20° meridians and parallels, clipped by the horizon like everything else. */
 function projectGraticule(camera: Camera): string {
   let path = "";
@@ -850,86 +1126,6 @@ function Plane({ at, angle }: { at: [number, number]; angle: number }) {
       />
     </g>
   );
-}
-
-interface EarthTexture {
-  pixels: Uint8ClampedArray;
-  width: number;
-  height: number;
-}
-
-/** Inverse-project NASA's equirectangular Blue Marble pixels onto the current orthographic view. */
-function renderEarthTexture(
-  context: CanvasRenderingContext2D,
-  canvasWidth: number,
-  canvasHeight: number,
-  dpr: number,
-  texture: EarthTexture,
-  camera: Camera,
-): void {
-  const image = context.createImageData(canvasWidth, canvasHeight);
-  const output = image.data;
-  const input = texture.pixels;
-  const radius = camera.radius * dpr;
-  const cx = camera.cx * dpr;
-  const cy = camera.cy * dpr;
-  const light = { x: -0.42, y: -0.78, z: 0.48 };
-  const lightLength = Math.hypot(light.x, light.y, light.z);
-  light.x /= lightLength;
-  light.y /= lightLength;
-  light.z /= lightLength;
-
-  for (let py = 0; py < canvasHeight; py += 1) {
-    const nz = (cy - py - 0.5) / radius;
-    for (let px = 0; px < canvasWidth; px += 1) {
-      const nx = (px + 0.5 - cx) / radius;
-      const r2 = nx * nx + nz * nz;
-      if (r2 >= 1) continue;
-      const ny = -Math.sqrt(1 - r2);
-      // The globe matrix is orthonormal, so its inverse is its transpose.
-      const m = camera.m;
-      const wx = m[0]! * nx + m[3]! * ny + m[6]! * nz;
-      const wy = m[1]! * nx + m[4]! * ny + m[7]! * nz;
-      const wz = m[2]! * nx + m[5]! * ny + m[8]! * nz;
-      const longitude = Math.atan2(wy, wx);
-      const latitude = Math.asin(Math.max(-1, Math.min(1, wz)));
-      const tx =
-        ((longitude / (2 * Math.PI) + 0.5) * texture.width) % texture.width;
-      const ty = Math.max(
-        0,
-        Math.min(
-          texture.height - 1,
-          (0.5 - latitude / Math.PI) * texture.height,
-        ),
-      );
-      const x0 = Math.floor(tx);
-      const y0 = Math.floor(ty);
-      const x1 = (x0 + 1) % texture.width;
-      const y1 = Math.min(texture.height - 1, y0 + 1);
-      const fx = tx - x0;
-      const fy = ty - y0;
-      const a = (y0 * texture.width + x0) * 4;
-      const b = (y0 * texture.width + x1) * 4;
-      const c = (y1 * texture.width + x0) * 4;
-      const d = (y1 * texture.width + x1) * 4;
-      const dot = Math.max(0, nx * light.x + ny * light.y + nz * light.z);
-      const shade = 0.5 + dot * 0.5;
-      const rim = Math.pow(r2, 7) * 0.12;
-      const out = (py * canvasWidth + px) * 4;
-      for (let channel = 0; channel < 3; channel += 1) {
-        const top = input[a + channel]! * (1 - fx) + input[b + channel]! * fx;
-        const bottom =
-          input[c + channel]! * (1 - fx) + input[d + channel]! * fx;
-        const color = (top * (1 - fy) + bottom * fy) * shade;
-        output[out + channel] = Math.min(
-          255,
-          color * (1 - rim) + [50, 155, 230][channel]! * rim,
-        );
-      }
-      output[out + 3] = 255;
-    }
-  }
-  context.putImageData(image, 0, 0);
 }
 
 function GlobeButton({

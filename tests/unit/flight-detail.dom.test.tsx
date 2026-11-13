@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { render, screen, within, cleanup } from "@testing-library/react";
+import {
+  render,
+  screen,
+  within,
+  cleanup,
+  fireEvent,
+  waitFor,
+} from "@testing-library/react";
 import { createElement } from "react";
 import { afterEach } from "vitest";
 
@@ -17,7 +24,11 @@ import FlightPage from "@/app/(search)/flight/page";
  * it must never invent a price: the number it shows is the one the card showed.
  */
 
-const query = createQuery({ originCode: "IFN", destinationCode: "KIH", departDate: "2026-11-20" });
+const query = createQuery({
+  originCode: "IFN",
+  destinationCode: "KIH",
+  departDate: "2026-11-20",
+});
 const NOW = new Date("2026-11-01T08:00:00Z");
 
 async function renderFor(offerId?: string) {
@@ -51,7 +62,9 @@ describe("/flight — the per-ticket page", () => {
     await renderFor(offerId);
 
     const page = screen.getByTestId("flight-page");
-    expect(within(page).getByTestId("flight-title").textContent).toContain(flight.display.airlineName);
+    expect(within(page).getByTestId("flight-title").textContent).toContain(
+      flight.display.airlineName,
+    );
 
     const sellers = within(page).getByTestId("seller-list");
     expect(sellers.querySelectorAll("li").length).toBeGreaterThanOrEqual(3);
@@ -64,7 +77,9 @@ describe("/flight — the per-ticket page", () => {
       .closest("li") as HTMLElement;
     const rowPrice = cheapestRow.querySelector("p.nums")?.textContent ?? "";
     expect(rowPrice).toContain("تومان");
-    expect(within(page).getByTestId("flight-cheapest").textContent).toBe(rowPrice);
+    expect(within(page).getByTestId("flight-cheapest").textContent).toBe(
+      rowPrice,
+    );
   });
 
   it("shows the facts the results list no longer shows: globe, baggage, refund, segments", async () => {
@@ -80,6 +95,16 @@ describe("/flight — the per-ticket page", () => {
     expect(globe.querySelectorAll("circle").length).toBeGreaterThan(1);
     expect(within(globe).getByTestId("globe-zoom-in")).toBeTruthy();
     expect(within(globe).getByTestId("globe-zoom-out")).toBeTruthy();
+    const beforeZoom = Number(globe.getAttribute("data-zoom"));
+    fireEvent.click(within(globe).getByTestId("globe-zoom-in"));
+    expect(Number(globe.getAttribute("data-zoom"))).toBeGreaterThan(beforeZoom);
+    const afterButtonZoom = Number(globe.getAttribute("data-zoom"));
+    fireEvent.wheel(globe.querySelector("svg")!, { deltaY: -100 });
+    await waitFor(() => {
+      expect(Number(globe.getAttribute("data-zoom"))).toBeGreaterThan(
+        afterButtonZoom,
+      );
+    });
     expect(globe.textContent).toContain("کیلومتر");
     // Unknown values are labelled, never guessed.
     expect(text).toMatch(/نامشخص|اعلام نشده|شامل|ندارد|استرداد/);
@@ -91,7 +116,9 @@ describe("/flight — the per-ticket page", () => {
     const flight = await firstFlight();
     await renderFor(flight.group.groupKey);
     const page = screen.getByTestId("flight-page");
-    expect(within(page).getByTestId("seller-list").querySelectorAll("li").length).toBeGreaterThan(0);
+    expect(
+      within(page).getByTestId("seller-list").querySelectorAll("li").length,
+    ).toBeGreaterThan(0);
   });
 
   it("explains a link whose offer is not in this search instead of showing a wrong ticket", async () => {
