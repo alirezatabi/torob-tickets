@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { distanceKm, type Point } from "@/lib/geo";
+import globeDots from "@/lib/map/globe-dots.json";
 import {
   COAST,
   coastLevel,
@@ -114,7 +115,7 @@ export function GlobeScene({
   /** Keep short domestic routes at globe scale; see routeZoom() and docs/REPORT-02 §۱۴. */
   const baseZoom = useMemo(() => (route ? routeZoom(km) : 1), [route, km]);
 
-  const [yaw, setYaw] = useState(planet ? 52 : centre[0]);
+  const [yaw, setYaw] = useState(planet ? -32 : centre[0]);
   const [pitch, setPitch] = useState(planet ? 22 : centre[1]);
   /**
    * The server's first paint is the whole planet with the whole route, drawn from the one tier that
@@ -146,7 +147,7 @@ export function GlobeScene({
   const touched = useRef(false);
   const phase = useRef(Math.random() * Math.PI * 2);
   const frame = useRef<number | null>(null);
-  const startYaw = useRef(planet ? 52 : centre[0]);
+  const startYaw = useRef(planet ? -32 : centre[0]);
   const startPitch = useRef(planet ? 22 : centre[1]);
 
   /**
@@ -294,6 +295,14 @@ export function GlobeScene({
   const graticule = useMemo(() => projectGraticule(camera), [camera]);
   const biomes = useMemo(() => projectBiomes(camera), [camera]);
   const relief = useMemo(() => projectRelief(camera), [camera]);
+  const dottedLand = useMemo(
+    () => (planet ? projectDottedLand(camera) : { land: "", lights: "" }),
+    [camera, planet],
+  );
+  const serviceMarkers = useMemo(
+    () => (planet ? projectServiceMarkers(camera) : []),
+    [camera, planet],
+  );
   const network = useMemo(
     () => (planet ? projectNetwork(camera) : []),
     [camera, planet],
@@ -453,6 +462,21 @@ export function GlobeScene({
               <stop offset="66%" stopColor="#155c91" />
               <stop offset="100%" stopColor="#102145" />
             </radialGradient>
+            <radialGradient
+              id={`${gradientId}-planet-ocean`}
+              cx="34%"
+              cy="27%"
+              r="78%"
+            >
+              <stop offset="0%" stopColor="#14345a" />
+              <stop offset="48%" stopColor="#081a31" />
+              <stop offset="82%" stopColor="#041020" />
+              <stop offset="100%" stopColor="#020711" />
+            </radialGradient>
+            <linearGradient id={`${gradientId}-planet-night`} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="22%" stopColor="#020711" stopOpacity="0" />
+              <stop offset="100%" stopColor="#020711" stopOpacity="0.58" />
+            </linearGradient>
             <radialGradient id={`${gradientId}-land`} cx="30%" cy="20%" r="95%">
               <stop offset="0%" stopColor="#f9e4b7" />
               <stop offset="42%" stopColor="#bad9b9" />
@@ -534,128 +558,129 @@ export function GlobeScene({
             </filter>
           </defs>
 
-          {/* A fine orbital loop gives the illustration a little Cloudflare-like network energy. */}
-          <ellipse
-            cx={cx}
-            cy={cy}
-            rx={radius * 1.16}
-            ry={radius * 0.36}
-            transform={`rotate(-22 ${cx} ${cy})`}
-            fill="none"
-            stroke="#ffad66"
-            strokeOpacity="0.48"
-            strokeWidth="1.25"
-            strokeDasharray="2 8"
-          />
-          {/* Atmosphere: twin cyan and amber halos, rather than a photographic glow. */}
+          {/* One quiet orbital trace adds scale without crowding the globe. */}
+          {planet ? (
+            <ellipse
+              cx={cx}
+              cy={cy}
+              rx={radius * 1.2}
+              ry={radius * 0.43}
+              transform={`rotate(-24 ${cx} ${cy})`}
+              fill="none"
+              stroke="#318fd5"
+              strokeOpacity="0.22"
+              strokeWidth="1"
+              strokeDasharray="2 8"
+            />
+          ) : (
+            <ellipse
+              cx={cx}
+              cy={cy}
+              rx={radius * 1.16}
+              ry={radius * 0.36}
+              transform={`rotate(-22 ${cx} ${cy})`}
+              fill="none"
+              stroke="#ffad66"
+              strokeOpacity="0.48"
+              strokeWidth="1.25"
+              strokeDasharray="2 8"
+            />
+          )}
+          {/* Stylized atmosphere, rather than a photographic glow. */}
           <circle
             cx={cx}
             cy={cy}
-            r={radius * 1.035}
-            fill="#ff9c55"
-            fillOpacity="0.2"
+            r={radius * 1.04}
+            fill={planet ? "#138cf1" : "#ff9c55"}
+            fillOpacity={planet ? "0.075" : "0.2"}
           />
           <circle
             cx={cx}
             cy={cy}
-            r={radius * 1.015}
-            fill="#55bdff"
-            fillOpacity="0.19"
+            r={radius * 1.018}
+            fill={planet ? "#35b9ff" : "#55bdff"}
+            fillOpacity={planet ? "0.09" : "0.19"}
           />
           <circle
             cx={cx}
             cy={cy}
             r={radius}
-            fill={`url(#${gradientId}-ocean)`}
+            fill={planet ? `url(#${gradientId}-planet-ocean)` : `url(#${gradientId}-ocean)`}
           />
 
           <g clipPath={`url(#${clipId})`}>
             <path
               d={graticule}
               fill="none"
-              stroke="#eafaf7"
-              strokeOpacity="0.13"
+              stroke={planet ? "#3978aa" : "#eafaf7"}
+              strokeOpacity={planet ? "0.22" : "0.13"}
               strokeWidth={0.6}
               vectorEffect="non-scaling-stroke"
             />
 
-            {/* Land, far rings first: the depth sort is what makes overlapping coastlines read as
-                surfaces rather than as one flat sticker. */}
-            <g>
-              {land.map((ring, index) => (
+            {planet ? (
+              <>
                 <path
-                  key={index}
-                  d={ring.path}
-                  fill={`url(#${gradientId}-land)`}
-                  fillOpacity={0.68 + 0.32 * Math.min(1, ring.depth * 1.3)}
-                  stroke="#31585e"
-                  strokeOpacity="0.48"
-                  strokeWidth="0.62"
-                />
-              ))}
-            </g>
-            <g clipPath={`url(#${landClipId})`}>
-              <rect
-                x="0"
-                y="0"
-                width={size}
-                height={size}
-                fill={`url(#${gradientId}-handmade)`}
-                opacity="0.78"
-              />
-              {biomes.map((zone, index) => (
-                <path
-                  key={`biome-${index}`}
-                  d={zone.path}
-                  fill={zone.fill}
-                  fillOpacity={zone.opacity}
-                />
-              ))}
-              {relief.map((ridge, index) => (
-                <path
-                  key={`ridge-${index}`}
-                  d={ridge}
+                  d={dottedLand.land}
                   fill="none"
-                  stroke="#795e46"
-                  strokeOpacity="0.68"
-                  strokeWidth="1.15"
+                  stroke="#55baff"
+                  strokeWidth="1.45"
                   strokeLinecap="round"
-                  strokeLinejoin="round"
+                  strokeOpacity="0.82"
                 />
-              ))}
-            </g>
-            {network.map((link, index) => (
-              <path
-                key={`network-${index}`}
-                d={link.path}
-                fill="none"
-                stroke="#ffb45e"
-                strokeOpacity="0.68"
-                strokeWidth="1.45"
-                strokeDasharray="none"
-              />
-            ))}
-            {planet &&
-              networkNodes(camera).map((node, index) => (
-                <g key={`node-${index}`}>
-                  <circle
-                    cx={node[0]}
-                    cy={node[1]}
-                    r="8"
-                    fill="#ff9c55"
-                    fillOpacity="0.18"
-                  />
-                  <circle
-                    cx={node[0]}
-                    cy={node[1]}
-                    r="2.4"
-                    fill="#fff0cc"
-                    stroke="#ff9c55"
-                    strokeWidth="1"
-                  />
+                <path
+                  d={dottedLand.lights}
+                  fill="none"
+                  stroke="#f1bd63"
+                  strokeWidth="1.65"
+                  strokeLinecap="round"
+                  strokeOpacity="0.8"
+                />
+              </>
+            ) : (
+              <>
+                {/* Land, far rings first: the depth sort is what makes overlapping coastlines read as
+                    surfaces rather than as one flat sticker. */}
+                <g>
+                  {land.map((ring, index) => (
+                    <path
+                      key={index}
+                      d={ring.path}
+                      fill={`url(#${gradientId}-land)`}
+                      fillOpacity={0.68 + 0.32 * Math.min(1, ring.depth * 1.3)}
+                      stroke="#31585e"
+                      strokeOpacity="0.48"
+                      strokeWidth="0.62"
+                    />
+                  ))}
                 </g>
-              ))}
-
+                <g clipPath={`url(#${landClipId})`}>
+                  <rect x="0" y="0" width={size} height={size} fill={`url(#${gradientId}-handmade)`} opacity="0.78" />
+                  {biomes.map((zone, index) => (
+                    <path key={`biome-${index}`} d={zone.path} fill={zone.fill} fillOpacity={zone.opacity} />
+                  ))}
+                  {relief.map((ridge, index) => (
+                    <path key={`ridge-${index}`} d={ridge} fill="none" stroke="#795e46" strokeOpacity="0.68" strokeWidth="1.15" strokeLinecap="round" strokeLinejoin="round" />
+                  ))}
+                </g>
+              </>
+            )}
+            {planet
+              ? network.map((link, index) => (
+                  <path
+                    key={`network-${index}`}
+                    d={link.path}
+                    fill="none"
+                    stroke={index % 3 === 0 ? "#e9b85e" : "#36aaff"}
+                    strokeOpacity={index % 3 === 0 ? "0.78" : "0.64"}
+                    strokeWidth="1.45"
+                    strokeDasharray="4 8"
+                  />
+                ))
+              : null}
+            {planet && serviceMarkers.map((marker, index) => (
+              <NetworkNode key={`service-${index}`} marker={marker} glowId={`${gradientId}-glow`} />
+            ))}
             {arc && (
               <g filter={`url(#${gradientId}-glow)`}>
                 <path
@@ -708,11 +733,34 @@ export function GlobeScene({
             {plane && <Plane at={plane.at} angle={plane.angle} />}
           </g>
 
+          {planet && (
+            <circle
+              cx={cx}
+              cy={cy}
+              r={radius}
+              fill={`url(#${gradientId}-planet-night)`}
+              pointerEvents="none"
+            />
+          )}
+          {planet && (
+            <circle
+              cx={cx}
+              cy={cy}
+              r={radius * 1.004}
+              fill="none"
+              stroke="#168ff0"
+              strokeOpacity="0.34"
+              strokeWidth="7"
+              filter={`url(#${gradientId}-glow)`}
+              pointerEvents="none"
+            />
+          )}
           <circle
             cx={cx}
             cy={cy}
             r={radius}
-            fill={`url(#${gradientId}-shade)`}
+            fill={planet ? "#020711" : `url(#${gradientId}-shade)`}
+            fillOpacity={planet ? "0.12" : undefined}
             pointerEvents="none"
           />
           <circle
@@ -720,9 +768,9 @@ export function GlobeScene({
             cy={cy}
             r={radius}
             fill="none"
-            stroke="#eafaf7"
-            strokeOpacity="0.5"
-            strokeWidth="1"
+            stroke={planet ? "#54baff" : "#eafaf7"}
+            strokeOpacity={planet ? "0.48" : "0.5"}
+            strokeWidth={planet ? "1.4" : "1"}
             pointerEvents="none"
           />
         </svg>
@@ -943,6 +991,60 @@ const MOUNTAIN_RANGES: Point[][] = [
   ], // Greenland ice ridge
 ];
 
+type ServiceMarkerData = { x: number; y: number; accent: "cyan" | "gold" };
+
+const SERVICE_LOCATIONS: { point: Point; accent: "cyan" | "gold" }[] = [
+  { point: [-74, 40.7], accent: "cyan" },
+  { point: [-46.6, -23.5], accent: "gold" },
+  { point: [8.68, 50.1], accent: "gold" },
+  { point: [55.3, 25.2], accent: "cyan" },
+  { point: [103.8, 1.35], accent: "gold" },
+  { point: [139.7, 35.7], accent: "cyan" },
+];
+
+const CITY_LIGHT_CENTERS: Point[] = [
+  [-74, 40],
+  [-122, 37],
+  [-47, -23],
+  [8, 50],
+  [30, 30],
+  [55, 25],
+  [78, 23],
+  [105, 30],
+  [139, 36],
+];
+
+function projectDottedLand(camera: Camera): { land: string; lights: string } {
+  const points = globeDots as [number, number][];
+  let land = "";
+  let lights = "";
+  for (const [lon, lat] of points) {
+    const point = rotate(camera.m, toVec(lon, lat));
+    if (point.y >= -0.025) continue;
+    const x = (camera.cx + camera.radius * point.x).toFixed(1);
+    const y = (camera.cy - camera.radius * point.z).toFixed(1);
+    const cityLit = CITY_LIGHT_CENTERS.some(([cityLon, cityLat]) => {
+      const lonDistance = Math.abs(((lon - cityLon + 540) % 360) - 180);
+      return lonDistance < 7.5 && Math.abs(lat - cityLat) < 6;
+    });
+    if (cityLit) lights += `M${x} ${y}h0.01`;
+    else land += `M${x} ${y}h0.01`;
+  }
+  return { land, lights };
+}
+
+function projectServiceMarkers(camera: Camera): ServiceMarkerData[] {
+  return SERVICE_LOCATIONS.flatMap(({ point: [lon, lat], accent }) => {
+    const surface = rotate(camera.m, toVec(lon, lat));
+    if (surface.y >= -0.08) return [];
+    return [{
+      x: camera.cx + camera.radius * surface.x,
+      y: camera.cy - camera.radius * surface.z,
+      accent,
+    }];
+  });
+}
+
 const NETWORK_LOCATIONS: Point[] = [
   [-0.12, 51.5], // London
   [-74, 40.7], // New York
@@ -994,19 +1096,6 @@ function projectRelief(camera: Camera): string[] {
   });
 }
 
-function networkNodes(camera: Camera): [number, number][] {
-  return NETWORK_LOCATIONS.flatMap((location) => {
-    const point = rotate(camera.m, toVec(location[0], location[1]));
-    return point.y < 0
-      ? [
-          [
-            camera.cx + camera.radius * point.x,
-            camera.cy - camera.radius * point.z,
-          ] as [number, number],
-        ]
-      : [];
-  });
-}
 
 function projectNetwork(camera: Camera): { path: string }[] {
   const hub = NETWORK_LOCATIONS[3]!;
@@ -1061,6 +1150,18 @@ function projectGraticule(camera: Camera): string {
     push(run);
   }
   return path;
+}
+
+function NetworkNode({ marker, glowId }: { marker: ServiceMarkerData; glowId: string }) {
+  const color = marker.accent === "gold" ? "#f1bd63" : "#62c6ff";
+  return (
+    <g aria-hidden="true">
+      <circle cx={marker.x} cy={marker.y} r="24" fill="none" stroke={color} strokeOpacity="0.11" strokeWidth="1" />
+      <circle cx={marker.x} cy={marker.y} r="12" fill="none" stroke={color} strokeOpacity="0.38" strokeWidth="0.9" />
+      <circle cx={marker.x} cy={marker.y} r="5" fill={color} fillOpacity="0.2" />
+      <circle cx={marker.x} cy={marker.y} r="2.6" fill={color} filter={`url(#${glowId})`} />
+    </g>
+  );
 }
 
 function Marker({
