@@ -30,9 +30,7 @@ export default function HomePage() {
         <div className="absolute inset-x-0 bottom-0 h-44 bg-gradient-to-b from-transparent to-ink-50" />
       </div>
 
-      <Hero
-        badge={`${toPersianDigits(providers.length)} منبع قیمت · ${toPersianDigits(airlineCount())} ایرلاین · بدون قیمت ساختگی`}
-      >
+      <Hero>
         <SearchForm />
         <DemoSearches />
       </Hero>

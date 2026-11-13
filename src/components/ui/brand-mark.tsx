@@ -73,14 +73,14 @@ export function BrandMark({
   );
 }
 
-export function Wordmark({ compact = false }: { compact?: boolean }) {
+export function Wordmark({ compact = false, inverse = false }: { compact?: boolean; inverse?: boolean }) {
   return (
     <span className="flex items-center gap-2.5">
       <BrandMark size={36} />
       <span className="flex flex-col leading-none">
-        <span className="text-[1.05rem] font-extrabold tracking-tight text-ink-900">ترب بلیت</span>
+        <span className={cn("text-[1.05rem] font-extrabold tracking-tight", inverse ? "text-white" : "text-ink-900")}>ترب بلیت</span>
         {!compact && (
-          <span className="mt-0.5 text-[0.62rem] font-medium tracking-wide text-ink-400">
+          <span className={cn("mt-0.5 text-[0.62rem] font-medium tracking-wide", inverse ? "text-slate-300" : "text-ink-400")}>
             مقایسهٔ قیمت بلیت هواپیما
           </span>
         )}
