@@ -46,9 +46,11 @@ describe("globe hydration", () => {
     )).toBe(false);
     const serviceMarkers = [...container.querySelectorAll<SVGGElement>("[data-service-marker]")];
     expect(serviceMarkers.length).toBeGreaterThan(0);
-    expect(serviceMarkers.every((marker) =>
-      marker.querySelector("circle")?.getAttribute("r") === "8" && marker.querySelector("path") !== null,
-    )).toBe(true);
+    expect(serviceMarkers.every((marker) => {
+      const glowDot = marker.querySelector('circle[r="3"]');
+      return glowDot?.getAttribute("fill") === "#62c6ff" && glowDot.hasAttribute("filter");
+    })).toBe(true);
+    expect(container.querySelector('[data-city-icon="pin"]')).toBeNull();
     expect(container.querySelector('[stroke="#ffd17a"]')).toBeNull();
     const airplaneMarkers = [...container.querySelectorAll<SVGGElement>("[data-airplane-marker]")];
     expect(airplaneMarkers.length).toBeGreaterThan(0);

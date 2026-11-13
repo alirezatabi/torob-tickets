@@ -768,7 +768,7 @@ export function GlobeScene({
               </g>
             ))}
             {planet && serviceMarkers.map((marker, index) => (
-              <NetworkNode key={`service-${index}`} marker={marker} />
+              <NetworkNode key={`service-${index}`} marker={marker} glowId={`${gradientId}-glow`} />
             ))}
             {planet && network.map((link, index) => (
               link.plane ? (
@@ -1412,11 +1412,14 @@ function projectGraticule(camera: Camera): string {
   return path;
 }
 
-function NetworkNode({ marker }: { marker: ServiceMarkerData }) {
+function NetworkNode({ marker, glowId }: { marker: ServiceMarkerData; glowId: string }) {
+  const color = "#62c6ff";
   return (
-    <g transform={`translate(${marker.x} ${marker.y})`} data-service-marker="true" aria-hidden="true">
-      <circle r="8" fill="#08233d" fillOpacity="0.92" stroke="#62c6ff" strokeOpacity="0.82" strokeWidth="1" />
-      <path d="M-4 3V-1h2v-3h2v3h2v-2h2v6Z" fill="#b7ecff" />
+    <g data-service-marker="true" aria-hidden="true">
+      <circle cx={marker.x} cy={marker.y} r="30" fill="none" stroke={color} strokeOpacity="0.12" strokeWidth="1" />
+      <circle cx={marker.x} cy={marker.y} r="15" fill="none" stroke={color} strokeOpacity="0.42" strokeWidth="0.9" />
+      <circle cx={marker.x} cy={marker.y} r="6" fill={color} fillOpacity="0.24" />
+      <circle cx={marker.x} cy={marker.y} r="3" fill={color} filter={`url(#${glowId})`} />
     </g>
   );
 }
