@@ -1,9 +1,10 @@
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
-import { SearchForm } from "@/app/(home)/_components/search-form";
 import { DemoSearches } from "@/app/(home)/_components/demo-searches";
 import { RouteExplorer, CityIndex } from "@/app/(home)/_components/route-explorer";
 import { PopularRoutes } from "@/app/(home)/_components/popular-routes";
+import { Hero } from "@/app/(home)/_components/hero";
+import { SearchForm } from "@/app/(home)/_components/search-form";
 import { listProviders } from "@/providers/registry";
 import { airlineCount } from "@/lib/airlines";
 import { routeCount, servedCities } from "@/lib/schedules";
@@ -29,20 +30,14 @@ export default function HomePage() {
         <div className="absolute inset-x-0 bottom-0 h-44 bg-gradient-to-b from-transparent to-ink-50" />
       </div>
 
-      <div className="mx-auto max-w-6xl px-4 pb-6 pt-14 sm:px-6 sm:pt-20">
-        <div className="mx-auto max-w-2xl text-center">
-          <h1 className="text-[2rem] font-black leading-[1.25] text-ink-900 sm:text-[2.9rem] sm:leading-[1.15]">
-            قیمت پرواز را <span className="brand-gradient-text">مقایسه</span> کنید
-          </h1>
-          <p className="mx-auto mt-3 max-w-md text-[0.9rem] leading-7 text-ink-500">
-            چند منبع، یک رتبه‌بندی شفاف، بدون قیمت ساختگی.
-          </p>
-        </div>
+      <Hero
+        badge={`${toPersianDigits(providers.length)} منبع قیمت · ${toPersianDigits(airlineCount())} ایرلاین · بدون قیمت ساختگی`}
+      >
+        <SearchForm />
+        <DemoSearches />
+      </Hero>
 
-        <div className="mx-auto mt-9 max-w-4xl">
-          <SearchForm />
-          <DemoSearches />
-        </div>
+      <div className="mx-auto max-w-6xl px-4 pb-6 sm:px-6">
 
         {/* Numbers, not prose: the coverage claim is the metric itself. */}
         <dl className="mx-auto mt-10 grid max-w-3xl grid-cols-2 gap-px overflow-hidden rounded-2xl border border-ink-200 bg-ink-200 sm:grid-cols-4">

@@ -108,6 +108,60 @@ test.describe("Isfahan → Kish, no date chosen", () => {
     await expect(detail.getByTestId("route-globe")).toBeVisible();
   });
 
+  test("the ticket globe is a real 3D sphere you can drag, not a picture", async ({ page }) => {
+    await page.goto(
+      `/search?origin=${SCENARIO.origin}&destination=${SCENARIO.destination}&date=2026-11-20`,
+    );
+    const card = page.getByTestId("offer-card").first();
+    const shown = (await card.getByTestId("offer-price").innerText()).trim();
+    await card.getByTestId("flight-details").click();
+    await page.waitForURL(/\/flight\?/);
+
+    // The live globe (not the <noscript> fallback) is the one on screen.
+    const globe = page.locator('[data-globe="live"]');
+    await expect(globe).toBeVisible();
+    await expect(globe.locator("svg")).toBeVisible();
+    await expect(globe).toContainText("کیلومتر");
+
+    // It draws projected land: hundreds of path commands, far more than a decorative circle.
+    const pathData = await globe.locator("svg path").first().getAttribute("d");
+    expect((pathData ?? "").length).toBeGreaterThan(200);
+
+    // Dragging turns the sphere: the projected land changes between frames.
+    const before = await globe.locator("svg").evaluate((node) =>
+      Array.from(node.querySelectorAll("path")).map((path) => path.getAttribute("d")?.slice(0, 60) ?? "").join("|"),
+    );
+    const box = (await globe.locator("svg").boundingBox())!;
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(box.x + box.width / 2 + 120, box.y + box.height / 2 + 20, { steps: 8 });
+    await page.mouse.up();
+    await page.waitForTimeout(400);
+    const after = await globe.locator("svg").evaluate((node) =>
+      Array.from(node.querySelectorAll("path")).map((path) => path.getAttribute("d")?.slice(0, 60) ?? "").join("|"),
+    );
+    expect(after).not.toBe(before);
+
+    // The reset control returns to the route view, and the price is unchanged by any of this.
+    await page.getByTestId("globe-reset").click();
+    await expect(page.getByTestId("flight-cheapest")).toHaveText(shown);
+  });
+
+  test("with reduced motion the globe is a still, correct drawing", async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await page.goto(
+      `/search?origin=${SCENARIO.origin}&destination=${SCENARIO.destination}&date=2026-11-20`,
+    );
+    const card = page.getByTestId("offer-card").first();
+    await card.getByTestId("flight-details").click();
+    await page.waitForURL(/\/flight\?/);
+    const globe = page.locator('[data-globe="live"]');
+    await expect(globe).toBeVisible();
+    // No spin/pause chrome when motion is unwelcome; the drawing itself stays.
+    await expect(page.getByTestId("globe-spin")).toHaveCount(0);
+    await expect(globe).toContainText("کیلومتر");
+  });
+
   test("the day strip slides: the picked day is not shoved to the start, and days before it stay", async ({ page }) => {
     // A window of eight days, with the selection two days in.
     await page.goto(

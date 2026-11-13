@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { PopularRoutesList } from "./popular-routes-list";
 import { ArrowLeft, Flame, Ticket } from "lucide-react";
 
 import { AirlineLogo } from "@/components/ui/airline-logo";
@@ -83,7 +84,7 @@ export async function PopularRoutes({ limit = 6 }: { limit?: number }) {
           </span>
         </Link>
 
-        <ul className="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-3" data-testid="popular-routes">
+        <PopularRoutesList>
           {routes.slice(1).map((route) => {
             const from = getCity(route.originCode);
             const to = getCity(route.destinationCode);
@@ -91,7 +92,7 @@ export async function PopularRoutes({ limit = 6 }: { limit?: number }) {
             const when = route.daysAhead === 0 ? "امروز" : route.daysAhead === 1 ? "فردا" : route.dateLabel;
 
             return (
-              <li key={`${route.originCode}-${route.destinationCode}`}>
+              <div key={`${route.originCode}-${route.destinationCode}`}>
                 <Link
                   href={`/search?origin=${route.originCode}&destination=${route.destinationCode}&date=${route.date}`}
                   className="card card-hover group flex h-full flex-col justify-between gap-2 p-3"
@@ -115,10 +116,10 @@ export async function PopularRoutes({ limit = 6 }: { limit?: number }) {
                     <span className="shrink-0 text-[0.62rem] text-ink-400">{when}</span>
                   </span>
                 </Link>
-              </li>
+              </div>
             );
           })}
-        </ul>
+        </PopularRoutesList>
       </div>
 
       <p className="mt-2 px-1 text-[0.62rem] leading-5 text-ink-400">

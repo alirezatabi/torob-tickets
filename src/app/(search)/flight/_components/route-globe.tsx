@@ -4,11 +4,11 @@ import {
   greatCirclePath,
   orthographic,
   routeCentre,
-  runToPath,
   visibleRuns,
   type Point,
 } from "@/lib/geo";
-import mapData from "@/lib/map/countries-50m.json";
+import landData from "@/lib/map/land-1deg.json";
+import { GlobeLive } from "./route-globe-live";
 import { cn } from "@/lib/cn";
 import { toPersianDigits } from "@/lib/format";
 
@@ -17,20 +17,23 @@ import { toPersianDigits } from "@/lib/format";
  *
  * Why a real orthographic projection instead of a static image: the route has to be drawn, the
  * viewer has to see *which way round the Earth* the flight goes (Tehran → Istanbul heads
- * north-west, not straight left), and the drawing has to be honest about distance. So the
- * countries come from Natural Earth (public domain, generated once into `lib/map/countries-50m.json`,
- * ships with the repo, no dependency at runtime), the arc is the
- * **great circle** between the two airports, and everything is projected server-side into one
- * inline SVG — no tiles, no network, no client JavaScript, no layout shift, and nothing to
- * fail offline.
+ * north-west, not straight left), and the drawing has to be honest about distance. The coastline
+ * is Natural Earth (public domain), thinned once by `scripts/build-land.mjs` into
+ * `lib/map/land-1deg.json` so the same geometry can be shipped to the client too; the arc is the
+ * **great circle** between the two airports, and this figure projects everything server-side into
+ * one inline SVG — no tiles, no network, no client JavaScript, no layout shift.
+ *
+ * The interactive 3D globe (`GlobeLive`) is the primary experience; this static figure is the
+ * no-JavaScript fallback, so a plain `<noscript>` block renders it and visitors are never left
+ * without the map.
  *
  * The disc is centred on the route (the midpoint of the great circle) and scaled so the flight
  * always fills a readable share of it: short hops zoom in, long hauls show more of the planet.
  * That is deliberate — a fixed world view turns a 700 km domestic hop into a two-pixel dot.
  */
 
-/** GeoJSON-ish rings, typed loosely: the file is generated data, not a hand-written contract. */
-const MAP = mapData as unknown as { countries: { name: string; rings: number[][][] }[] };
+/** Generated data, typed loosely: it is output of a script, not a hand-written contract. */
+const LANDS = (landData as unknown as { rings: [number, number][][] }).rings;
 
 const SIZE = 340;
 const RADIUS = 152;
@@ -68,17 +71,13 @@ export function Globe({ origin, destination, originLabel, destinationLabel, clas
   /** Projected coordinates already live in the on-screen disc — no rescaling needed. */
   const screen = (point: Point): Point => point;
 
-  const countries = MAP.countries
-    .map((country) => ({
-      name: country.name,
-      paths: country.rings
-        .flatMap((ring) => visibleRuns(ring.map(([lon, lat]) => [lon ?? 0, lat ?? 0] as Point), projection))
-        // A 0.35 px tolerance is invisible at this size and removes most of the vertices: the
-        // full 1:50m coastline would otherwise ship ~500 kB of path data per ticket page.
-        .map((run) => simplifyRun(run, 0.35))
-        .map(runToPath),
-    }))
-    .filter((country) => country.paths.length > 0);
+  // A 0.35 px tolerance is invisible at this size and removes most of the vertices: the full
+  // 1:50m coastline would otherwise ship ~500 kB of path data per ticket page.
+  const landPaths = LANDS.flatMap((ring) =>
+    visibleRuns(ring.map(([lon, lat]) => [lon, lat] as Point), projection)
+      .map((run) => simplifyRun(run, 0.35))
+      .map(integerPath),
+  );
 
   const arc = greatCirclePath(origin, destination, projection, 240);
   const from = projection.project(origin);
@@ -88,8 +87,22 @@ export function Globe({ origin, destination, originLabel, destinationLabel, clas
   const showGrid = zoom <= 6;
   const rimOpacity = fullGlobe ? 0.42 : 0.22;
 
+  // Two layers of the same disc:
+  //   • the server SVG below is the *first paint* — the route is on screen before any JavaScript
+  //     runs, and it is what a visitor with JS disabled (or a crawler) sees, wrapped in
+  //     <noscript> so it is not duplicated once hydration takes over;
+  //   • `GlobeLive` replaces it with the same projection computed every frame, so the planet can
+  //     be dragged and the flight drawn progressively.
   return (
-    <figure className={cn("relative", className)} data-testid="route-globe">
+    <>
+      <GlobeLive origin={origin} destination={destination} originLabel={originLabel} destinationLabel={destinationLabel} />
+      <noscript>{serverFigure()}</noscript>
+    </>
+  );
+
+  function serverFigure() {
+  return (
+    <figure className={cn("relative", className)} data-testid="route-globe" data-globe="static">
       <div className="relative mx-auto aspect-square w-full max-w-[21rem]">
         <svg
           viewBox={`0 0 ${SIZE} ${SIZE}`}
@@ -140,11 +153,7 @@ export function Globe({ origin, destination, originLabel, destinationLabel, clas
               </g>
             )}
 
-            <g fill="url(#globe-land)" stroke="#0a4d47" strokeOpacity="0.35" strokeWidth="0.6">
-              {countries.flatMap((country) =>
-                country.paths.map((path, index) => <path key={`${country.name}-${index}`} d={path} />),
-              )}
-            </g>
+            <path d={landPaths.join("")} fill="url(#globe-land)" fillRule="evenodd" stroke="#0a4d47" strokeOpacity="0.35" strokeWidth="0.6" />
 
             <g fill="none" strokeLinecap="round">
               <path d={arc.path} stroke="#ffffff" strokeOpacity="0.92" strokeWidth="7" />
@@ -205,6 +214,7 @@ export function Globe({ origin, destination, originLabel, destinationLabel, clas
       </figcaption>
     </figure>
   );
+  }
 }
 
 function Endpoint({ point, color }: { point: Point; color: string }) {
@@ -321,6 +331,17 @@ function graticule(projection: ReturnType<typeof orthographic>, step: number): s
     }
   }
   return paths;
+}
+
+/**
+ * Path with whole-number coordinates.
+ *
+ * The disc is 340 units across, so a tenth of a unit is a third of a pixel on a retina screen:
+ * rounding costs nothing visible and takes roughly a third off the markup this fallback ships.
+ */
+function integerPath(run: Point[]): string {
+  if (run.length === 0) return "";
+  return `M${run.map(([x, y]) => `${Math.round(x)} ${Math.round(y)}`).join("L")}Z`;
 }
 
 /** A small arrowhead on the middle of the visible track, pointing along the travel direction. */

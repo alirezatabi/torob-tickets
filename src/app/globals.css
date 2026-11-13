@@ -322,6 +322,19 @@
   }
 }
 
+/* Staggered entrance for lists: cards rise a few pixels into place, one after another.
+   The reduced-motion block at the bottom of this file collapses it to nothing. */
+@keyframes stagger-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
 @keyframes shimmer {
   0% {
     background-position: 100% 50%;
@@ -365,6 +378,15 @@
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
+}
+
+.stagger-item {
+  animation: stagger-in 0.42s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* The 3D globe is dragged by touch: never let the browser scroll the page during the gesture. */
+[data-globe="live"] svg {
+  touch-action: none;
 }
 
 @media (prefers-reduced-motion: reduce) {

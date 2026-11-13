@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter, useSearchParams } from "next/navigation";
+import { useReducedMotion } from "motion/react";
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import type { TripQuery } from "@/domain/trip";
@@ -34,6 +35,7 @@ export function ResultsList({
   const searchParams = useSearchParams();
   const [, startTransition] = useTransition();
   const [showExcluded, setShowExcluded] = useState(true);
+  const reduce = useReducedMotion();
 
   const filters: DisplayFilters = query.filters;
   const { visible, hidden } = useMemo(
@@ -107,9 +109,23 @@ export function ResultsList({
 
   return (
     <div>
-      <div className="space-y-3" data-testid="results-list">
-        {ranked.map((flight, index) => card(flight, index))}
-      </div>
+      {/* The list is a live region of sorts: results arrive, filters remove them. Animating the
+          transition (instead of the initial paint, which is already in the HTML) makes a filter
+          change legible rather than a silent re-layout. */}
+      {/* Results enter with a short, staggered rise (the `.stagger-item` utility already obeys
+          `prefers-reduced-motion`). It is deliberately CSS rather than a JS animation: the list can
+          be long, and a filter change must not wait for a client-side tween to re-render it. */}
+      <ol className="space-y-3" data-testid="results-list">
+        {ranked.map((flight, index) => (
+          <li
+            key={flight.group.groupKey}
+            className={reduce ? "list-none" : "stagger-item list-none"}
+            style={reduce ? undefined : { animationDelay: `${Math.min(index, 8) * 45}ms` }}
+          >
+            {card(flight, index)}
+          </li>
+        ))}
+      </ol>
 
       {ranked.length === 0 && soldOut.length === 0 && (
         <div className="card p-8 text-center">
