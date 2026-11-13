@@ -108,6 +108,48 @@ test.describe("Isfahan → Kish, no date chosen", () => {
     await expect(detail.getByTestId("route-globe")).toBeVisible();
   });
 
+  test("the day strip slides: the picked day is not shoved to the start, and days before it stay", async ({ page }) => {
+    // A window of eight days, with the selection two days in.
+    await page.goto(
+      `/search?origin=${SCENARIO.origin}&destination=${SCENARIO.destination}&date=2026-11-20&strip=2026-11-18`,
+    );
+    const chips = page.getByTestId("date-chip");
+    await expect(chips).toHaveCount(8);
+    const dates = await chips.evaluateAll((nodes) => nodes.map((node) => node.getAttribute("data-date") ?? ""));
+    const selectedIndex = dates.indexOf("2026-11-20");
+    // Days *before* the selection are on screen — the old strip started at the selection.
+    expect(selectedIndex).toBeGreaterThan(0);
+
+    // Tapping a later day keeps the whole window exactly where it was.
+    await chips.nth(5).click();
+    await page.waitForURL(/date=/);
+    const after = await page
+      .getByTestId("date-chip")
+      .evaluateAll((nodes) => nodes.map((node) => node.getAttribute("data-date") ?? ""));
+    expect(after).toEqual(dates);
+    await expect(page.getByTestId("results-list")).toBeVisible();
+  });
+
+  test("the pager walks forward a window at a time and back again", async ({ page }) => {
+    await page.goto(
+      `/search?origin=${SCENARIO.origin}&destination=${SCENARIO.destination}&date=2026-11-20&strip=2026-11-18`,
+    );
+    const readDates = () =>
+      page.getByTestId("date-chip").evaluateAll((nodes) => nodes.map((node) => node.getAttribute("data-date") ?? ""));
+    const first = await readDates();
+
+    await page.getByTestId("date-strip-next").click();
+    await page.waitForURL(/strip=2026-11-26/);
+    const next = await readDates();
+    // One window forward, not one day: none of the old days remain, and a chip is still selected.
+    expect(next[0]).toBe("2026-11-26");
+    await expect(page.locator('[data-testid="date-chip"][data-selected="true"]')).toHaveCount(1);
+
+    await page.getByTestId("date-strip-prev").click();
+    await page.waitForURL(/strip=2026-11-18/);
+    expect(await readDates()).toEqual(first);
+  });
+
   test("changing the day keeps every other parameter and reloads the list", async ({ page }) => {
     await page.goto(
       `/search?origin=${SCENARIO.origin}&destination=${SCENARIO.destination}&pax=2&sort=fastest`,

@@ -7,7 +7,15 @@ import { addDays, isoToday } from "@/lib/jalali";
 import { cityLabel } from "@/lib/cities";
 import { toPersianDigits } from "@/lib/format";
 import { searchTrips } from "@/server/search-service";
-import { getDayPrices, DATE_STRIP_DAYS } from "@/server/day-prices";
+import {
+  clampIntoWindow,
+  DATE_STRIP_DAYS,
+  getDayPrices,
+  nextStripStart,
+  previousStripStart,
+  resolveStripStart,
+  stripRangeLabel,
+} from "@/server/day-prices";
 import { recordSearch } from "@/server/persistence";
 import { ResultsList } from "@/app/(search)/search/_components/results-list";
 import { FilterSidebar } from "@/app/(search)/search/_components/filter-sidebar";
@@ -62,7 +70,14 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
 
   const providersOk = outcome.health.filter((health) => health.ok).length;
   const hasResults = flights.length > 0;
-  const stripStart = query.departDate < isoToday() ? isoToday() : query.departDate;
+  // The strip's position travels in `?strip=`, so tapping a chip does not re-anchor the strip
+  // (`resolveStripStart` rejects a start that would hide the selected day or point into the past).
+  const today = isoToday();
+  const stripStart = resolveStripStart(
+    typeof raw.strip === "string" ? raw.strip : null,
+    query.departDate,
+    today,
+  );
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-8">
@@ -75,6 +90,7 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
             sort={sortParam}
             selectedDate={query.departDate}
             stripStart={stripStart}
+            today={today}
           />
         </Suspense>
       </div>
@@ -137,18 +153,37 @@ async function DateStripSection({
   sort,
   selectedDate,
   stripStart,
+  today,
 }: {
   query: Parameters<typeof getDayPrices>[0];
   sort: SortKeyParam;
   selectedDate: string;
   stripStart: string;
+  today: string;
 }) {
   const prices = await getDayPrices(query, { from: stripStart, days: DATE_STRIP_DAYS });
+  const sortParam = sort === DEFAULT_SORT ? null : sort;
+  // Every chip keeps the window where it is; only the day changes.
+  const href = (date: string, strip: string = stripStart) =>
+    `${searchHref(query, { date, sort: sortParam, strip })}`;
+  const previous = previousStripStart(stripStart, today, DATE_STRIP_DAYS);
+  const next = nextStripStart(stripStart, today, DATE_STRIP_DAYS);
+  // Paging moves the window *and* keeps a chip selected: the nearest day inside the new window
+  // (the current selection when the new window still contains it).
+  const jump = (target: string) =>
+    href(clampIntoWindow(target, DATE_STRIP_DAYS, selectedDate, today), target);
+
   return (
     <DateStrip
       prices={prices}
       selectedDate={selectedDate}
-      buildHref={(date) => `${searchHref(query, { date, sort: sort === DEFAULT_SORT ? null : sort })}`}
+      buildHref={(date) => href(date)}
+      pager={{
+        label: stripRangeLabel(stripStart, DATE_STRIP_DAYS),
+        previousHref: previous ? jump(previous) : null,
+        nextHref: next ? jump(next) : null,
+        nextUnavailableReason: "بیشتر از این جلو نمی‌رویم؛ تاریخ را از فرم تغییر دهید.",
+      }}
     />
   );
 }
