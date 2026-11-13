@@ -130,7 +130,7 @@ export function providerUpdatedAt(fetchedAt: string, stalenessMinutes: number): 
  * external page, so the honest link is back into our own comparison for the same route and
  * date — never an absolute URL that implies a real provider page.
  *
- * `modules/live/source-link.ts` enforces the same rule at render time, for every surface.
+ * The whole product follows that rule now: no offer in this build has an external page.
  */
 export function demoOfferUrl(_providerId: string, _patternId: string, dateIso: string): string {
   return `/search?date=${dateIso}`;
