@@ -65,6 +65,26 @@ export interface GlobeSceneProps {
 
 const DISC = 0.9; // disc radius as a fraction of the viewbox, leaving room for the halo
 
+const SPACE_STARS = (() => {
+  let seed = 0x51f15e;
+  const next = () => {
+    seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+    return seed / 0x1_0000_0000;
+  };
+  return Array.from({ length: 72 }, () => ({
+    x: next(),
+    y: next(),
+    radius: 0.45 + next() * 0.8,
+    opacity: 0.16 + next() * 0.34,
+  }));
+})();
+
+const SATELLITES = [
+  { x: 0.08, y: 0.2, angle: -28, scale: 1 },
+  { x: 0.82, y: 0.105, angle: 24, scale: 1.12 },
+  { x: 0.32, y: 0.055, angle: 8, scale: 0.8 },
+] as const;
+
 export function GlobeScene({
   origin,
   destination,
@@ -293,6 +313,7 @@ export function GlobeScene({
 
   const rings = COAST[level];
   const land = useMemo(() => projectLand(rings, camera), [rings, camera]);
+  const planetLandPath = useMemo(() => land.map((ring) => ring.path).join(""), [land]);
   const graticule = useMemo(() => projectGraticule(camera), [camera]);
   const biomes = useMemo(() => projectBiomes(camera), [camera]);
   const relief = useMemo(() => projectRelief(camera), [camera]);
@@ -478,7 +499,13 @@ export function GlobeScene({
               <stop offset="82%" stopColor="#041020" />
               <stop offset="100%" stopColor="#020711" />
             </radialGradient>
-            <radialGradient id={`${gradientId}-planet-land`} cx="35%" cy="28%" r="92%">
+            <radialGradient
+              id={`${gradientId}-planet-land`}
+              gradientUnits="userSpaceOnUse"
+              cx={cx - radius * 0.34}
+              cy={cy - radius * 0.42}
+              r={radius * 1.55}
+            >
               <stop offset="0%" stopColor="#28465a" />
               <stop offset="58%" stopColor="#142c40" />
               <stop offset="100%" stopColor="#091724" />
@@ -574,6 +601,25 @@ export function GlobeScene({
             </filter>
           </defs>
 
+          {planet && (
+            <g aria-hidden="true">
+              {SPACE_STARS.filter((star) => {
+                const dx = star.x * size - cx;
+                const dy = star.y * size - cy;
+                return dx * dx + dy * dy > (radius * 1.045) ** 2;
+              }).map((star, index) => (
+                <circle
+                  key={`space-star-${index}`}
+                  cx={star.x * size}
+                  cy={star.y * size}
+                  r={star.radius}
+                  fill={index % 9 === 0 ? "#bdeeff" : "#8fb9d8"}
+                  opacity={star.opacity}
+                />
+              ))}
+            </g>
+          )}
+
           {/* Fine orbital paths echo the satellite network while keeping the globe illustrative. */}
           {planet ? (
             <>
@@ -616,6 +662,23 @@ export function GlobeScene({
               strokeDasharray="2 8"
             />
           )}
+          {planet && SATELLITES.map((satellite, index) => (
+            <g
+              key={`satellite-${index}`}
+              aria-hidden="true"
+              transform={`translate(${size * satellite.x} ${size * satellite.y}) rotate(${satellite.angle}) scale(${satellite.scale})`}
+              opacity="0.82"
+            >
+              <path d="M-3 0H-14M3 0H14" stroke="#a9d8ee" strokeWidth="1.2" />
+              <rect x="-14" y="-4.5" width="8" height="9" rx="0.7" fill="#155b89" stroke="#8bd6ff" strokeWidth="0.8" />
+              <path d="M-12-2.5h4M-12 0h4M-12 2.5h4" stroke="#5bb9eb" strokeWidth="0.45" />
+              <rect x="6" y="-4.5" width="8" height="9" rx="0.7" fill="#155b89" stroke="#8bd6ff" strokeWidth="0.8" />
+              <path d="M8-2.5h4M8 0h4M8 2.5h4" stroke="#5bb9eb" strokeWidth="0.45" />
+              <rect x="-3.2" y="-3.2" width="6.4" height="6.4" rx="1" fill="#d8f5ff" stroke="#4fbaff" strokeWidth="0.8" />
+              <circle cx="0" cy="0" r="1" fill="#ffd47b" />
+              <path d="M0-3.2V-7" stroke="#9ce8ff" strokeWidth="0.7" />
+            </g>
+          ))}
           {/* Stylized atmosphere, rather than a photographic glow. */}
           <circle
             cx={cx}
@@ -650,28 +713,16 @@ export function GlobeScene({
 
             {planet ? (
               <>
-                <g>
-                  {land.map((ring, index) => (
-                    <path
-                      key={`planet-land-${index}`}
-                      d={ring.path}
-                      fill={`url(#${gradientId}-planet-land)`}
-                      fillOpacity={0.7 + 0.3 * Math.min(1, ring.depth * 1.3)}
-                      stroke="#6ab6dc"
-                      strokeOpacity={0.19 + 0.1 * Math.max(0, ring.depth)}
-                      strokeWidth="0.7"
-                    />
-                  ))}
+                {/* One seamless land silhouette: no political-border strokes or per-country shading. */}
+                <g data-land-layer="planet">
+                  <path
+                    d={planetLandPath}
+                    fill={`url(#${gradientId}-planet-land)`}
+                    fillOpacity="1"
+                    fillRule="nonzero"
+                  />
                 </g>
                 <g clipPath={`url(#${landClipId})`}>
-                  {biomes.map((zone, index) => (
-                    <path
-                      key={`planet-biome-${index}`}
-                      d={zone.path}
-                      fill={zone.fill}
-                      fillOpacity={zone.opacity * 0.2}
-                    />
-                  ))}
                   {relief.map((ridge, index) => (
                     <path
                       key={`planet-relief-${index}`}
@@ -698,10 +749,10 @@ export function GlobeScene({
                 <path
                   d={dottedLand.land}
                   fill="none"
-                  stroke="#55baff"
-                  strokeWidth="1.05"
+                  stroke="#72caff"
+                  strokeWidth="0.8"
                   strokeLinecap="round"
-                  strokeOpacity="0.62"
+                  strokeOpacity="0.24"
                 />
                 <path
                   d={dottedLand.lights}
@@ -743,12 +794,12 @@ export function GlobeScene({
             )}
             {planet && network.map((link, index) => {
               const color = link.accent === "gold" ? "#efbd63" : "#43baff";
-              const opacity = link.accent === "gold" ? 0.7 : 0.5;
+              const opacity = link.accent === "gold" ? 0.58 : 0.68;
               return (
                 <g key={`network-${index}`} fill="none" stroke={color} strokeLinecap="round">
                   <path
                     d={link.path}
-                    strokeOpacity={link.accent === "gold" ? "0.2" : "0.1"}
+                    strokeOpacity={link.accent === "gold" ? "0.13" : "0.18"}
                     strokeWidth="4"
                     filter={`url(#${gradientId}-glow)`}
                   />
@@ -1115,19 +1166,34 @@ const CITY_LIGHT_CENTERS: Point[] = [
   [139, 36],
 ];
 
+const GLOBE_DOT_DATA = (globeDots as [number, number][]).map(([lon, lat]) => {
+  let cityStrength = 0;
+  for (const [cityLon, cityLat] of CITY_LIGHT_CENTERS) {
+    const lonDelta = Math.round(Math.abs(((lon - cityLon + 540) % 360) - 180) * 700);
+    const latDelta = Math.round((lat - cityLat) * 1000);
+    const distanceSquared = lonDelta * lonDelta + latDelta * latDelta;
+    const strength = distanceSquared < 25_000_000 ? 0.96
+      : distanceSquared < 81_000_000 ? 0.68
+        : distanceSquared < 169_000_000 ? 0.32
+          : 0;
+    cityStrength = Math.max(cityStrength, strength);
+  }
+  let hash =
+    Math.imul(Math.round((lon + 180) * 1000), 374761393) ^
+    Math.imul(Math.round((lat + 90) * 1000), 668265263);
+  hash = Math.imul(hash ^ (hash >>> 13), 1274126177);
+  const lightNoise = (hash >>> 0) / 0x1_0000_0000;
+  return { lon, lat, cityLit: cityStrength > 0 && lightNoise < 0.25 + cityStrength * 0.7 };
+});
+
 function projectDottedLand(camera: Camera): { land: string; lights: string } {
-  const points = globeDots as [number, number][];
   let land = "";
   let lights = "";
-  for (const [lon, lat] of points) {
+  for (const { lon, lat, cityLit } of GLOBE_DOT_DATA) {
     const point = rotate(camera.m, toVec(lon, lat));
     if (point.y >= -0.025) continue;
     const x = (camera.cx + camera.radius * point.x).toFixed(1);
     const y = (camera.cy - camera.radius * point.z).toFixed(1);
-    const cityLit = CITY_LIGHT_CENTERS.some(([cityLon, cityLat]) => {
-      const lonDistance = Math.abs(((lon - cityLon + 540) % 360) - 180);
-      return lonDistance < 10 && Math.abs(lat - cityLat) < 8;
-    });
     if (cityLit) lights += `M${x} ${y}h0.01`;
     else land += `M${x} ${y}h0.01`;
   }

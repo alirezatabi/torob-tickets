@@ -30,6 +30,8 @@ describe("globe hydration", () => {
     const serverHtml = renderToString(globe);
     container.innerHTML = serverHtml;
     document.body.appendChild(container);
+    expect(container.querySelectorAll('[data-land-layer="planet"] path[fill]').length).toBeGreaterThan(0);
+    expect(container.querySelector('[data-land-layer="planet"] path[stroke]')).toBeNull();
 
     // SVG transform attributes must use a canonical precision, not the raw result of atan2
     // (which may differ by the last floating-point bit between server and browser runtimes).
