@@ -145,7 +145,8 @@ export function GlobeScene({
   } | null>(null);
   const inertia = useRef({ yaw: 0, pitch: 0 });
   const touched = useRef(false);
-  const phase = useRef(Math.random() * Math.PI * 2);
+  // Keep the render path deterministic; the idle sway starts at a neutral phase after hydration.
+  const phase = useRef(0);
   const frame = useRef<number | null>(null);
   const startYaw = useRef(planet ? 18 : centre[0]);
   const startPitch = useRef(planet ? 22 : centre[1]);
@@ -297,6 +298,10 @@ export function GlobeScene({
   const relief = useMemo(() => projectRelief(camera), [camera]);
   const dottedLand = useMemo(
     () => (planet ? projectDottedLand(camera) : { land: "", lights: "" }),
+    [camera, planet],
+  );
+  const cityLights = useMemo(
+    () => (planet ? projectCityLights(camera) : []),
     [camera, planet],
   );
   const serviceMarkers = useMemo(
@@ -473,6 +478,17 @@ export function GlobeScene({
               <stop offset="82%" stopColor="#041020" />
               <stop offset="100%" stopColor="#020711" />
             </radialGradient>
+            <radialGradient id={`${gradientId}-planet-land`} cx="35%" cy="28%" r="92%">
+              <stop offset="0%" stopColor="#28465a" />
+              <stop offset="58%" stopColor="#142c40" />
+              <stop offset="100%" stopColor="#091724" />
+            </radialGradient>
+            <radialGradient id={`${gradientId}-city-glow`}>
+              <stop offset="0%" stopColor="#fff4c3" stopOpacity="0.9" />
+              <stop offset="18%" stopColor="#ffd477" stopOpacity="0.72" />
+              <stop offset="48%" stopColor="#ff9e48" stopOpacity="0.28" />
+              <stop offset="100%" stopColor="#ff8738" stopOpacity="0" />
+            </radialGradient>
             <linearGradient id={`${gradientId}-planet-night`} x1="0" y1="0" x2="0" y2="1">
               <stop offset="22%" stopColor="#020711" stopOpacity="0" />
               <stop offset="100%" stopColor="#020711" stopOpacity="0.58" />
@@ -558,20 +574,34 @@ export function GlobeScene({
             </filter>
           </defs>
 
-          {/* One quiet orbital trace adds scale without crowding the globe. */}
+          {/* Fine orbital paths echo the satellite network while keeping the globe illustrative. */}
           {planet ? (
-            <ellipse
-              cx={cx}
-              cy={cy}
-              rx={radius * 1.2}
-              ry={radius * 0.43}
-              transform={`rotate(-24 ${cx} ${cy})`}
-              fill="none"
-              stroke="#318fd5"
-              strokeOpacity="0.22"
-              strokeWidth="1"
-              strokeDasharray="2 8"
-            />
+            <>
+              <ellipse
+                cx={cx}
+                cy={cy}
+                rx={radius * 1.2}
+                ry={radius * 0.43}
+                transform={`rotate(-24 ${cx} ${cy})`}
+                fill="none"
+                stroke="#318fd5"
+                strokeOpacity="0.3"
+                strokeWidth="1"
+                strokeDasharray="2 7"
+              />
+              <ellipse
+                cx={cx}
+                cy={cy}
+                rx={radius * 1.31}
+                ry={radius * 0.58}
+                transform={`rotate(18 ${cx} ${cy})`}
+                fill="none"
+                stroke="#57baff"
+                strokeOpacity="0.13"
+                strokeWidth="0.8"
+                strokeDasharray="1 10"
+              />
+            </>
           ) : (
             <ellipse
               cx={cx}
@@ -620,21 +650,67 @@ export function GlobeScene({
 
             {planet ? (
               <>
+                <g>
+                  {land.map((ring, index) => (
+                    <path
+                      key={`planet-land-${index}`}
+                      d={ring.path}
+                      fill={`url(#${gradientId}-planet-land)`}
+                      fillOpacity={0.7 + 0.3 * Math.min(1, ring.depth * 1.3)}
+                      stroke="#6ab6dc"
+                      strokeOpacity={0.19 + 0.1 * Math.max(0, ring.depth)}
+                      strokeWidth="0.7"
+                    />
+                  ))}
+                </g>
+                <g clipPath={`url(#${landClipId})`}>
+                  {biomes.map((zone, index) => (
+                    <path
+                      key={`planet-biome-${index}`}
+                      d={zone.path}
+                      fill={zone.fill}
+                      fillOpacity={zone.opacity * 0.2}
+                    />
+                  ))}
+                  {relief.map((ridge, index) => (
+                    <path
+                      key={`planet-relief-${index}`}
+                      d={ridge}
+                      fill="none"
+                      stroke="#8cb8c7"
+                      strokeOpacity="0.2"
+                      strokeWidth="0.8"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  ))}
+                </g>
+                {cityLights.map((light, index) => (
+                  <circle
+                    key={`city-glow-${index}`}
+                    cx={light.x}
+                    cy={light.y}
+                    r={light.radius}
+                    fill={`url(#${gradientId}-city-glow)`}
+                    opacity="0.82"
+                  />
+                ))}
                 <path
                   d={dottedLand.land}
                   fill="none"
                   stroke="#55baff"
-                  strokeWidth="1.45"
+                  strokeWidth="1.05"
                   strokeLinecap="round"
-                  strokeOpacity="0.82"
+                  strokeOpacity="0.62"
                 />
                 <path
                   d={dottedLand.lights}
                   fill="none"
                   stroke="#ffd17a"
-                  strokeWidth="1.9"
+                  strokeWidth="1.65"
                   strokeLinecap="round"
-                  strokeOpacity="0.92"
+                  strokeOpacity="0.96"
+                  filter={`url(#${gradientId}-glow)`}
                 />
               </>
             ) : (
@@ -760,9 +836,9 @@ export function GlobeScene({
               cy={cy}
               r={radius * 1.004}
               fill="none"
-              stroke="#168ff0"
-              strokeOpacity="0.34"
-              strokeWidth="7"
+              stroke="#38baff"
+              strokeOpacity="0.52"
+              strokeWidth="8"
               filter={`url(#${gradientId}-glow)`}
               pointerEvents="none"
             />
@@ -1058,6 +1134,18 @@ function projectDottedLand(camera: Camera): { land: string; lights: string } {
   return { land, lights };
 }
 
+function projectCityLights(camera: Camera): { x: number; y: number; radius: number }[] {
+  return CITY_LIGHT_CENTERS.flatMap(([lon, lat], index) => {
+    const point = rotate(camera.m, toVec(lon, lat));
+    if (point.y >= -0.025) return [];
+    return [{
+      x: Number((camera.cx + camera.radius * point.x).toFixed(1)),
+      y: Number((camera.cy - camera.radius * point.z).toFixed(1)),
+      radius: 13 + (index % 4) * 2.5,
+    }];
+  });
+}
+
 function projectServiceMarkers(camera: Camera): ServiceMarkerData[] {
   return SERVICE_LOCATIONS.flatMap(({ point: [lon, lat], accent }) => {
     const surface = rotate(camera.m, toVec(lon, lat));
@@ -1271,6 +1359,11 @@ function NetworkNode({ marker, glowId }: { marker: ServiceMarkerData; glowId: st
   );
 }
 
+function formatRotationAngle(angle: number): string {
+  const rounded = Math.round(angle * 10) / 10;
+  return (Object.is(rounded, -0) ? 0 : rounded).toFixed(1);
+}
+
 function AirplaneMarker({
   at,
   angle,
@@ -1282,7 +1375,7 @@ function AirplaneMarker({
 }) {
   const color = accent === "gold" ? "#f1bd63" : "#62c6ff";
   return (
-    <g transform={`translate(${at[0]} ${at[1]}) rotate(${angle.toFixed(1)})`} aria-hidden="true">
+    <g transform={`translate(${at[0]} ${at[1]}) rotate(${formatRotationAngle(angle)})`} aria-hidden="true">
       <circle r="11" fill={color} fillOpacity="0.18" />
       <path
         d="M10 0-6 3-2.1 0-6-3Z"
@@ -1345,7 +1438,7 @@ function Marker({
 function Plane({ at, angle }: { at: [number, number]; angle: number }) {
   return (
     <g
-      transform={`translate(${at[0]} ${at[1]}) rotate(${angle})`}
+      transform={`translate(${at[0]} ${at[1]}) rotate(${formatRotationAngle(angle)})`}
       style={{ pointerEvents: "none" }}
     >
       <circle r="9" fill="#0f8a78" fillOpacity="0.14" />

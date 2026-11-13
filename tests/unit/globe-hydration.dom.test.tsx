@@ -27,8 +27,17 @@ describe("globe hydration", () => {
 
     const globe = createElement(GlobeScene, { planet: true, size: 220, period: 150 });
     container = document.createElement("div");
-    container.innerHTML = renderToString(globe);
+    const serverHtml = renderToString(globe);
+    container.innerHTML = serverHtml;
     document.body.appendChild(container);
+
+    // SVG transform attributes must use a canonical precision, not the raw result of atan2
+    // (which may differ by the last floating-point bit between server and browser runtimes).
+    const serverPlaneTransforms = [...serverHtml.matchAll(/transform="(translate\([^)]*\) rotate\([^)]*\))"/g)].map(
+      (match) => match[1],
+    );
+    expect(serverPlaneTransforms.length).toBeGreaterThan(0);
+    expect(serverPlaneTransforms.every((transform) => /rotate\(-?\d+\.\d\)$/.test(transform ?? ""))).toBe(true);
 
     const errors: string[] = [];
     const consoleError = vi.spyOn(console, "error").mockImplementation((...args) => {
