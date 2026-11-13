@@ -712,10 +712,10 @@ export function GlobeScene({
                   d={dottedLand.land}
                   data-globe-land-dots="true"
                   fill="none"
-                  stroke="#72caff"
-                  strokeWidth="1.15"
+                  stroke="#91ddff"
+                  strokeWidth="1.45"
                   strokeLinecap="round"
-                  strokeOpacity="0.58"
+                  strokeOpacity="0.9"
                 />
               </>
             ) : (
@@ -1421,6 +1421,7 @@ function AirplaneMarker({
     >
       <circle r="12" fill={color} fillOpacity="0.18" />
       <path
+        transform="translate(-11.5 -11.5)"
         d="M11.5 1.25c.8 0 1.3.6 1.3 1.5v4.6l7.4 4.3c.4.2.6.6.6 1v1.2l-8-2.2v6.7l2.8 1.8v1.4l-4.1-.5-4.1.5v-1.4l2.8-1.8v-6.7l-8 2.2v-1.2c0-.4.2-.8.6-1l7.4-4.3v-4.6c0-.9.5-1.5 1.3-1.5Z"
         fill="#eaf6ff"
         stroke={color}

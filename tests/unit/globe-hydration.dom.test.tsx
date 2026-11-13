@@ -30,7 +30,10 @@ describe("globe hydration", () => {
     const serverHtml = renderToString(globe);
     container.innerHTML = serverHtml;
     document.body.appendChild(container);
-    expect(container.querySelector("[data-globe-land-dots]")).not.toBeNull();
+    const landDots = container.querySelector<SVGPathElement>("[data-globe-land-dots]");
+    expect(landDots).not.toBeNull();
+    expect(landDots?.getAttribute("stroke")).toBe("#91ddff");
+    expect(landDots?.getAttribute("stroke-opacity")).toBe("0.9");
     expect(container.querySelector('[data-land-layer="planet"]')).toBeNull();
     const networkLanes = [...container.querySelectorAll<SVGGElement>("[data-network-flight]")];
     expect(networkLanes.length).toBeGreaterThan(0);
@@ -43,7 +46,10 @@ describe("globe hydration", () => {
     expect(container.querySelector('[stroke="#ffd17a"]')).toBeNull();
     const airplaneMarkers = [...container.querySelectorAll<SVGGElement>("[data-airplane-marker]")];
     expect(airplaneMarkers.length).toBeGreaterThan(0);
-    expect(airplaneMarkers.every((marker) => (marker.querySelector("path")?.getAttribute("d")?.length ?? 0) > 80)).toBe(true);
+    expect(airplaneMarkers.every((marker) => {
+      const icon = marker.querySelector("path");
+      return (icon?.getAttribute("d")?.length ?? 0) > 80 && icon?.getAttribute("transform") === "translate(-11.5 -11.5)";
+    })).toBe(true);
     const flightExtensions = [...container.querySelectorAll<SVGGElement>("[data-flight-extension]")];
     expect(flightExtensions.length).toBeGreaterThan(0);
     for (const extension of flightExtensions) {
