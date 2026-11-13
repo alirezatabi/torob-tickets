@@ -35,6 +35,15 @@ describe("globe hydration", () => {
     const networkLanes = [...container.querySelectorAll<SVGGElement>("[data-network-flight]")];
     expect(networkLanes.length).toBeGreaterThan(0);
     expect(networkLanes.every((lane) => lane.getAttribute("stroke") === "#43baff")).toBe(true);
+    const serviceMarkers = [...container.querySelectorAll<SVGGElement>("[data-service-marker]")];
+    expect(serviceMarkers.length).toBeGreaterThan(0);
+    expect(serviceMarkers.every((marker) => [...marker.querySelectorAll("circle")].every(
+      (circle) => circle.getAttribute("fill") === "#62c6ff" || circle.getAttribute("stroke") === "#62c6ff",
+    ))).toBe(true);
+    expect(container.querySelector('[stroke="#ffd17a"]')).toBeNull();
+    const airplaneMarkers = [...container.querySelectorAll<SVGGElement>("[data-airplane-marker]")];
+    expect(airplaneMarkers.length).toBeGreaterThan(0);
+    expect(airplaneMarkers.every((marker) => (marker.querySelector("path")?.getAttribute("d")?.length ?? 0) > 80)).toBe(true);
     const flightExtensions = [...container.querySelectorAll<SVGGElement>("[data-flight-extension]")];
     expect(flightExtensions.length).toBeGreaterThan(0);
     for (const extension of flightExtensions) {

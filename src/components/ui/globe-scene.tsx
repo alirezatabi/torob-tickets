@@ -319,11 +319,7 @@ export function GlobeScene({
   const biomes = useMemo(() => (planet ? [] : projectBiomes(camera)), [camera, planet]);
   const relief = useMemo(() => projectRelief(camera), [camera]);
   const dottedLand = useMemo(
-    () => (planet ? projectDottedLand(camera) : { land: "", lights: "" }),
-    [camera, planet],
-  );
-  const cityLights = useMemo(
-    () => (planet ? projectCityLights(camera) : []),
+    () => (planet ? projectDottedLand(camera) : { land: "" }),
     [camera, planet],
   );
   const serviceMarkers = useMemo(
@@ -500,12 +496,6 @@ export function GlobeScene({
               <stop offset="82%" stopColor="#041020" />
               <stop offset="100%" stopColor="#020711" />
             </radialGradient>
-            <radialGradient id={`${gradientId}-city-glow`}>
-              <stop offset="0%" stopColor="#fff4c3" stopOpacity="0.9" />
-              <stop offset="18%" stopColor="#ffd477" stopOpacity="0.72" />
-              <stop offset="48%" stopColor="#ff9e48" stopOpacity="0.28" />
-              <stop offset="100%" stopColor="#ff8738" stopOpacity="0" />
-            </radialGradient>
             <linearGradient id={`${gradientId}-planet-night`} x1="0" y1="0" x2="0" y2="1">
               <stop offset="22%" stopColor="#020711" stopOpacity="0" />
               <stop offset="100%" stopColor="#020711" stopOpacity="0.58" />
@@ -665,7 +655,7 @@ export function GlobeScene({
               <rect x="6" y="-4.5" width="8" height="9" rx="0.7" fill="#155b89" stroke="#8bd6ff" strokeWidth="0.8" />
               <path d="M8-2.5h4M8 0h4M8 2.5h4" stroke="#5bb9eb" strokeWidth="0.45" />
               <rect x="-3.2" y="-3.2" width="6.4" height="6.4" rx="1" fill="#d8f5ff" stroke="#4fbaff" strokeWidth="0.8" />
-              <circle cx="0" cy="0" r="1" fill="#ffd47b" />
+              <circle cx="0" cy="0" r="1" fill="#9ce8ff" />
               <path d="M0-3.2V-7" stroke="#9ce8ff" strokeWidth="0.7" />
             </g>
           ))}
@@ -718,16 +708,6 @@ export function GlobeScene({
                     />
                   ))}
                 </g>
-                {cityLights.map((light, index) => (
-                  <circle
-                    key={`city-glow-${index}`}
-                    cx={light.x}
-                    cy={light.y}
-                    r={light.radius}
-                    fill={`url(#${gradientId}-city-glow)`}
-                    opacity="0.82"
-                  />
-                ))}
                 <path
                   d={dottedLand.land}
                   data-globe-land-dots="true"
@@ -736,15 +716,6 @@ export function GlobeScene({
                   strokeWidth="1.15"
                   strokeLinecap="round"
                   strokeOpacity="0.58"
-                />
-                <path
-                  d={dottedLand.lights}
-                  fill="none"
-                  stroke="#ffd17a"
-                  strokeWidth="1.65"
-                  strokeLinecap="round"
-                  strokeOpacity="0.96"
-                  filter={`url(#${gradientId}-glow)`}
                 />
               </>
             ) : (
@@ -795,7 +766,6 @@ export function GlobeScene({
                   key={`plane-${index}`}
                   at={link.plane.at}
                   angle={link.plane.angle}
-                  accent={link.accent}
                 />
               ) : null
             ))}
@@ -1115,96 +1085,44 @@ const MOUNTAIN_RANGES: Point[][] = [
   ], // Greenland ice ridge
 ];
 
-type ServiceMarkerData = { x: number; y: number; accent: "cyan" | "gold" };
+type ServiceMarkerData = { x: number; y: number };
 
-const SERVICE_LOCATIONS: { point: Point; accent: "cyan" | "gold" }[] = [
-  { point: [-118.24, 34.05], accent: "cyan" },
-  { point: [-0.12, 51.5], accent: "cyan" },
-  { point: [-74, 40.7], accent: "cyan" },
-  { point: [-46.6, -23.5], accent: "gold" },
-  { point: [2.35, 48.86], accent: "gold" },
-  { point: [8.68, 50.1], accent: "gold" },
-  { point: [28.98, 41.01], accent: "cyan" },
-  { point: [55.3, 25.2], accent: "cyan" },
-  { point: [72.88, 19.08], accent: "gold" },
-  { point: [31.02, -29.86], accent: "gold" },
-  { point: [103.8, 1.35], accent: "gold" },
-  { point: [114.17, 22.3], accent: "cyan" },
-  { point: [139.7, 35.7], accent: "cyan" },
-  { point: [151.2, -33.8], accent: "gold" },
+const SERVICE_LOCATIONS: Point[] = [
+  [-118.24, 34.05],
+  [-0.12, 51.5],
+  [-74, 40.7],
+  [-46.6, -23.5],
+  [2.35, 48.86],
+  [8.68, 50.1],
+  [28.98, 41.01],
+  [55.3, 25.2],
+  [72.88, 19.08],
+  [31.02, -29.86],
+  [103.8, 1.35],
+  [114.17, 22.3],
+  [139.7, 35.7],
+  [151.2, -33.8],
 ];
 
-const CITY_LIGHT_CENTERS: Point[] = [
-  [-118, 34],
-  [-74, 40],
-  [-47, -23],
-  [-79, 44],
-  [2, 49],
-  [8, 50],
-  [29, 41],
-  [31, -30],
-  [55, 25],
-  [73, 19],
-  [104, 1],
-  [114, 22],
-  [127, 38],
-  [139, 36],
-];
-
-const GLOBE_DOT_DATA = (globeDots as [number, number][]).map(([lon, lat]) => {
-  let cityStrength = 0;
-  for (const [cityLon, cityLat] of CITY_LIGHT_CENTERS) {
-    const lonDelta = Math.round(Math.abs(((lon - cityLon + 540) % 360) - 180) * 700);
-    const latDelta = Math.round((lat - cityLat) * 1000);
-    const distanceSquared = lonDelta * lonDelta + latDelta * latDelta;
-    const strength = distanceSquared < 25_000_000 ? 0.96
-      : distanceSquared < 81_000_000 ? 0.68
-        : distanceSquared < 169_000_000 ? 0.32
-          : 0;
-    cityStrength = Math.max(cityStrength, strength);
-  }
-  let hash =
-    Math.imul(Math.round((lon + 180) * 1000), 374761393) ^
-    Math.imul(Math.round((lat + 90) * 1000), 668265263);
-  hash = Math.imul(hash ^ (hash >>> 13), 1274126177);
-  const lightNoise = (hash >>> 0) / 0x1_0000_0000;
-  return { lon, lat, cityLit: cityStrength > 0 && lightNoise < 0.25 + cityStrength * 0.7 };
-});
-
-function projectDottedLand(camera: Camera): { land: string; lights: string } {
+function projectDottedLand(camera: Camera): { land: string } {
   let land = "";
-  let lights = "";
-  for (const { lon, lat, cityLit } of GLOBE_DOT_DATA) {
+  for (const [lon, lat] of globeDots as [number, number][]) {
     const point = rotate(camera.m, toVec(lon, lat));
     if (point.y >= -0.025) continue;
     const x = (camera.cx + camera.radius * point.x).toFixed(1);
     const y = (camera.cy - camera.radius * point.z).toFixed(1);
-    if (cityLit) lights += `M${x} ${y}h0.01`;
-    else land += `M${x} ${y}h0.01`;
+    land += `M${x} ${y}h0.01`;
   }
-  return { land, lights };
-}
-
-function projectCityLights(camera: Camera): { x: number; y: number; radius: number }[] {
-  return CITY_LIGHT_CENTERS.flatMap(([lon, lat], index) => {
-    const point = rotate(camera.m, toVec(lon, lat));
-    if (point.y >= -0.025) return [];
-    return [{
-      x: Number((camera.cx + camera.radius * point.x).toFixed(1)),
-      y: Number((camera.cy - camera.radius * point.z).toFixed(1)),
-      radius: 13 + (index % 4) * 2.5,
-    }];
-  });
+  return { land };
 }
 
 function projectServiceMarkers(camera: Camera): ServiceMarkerData[] {
-  return SERVICE_LOCATIONS.flatMap(({ point: [lon, lat], accent }) => {
+  return SERVICE_LOCATIONS.flatMap(([lon, lat]) => {
     const surface = rotate(camera.m, toVec(lon, lat));
     if (surface.y >= -0.08) return [];
     return [{
       x: Number((camera.cx + camera.radius * surface.x).toFixed(1)),
       y: Number((camera.cy - camera.radius * surface.z).toFixed(1)),
-      accent,
     }];
   });
 }
@@ -1295,7 +1213,7 @@ const NETWORK_ROUTES: { from: number; to: number }[] = [
 
 function projectNetwork(
   camera: Camera,
-): { path: string; outerPath?: string; accent: "cyan"; plane?: { at: [number, number]; angle: number } }[] {
+): { path: string; outerPath?: string; plane?: { at: [number, number]; angle: number } }[] {
   return NETWORK_ROUTES.flatMap(({ from, to }, routeIndex) => {
     const origin = NETWORK_LOCATIONS[from]!;
     const destination = NETWORK_LOCATIONS[to]!;
@@ -1354,7 +1272,7 @@ function projectNetwork(
         };
       }
     }
-    return path ? [{ path, ...(outerPath ? { outerPath } : {}), accent: "cyan" as const, ...(plane ? { plane } : {}) }] : [];
+    return path ? [{ path, ...(outerPath ? { outerPath } : {}), ...(plane ? { plane } : {}) }] : [];
   });
 }
 
@@ -1471,9 +1389,9 @@ function projectGraticule(camera: Camera): string {
 }
 
 function NetworkNode({ marker, glowId }: { marker: ServiceMarkerData; glowId: string }) {
-  const color = marker.accent === "gold" ? "#f1bd63" : "#62c6ff";
+  const color = "#62c6ff";
   return (
-    <g aria-hidden="true">
+    <g data-service-marker="true" aria-hidden="true">
       <circle cx={marker.x} cy={marker.y} r="30" fill="none" stroke={color} strokeOpacity="0.12" strokeWidth="1" />
       <circle cx={marker.x} cy={marker.y} r="15" fill="none" stroke={color} strokeOpacity="0.42" strokeWidth="0.9" />
       <circle cx={marker.x} cy={marker.y} r="6" fill={color} fillOpacity="0.24" />
@@ -1490,21 +1408,23 @@ function formatRotationAngle(angle: number): string {
 function AirplaneMarker({
   at,
   angle,
-  accent,
 }: {
   at: [number, number];
   angle: number;
-  accent: "gold" | "cyan";
 }) {
-  const color = accent === "gold" ? "#f1bd63" : "#62c6ff";
+  const color = "#62c6ff";
   return (
-    <g transform={`translate(${at[0]} ${at[1]}) rotate(${formatRotationAngle(angle)})`} aria-hidden="true">
-      <circle r="11" fill={color} fillOpacity="0.18" />
+    <g
+      data-airplane-marker="true"
+      transform={`translate(${at[0]} ${at[1]}) rotate(${formatRotationAngle(angle + 90)})`}
+      aria-hidden="true"
+    >
+      <circle r="12" fill={color} fillOpacity="0.18" />
       <path
-        d="M10 0-6 3-2.1 0-6-3Z"
+        d="M11.5 1.25c.8 0 1.3.6 1.3 1.5v4.6l7.4 4.3c.4.2.6.6.6 1v1.2l-8-2.2v6.7l2.8 1.8v1.4l-4.1-.5-4.1.5v-1.4l2.8-1.8v-6.7l-8 2.2v-1.2c0-.4.2-.8.6-1l7.4-4.3v-4.6c0-.9.5-1.5 1.3-1.5Z"
         fill="#eaf6ff"
         stroke={color}
-        strokeWidth="0.9"
+        strokeWidth="0.85"
         strokeLinejoin="round"
       />
     </g>
