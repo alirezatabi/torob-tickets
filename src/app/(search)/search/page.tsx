@@ -12,7 +12,6 @@ import { recordSearch } from "@/server/persistence";
 import { ResultsList } from "@/app/(search)/search/_components/results-list";
 import { FilterSidebar } from "@/app/(search)/search/_components/filter-sidebar";
 import { SortTabs } from "@/app/(search)/search/_components/sort-tabs";
-import { RecommendationCard } from "@/app/(search)/search/_components/recommendation-card";
 import { ProviderStrip } from "@/app/(search)/search/_components/provider-strip";
 import { SummaryBar } from "@/app/(search)/search/_components/summary-bar";
 import { ResultsSkeleton } from "@/app/(search)/search/_components/results-skeleton";
@@ -28,7 +27,7 @@ export async function generateMetadata({ searchParams }: SearchPageProps): Promi
   if (!params.origin || !params.destination) return { title: "جستجوی پرواز" };
   return {
     title: `قیمت پرواز ${cityLabel(params.origin)} به ${cityLabel(params.destination)}`,
-    description: "هر پرواز یک کارت؛ زیرش قیمت همهٔ فروشنده‌های همان پرواز و ارزان‌ترین‌شان.",
+    description: "هر پرواز یک ردیف کوتاه: ساعت، ارزان‌ترین قیمت، ظرفیت، مسیر، ایرلاین و نوع هواپیما.",
   };
 }
 
@@ -41,9 +40,12 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
     return <SearchProblem reason={parsed.reason} missing={parsed.missing} invalidDate={parsed.invalid === "date"} />;
   }
 
-  const sortParam = (SORT_KEYS as readonly string[]).includes(raw.sort ?? "")
-    ? (raw.sort as SortKeyParam)
-    : DEFAULT_SORT;
+  // Only the three tabs exist now; a bookmarked `sort=best` link degrades to the default
+  // instead of silently ordering by a mode no tab can show.
+  const sortParam: SortKeyParam =
+    (SORT_KEYS as readonly string[]).includes(raw.sort ?? "") && raw.sort !== "best"
+      ? (raw.sort as SortKeyParam)
+      : DEFAULT_SORT;
   const query = parsed.query;
   const view = await searchTrips(query, sortParam);
   const { outcome, flights } = view;
@@ -92,13 +94,6 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
           <div className="mt-4 space-y-4">
             {hasResults ? (
               <>
-                <RecommendationCard
-                  query={query}
-                  ranked={view.results.rankedView}
-                  offer={pickBestOffer(view)}
-                  totalCount={flights.length}
-                />
-
                 <ProviderStrip health={outcome.health} providersOk={providersOk} issues={outcome.issues.length} />
 
                 <Suspense fallback={<ResultsSkeleton />}>
@@ -119,12 +114,6 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
       </div>
     </div>
   );
-}
-
-/** The offer the recommendation card leads with: the best *flight*, at its cheapest seller. */
-function pickBestOffer(view: Awaited<ReturnType<typeof searchTrips>>) {
-  const bestFlight = view.flights.find((flight) => !flight.soldOut && flight.feasible) ?? view.flights.find((f) => !f.soldOut);
-  return bestFlight?.selection.cheapest ?? null;
 }
 
 async function DateStripSection({

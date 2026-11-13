@@ -8,6 +8,8 @@ import type { FlightResult } from "@/modules/search/results";
 import { selectCheapestOffer } from "@/modules/pricing/select-cheapest";
 import { filterGroups, type DisplayFilters } from "@/lib/filter";
 import { toPersianDigits } from "@/lib/format";
+import { flightHref } from "@/lib/search-params";
+import { parseSelectionParam, selectionParam } from "@/lib/selection-param";
 import { OfferCard } from "./offer-card";
 import { CompareTray } from "./compare-tray";
 
@@ -58,9 +60,9 @@ export function ResultsList({
   // The URL is the source of truth, but we keep an optimistic copy so several
   // selections in a row work even before the server round-trip lands.
   const urlCompare = searchParams.get("compare") ?? "";
-  const [selection, setSelection] = useState(() => parseSelection(urlCompare));
+  const [selection, setSelection] = useState(() => parseSelectionParam(urlCompare));
   useEffect(() => {
-    setSelection(parseSelection(urlCompare));
+    setSelection(parseSelectionParam(urlCompare));
   }, [urlCompare]);
 
   const compareIdOf = (flight: FlightResult) => flight.selection.cheapest?.id ?? flight.display.id;
@@ -75,7 +77,7 @@ export function ResultsList({
 
     const params = new URLSearchParams(searchParams.toString());
     if (next.length === 0) params.delete("compare");
-    else params.set("compare", next.map((item) => `${item.groupKey}:${item.offerId}`).join(","));
+    else params.set("compare", selectionParam(next));
     startTransition(() => router.replace(`/search?${params.toString()}`, { scroll: false }));
   }
 
@@ -86,6 +88,8 @@ export function ResultsList({
   const card = (flight: FlightResult, index: number, muted = false, locked = false) => {
     const offerId = compareIdOf(flight);
     const selected = selection.some((item) => item.offerId === offerId);
+    // The detail page is a real URL: the same search plus the offer id.
+    const href = flightHref(query, offerId);
     return (
       <OfferCard
         key={flight.group.groupKey}
@@ -96,6 +100,7 @@ export function ResultsList({
         selected={selected}
         onToggleCompare={() => toggleCompare(flight.group.groupKey, offerId)}
         compareDisabled={locked || (selection.length >= 3 && !selected)}
+        detailHref={href}
       />
     );
   };
@@ -161,15 +166,6 @@ export function ResultsList({
       />
     </div>
   );
-}
-
-function parseSelection(value: string): { groupKey: string; offerId: string }[] {
-  if (!value) return [];
-  return value
-    .split(",")
-    .map((token) => token.split(":"))
-    .filter((parts) => parts.length === 2 && parts[0] && parts[1])
-    .map((parts) => ({ groupKey: parts[0] as string, offerId: parts[1] as string }));
 }
 
 export function ResultsCount({ value }: { value: number }) {

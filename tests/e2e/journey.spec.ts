@@ -2,7 +2,7 @@ import { test, expect, type Page } from "@playwright/test";
 
 /**
  * The critical flow from the brief:
- * search → results → filter/sort → AI recommendation → offer comparison.
+ * search → results (short rows) → filter/sort → per-ticket detail → offer comparison.
  *
  * Deliberately runs with no API key and no database: everything must work from
  * the curated demo data.
@@ -60,7 +60,7 @@ test.describe("Torob Tickets journey", () => {
     expect(url.searchParams.get("destination")).toBe("IST");
     expect(url.searchParams.get("bag")).toBe("1");
     expect(url.searchParams.get("stops")).toBe("0");
-    await expect(page.getByTestId("recommendation-text")).toBeVisible();
+    await expect(page.getByTestId("results-list")).toBeVisible();
   });
 
   test("sorting and filtering change the visible results", async ({ page }) => {
@@ -86,12 +86,18 @@ test.describe("Torob Tickets journey", () => {
     }
   });
 
-  test("the AI recommendation is grounded in the result set", async ({ page }) => {
+  test("the results page makes no recommendation — and each row opens its own ticket page", async ({ page }) => {
     await search(page, resultsUrl);
-    const recommendation = page.getByTestId("recommendation-text");
-    await expect(recommendation).toBeVisible();
-    await expect(recommendation).toContainText("بهترین تطابق");
-    await expect(recommendation).toContainText("تومان");
+    // The «بهترین تطابق» block was removed from /search by request.
+    await expect(page.getByTestId("recommendation-text")).toHaveCount(0);
+    await expect(page.getByText("بهترین تطابق")).toHaveCount(0);
+
+    const card = page.getByTestId("offer-card").first();
+    await card.getByTestId("flight-details").click();
+    await page.waitForURL(/\/flight\?/);
+    await expect(page.getByTestId("flight-page")).toBeVisible();
+    await expect(page.getByTestId("flight-page")).toContainText("فروشنده‌های همین پرواز");
+    await expect(page.getByTestId("flight-page")).toContainText("تومان");
   });
 
   test("comparing two offers shows a side-by-side table with unknown values marked", async ({ page }) => {

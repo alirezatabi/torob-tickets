@@ -6,6 +6,7 @@ import type { OfferGroup } from "@/domain/flight";
 import type { TripQuery } from "@/domain/trip";
 import { formatDurationShort, formatToman, toPersianDigits } from "@/lib/format";
 import { toSearchParams } from "@/lib/search-params";
+import { selectionParam } from "@/lib/selection-param";
 
 /**
  * Floating selection tray. Keeps the compare action reachable while scrolling and
@@ -35,7 +36,7 @@ export function CompareTray({
   if (items.length === 0) return null;
 
   const params = toSearchParams(query);
-  params.set("groups", selected.map((entry) => `${entry.groupKey}:${entry.offerId}`).join(","));
+  params.set("groups", selectionParam(selected));
 
   return (
     <div data-compare-tray className="glass animate-rise fixed inset-x-0 bottom-0 z-40 border-t border-ink-200 shadow-[0_-8px_30px_-20px_rgb(11_20_36/0.45)]">

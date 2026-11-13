@@ -2,17 +2,22 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { useTransition } from "react";
-import { CalendarClock, Clock, Sparkles, Wallet } from "lucide-react";
-import { SORT_LABELS, type SortKey } from "@/ranking/score";
+import { CalendarClock, Clock, Wallet } from "lucide-react";
+import type { SortKey } from "@/ranking/score";
 import { DEFAULT_SORT } from "@/lib/search-params";
 import { cn } from "@/lib/cn";
 
-const ICONS: Record<SortKey, React.ReactNode> = {
-  best: <Sparkles className="size-3.5" aria-hidden="true" />,
-  cheapest: <Wallet className="size-3.5" aria-hidden="true" />,
-  earliest: <CalendarClock className="size-3.5" aria-hidden="true" />,
-  fastest: <Clock className="size-3.5" aria-hidden="true" />,
-};
+/**
+ * The tabs the results page offers. «بهترین تطابق» is deliberately absent: the page no longer
+ * recommends a winner, it lets the user pick one — a tab called "best match" would be the same
+ * judgement in another place. The `best` sort key still exists server-side (the compare page
+ * and the explanation API use it as a ranking order), it is simply not a user-facing choice.
+ */
+const TABS: { key: SortKey; label: string; icon: React.ReactNode }[] = [
+  { key: "cheapest", label: "ارزان‌ترین", icon: <Wallet className="size-3.5" aria-hidden="true" /> },
+  { key: "fastest", label: "سریع‌ترین", icon: <Clock className="size-3.5" aria-hidden="true" /> },
+  { key: "earliest", label: "زودترین حرکت", icon: <CalendarClock className="size-3.5" aria-hidden="true" /> },
+];
 
 /**
  * Sorting is a URL change, not local state: results stay server-rendered and the
@@ -37,7 +42,7 @@ export function SortTabs({ current }: { current: SortKey }) {
       role="tablist"
       aria-label="مرتب‌سازی نتایج"
     >
-      {(Object.keys(SORT_LABELS) as SortKey[]).map((key) => (
+      {TABS.map(({ key, label, icon }) => (
         <button
           key={key}
           type="button"
@@ -51,8 +56,8 @@ export function SortTabs({ current }: { current: SortKey }) {
               : "text-ink-500 hover:text-ink-800",
           )}
         >
-          {ICONS[key]}
-          {SORT_LABELS[key]}
+          {icon}
+          {label}
         </button>
       ))}
     </div>

@@ -49,7 +49,7 @@ test.describe("Isfahan → Kish, no date chosen", () => {
     expect(firstPrice).not.toBe("۰");
   });
 
-  test("renders one card per physical flight, each with at least three sellers", async ({ page }) => {
+  test("renders one short row per physical flight — and nothing else", async ({ page }) => {
     await openScenario(page);
     const cards = page.getByTestId("offer-card");
     await expect(cards.first()).toBeVisible();
@@ -59,30 +59,39 @@ test.describe("Isfahan → Kish, no date chosen", () => {
     await expect(cards.filter({ hasText: "IR-3301" })).toHaveCount(1);
     await expect(cards.filter({ hasText: "Y9-7204" })).toHaveCount(1);
 
+    // The list is a summary: no seller list, no recommendation block on the page.
+    await expect(cards.first().getByTestId("seller-list")).toHaveCount(0);
+    await expect(page.getByTestId("recommendation-text")).toHaveCount(0);
+    await expect(page.getByText("بهترین تطابق")).toHaveCount(0);
+
+    // Every row carries the six facts of the brief.
     for (const card of await cards.all()) {
-      const sellers = card.getByTestId("seller-list").locator("li");
-      expect(await sellers.count()).toBeGreaterThanOrEqual(3);
-      // Every row shows a toman price.
-      await expect(sellers.first()).toContainText("تومان");
+      await expect(card.getByTestId("offer-price")).toContainText("تومان");
+      await expect(card.getByTestId("flight-capacity")).toContainText("صندلی");
+      await expect(card.getByTestId("flight-aircraft")).not.toBeEmpty();
+      await expect(card.getByTestId("flight-details")).toBeVisible();
+      // Origin → destination cities are both on the row.
+      await expect(card).toContainText("اصفهان");
+      await expect(card).toContainText("کیش");
     }
   });
 
-  test("the highlighted price is the cheapest of that flight's sellers", async ({ page }) => {
+  test("the row's price and its sellers' prices agree on the ticket page", async ({ page }) => {
     await openScenario(page);
     const card = page.getByTestId("offer-card").first();
     const shown = await card.getByTestId("offer-price").textContent();
-    const prices = await card.getByTestId("seller-list").locator("li .nums").allTextContents();
-    const toNumber = (text: string) =>
-      Number(
-        text
-          .replace(/[۰-۹]/g, (digit) => String("۰۱۲۳۴۵۶۷۸۹".indexOf(digit)))
-          .replace(/[^\d]/g, ""),
-      );
-    const numbers = prices.map(toNumber).filter((value) => Number.isFinite(value) && value > 0);
-    expect(numbers.length).toBeGreaterThan(0);
-    expect(toNumber(shown ?? "")).toBe(Math.min(...numbers));
-    // And exactly one seller is marked as the cheapest.
-    await expect(card.getByTestId("seller-list").getByText("کمترین")).toHaveCount(1);
+
+    await card.getByTestId("flight-details").click();
+    await page.waitForURL(/\/flight\?/);
+    const detail = page.getByTestId("flight-page");
+    await expect(detail).toBeVisible();
+    await expect(detail.getByTestId("flight-cheapest")).toHaveText(shown ?? "");
+    // Every seller of this flight is here, cheapest marked once.
+    const sellers = detail.getByTestId("seller-list").locator("li");
+    expect(await sellers.count()).toBeGreaterThanOrEqual(3);
+    await expect(detail.getByTestId("seller-list").getByText("کمترین")).toHaveCount(1);
+    await expect(detail).toContainText("شرایط استرداد");
+    await expect(detail).toContainText("بار همراه");
   });
 
   test("changing the day keeps every other parameter and reloads the list", async ({ page }) => {

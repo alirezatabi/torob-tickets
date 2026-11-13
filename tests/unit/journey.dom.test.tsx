@@ -6,9 +6,9 @@ import { createElement } from "react";
 /**
  * Journey integration test (jsdom).
  *
- * This mirrors the Playwright flow — search → results → filter/sort → recommendation
- * → comparison — against the real aggregation pipeline, so the critical path is
- * covered even in environments where a browser binary cannot be installed.
+ * This mirrors the Playwright flow — search → results → filter/sort → detail → comparison —
+ * against the real aggregation pipeline, so the critical path is covered even in
+ * environments where a browser binary cannot be installed.
  */
 
 const push = vi.fn();
@@ -26,8 +26,8 @@ import { groupOffers } from "@/dedupe/group";
 import { buildFlightResults } from "@/modules/search/results";
 import { rankOffers } from "@/ranking/score";
 import { createQuery } from "@/domain/trip";
+import { formatTimeInZone } from "@/lib/format";
 import { OfferCard } from "@/app/(search)/search/_components/offer-card";
-import { RecommendationCard } from "@/app/(search)/search/_components/recommendation-card";
 import { SortTabs } from "@/app/(search)/search/_components/sort-tabs";
 import { FilterPanel } from "@/app/(search)/search/_components/filter-sidebar";
 import { ResultsList } from "@/app/(search)/search/_components/results-list";
@@ -50,22 +50,15 @@ describe("search → results journey", () => {
     return { outcome, groups, results };
   }
 
-  it("renders one card per physical flight with provider prices and the recommendation", async () => {
-    const { results } = await flightsFor("best");
+  it("renders one compact card per physical flight and no recommendation block", async () => {
+    const { results } = await flightsFor("cheapest");
     const flights = results.flights;
 
-    // RecommendationCard is an async server component: await it before rendering.
-    const recommendationElement = await RecommendationCard({
-      query,
-      ranked: results.rankedView,
-      offer: flights[0]?.selection.cheapest ?? null,
-      totalCount: flights.length,
-    });
+    render(createElement("div", null, createElement(ResultsList, { query, flights })));
 
-    render(createElement("div", null, recommendationElement, createElement(ResultsList, { query, flights })));
-
-    const recommendation = screen.getByTestId("recommendation-text");
-    expect(recommendation.textContent).toContain("بهترین تطابق");
+    // The «بهترین تطابق» section is gone from the results page, by request.
+    expect(screen.queryByTestId("recommendation-text")).toBeNull();
+    expect(screen.queryByText("بهترین تطابق")).toBeNull();
 
     const cards = screen.getAllByTestId("offer-card");
     expect(cards.length).toBe(flights.length);
@@ -75,8 +68,37 @@ describe("search → results journey", () => {
       const soldOut = card.getAttribute("data-sold-out") === "true";
       expect(text).toContain(soldOut ? "ظرفیت" : "تومان");
     }
-    // At least one flight is sold by more than one provider (the whole point).
-    expect(cards.some((card) => card.textContent?.includes("منبع"))).toBe(true);
+  });
+
+  it("keeps each card to the six facts of the brief — the rest lives on the detail page", async () => {
+    const { results } = await flightsFor("cheapest");
+    const flight = results.flights[0]!;
+    const offer = flight.selection.cheapest ?? flight.display;
+    const detailHref = `/flight?origin=THR&destination=IST&date=2026-11-20&offer=${encodeURIComponent(offer.id)}`;
+
+    render(createElement(OfferCard, { flight, query, index: 0, detailHref }));
+
+    const card = screen.getByTestId("offer-card");
+    const text = card.textContent ?? "";
+
+    // 1. carrier name, 2. aircraft type, 3. price, 4. capacity, 5. origin → destination.
+    expect(text).toContain(offer.airlineName);
+    expect(within(card).getByTestId("flight-aircraft").textContent).toContain(
+      offer.segments[0]?.aircraft ?? "نامشخص",
+    );
+    expect(within(card).getByTestId("offer-price").textContent).toContain("تومان");
+    expect(within(card).getByTestId("flight-capacity").textContent).toContain("صندلی");
+    // 6. the two clocks of the route, in each airport's own timezone.
+    expect(text).toContain(formatTimeInZone(offer.departAt, "Asia/Tehran"));
+
+    // And everything heavy is *not* on the list any more.
+    expect(within(card).queryByTestId("seller-list")).toBeNull();
+    expect(text).not.toContain("بار");
+    expect(text).not.toContain("استرداد");
+
+    // The row links to the flight's own page.
+    const link = screen.getByTestId("flight-details");
+    expect(link.getAttribute("href")).toBe(detailHref);
   });
 
   it("selects two offers for comparison and stores them in the URL", async () => {
@@ -99,7 +121,10 @@ describe("search → results journey", () => {
 
   it("changes sort order through the URL (shareable, server-rendered)", async () => {
     const user = userEvent.setup();
-    render(createElement(SortTabs, { current: "best" }));
+    render(createElement(SortTabs, { current: "cheapest" }));
+
+    // «بهترین تطابق» is no longer a tab the results page offers.
+    expect(screen.queryByRole("tab", { name: "بهترین تطابق" })).toBeNull();
 
     // The default sort *is* «ارزان‌ترین», so a different tab is what produces a URL change.
     await user.click(screen.getByRole("tab", { name: /سریع‌ترین/ }));
@@ -130,7 +155,7 @@ describe("search → results journey", () => {
     expect(directGroups).toBeGreaterThan(0);
   });
 
-  it("keeps every offer's displayed facts consistent with its normalized data", async () => {
+  it("keeps the displayed price consistent with the normalized data", async () => {
     const { results } = await flightsFor("cheapest");
     const best = results.flights[0]!;
 
@@ -151,10 +176,5 @@ describe("search → results journey", () => {
     );
     expect(best.selection.cheapest?.price.toman).toBe(Math.min(...purchasable.map((offer) => offer.price.toman)));
     expect(price).toContain("تومان");
-    // Unknown baggage must never be rendered as a weight.
-    const shown = best.selection.cheapest ?? best.display;
-    if (shown.baggage.checked === "unknown") {
-      expect(screen.getByText("بار نامشخص")).toBeTruthy();
-    }
   });
 });

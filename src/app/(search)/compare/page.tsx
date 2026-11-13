@@ -6,10 +6,10 @@ import { formatJalaliFull } from "@/lib/jalali";
 import { cityLabel, getCity } from "@/lib/cities";
 import { formatDuration, formatStopsShort, formatTimeInZone, formatToman, toPersianDigits } from "@/lib/format";
 import { searchTrips } from "@/server/search-service";
-import { isGroupKey } from "@/dedupe/group";
 import { explainTradeoff, refundLabel, baggageLabel } from "@/ranking/explain";
 import type { FlightOffer, OfferGroup } from "@/domain/flight";
 import type { ScoredOffer } from "@/ranking/score";
+import { parseSelectionParam } from "@/lib/selection-param";
 import { DemoBadge } from "@/components/ui/demo-badge";
 import { cn } from "@/lib/cn";
 
@@ -32,25 +32,12 @@ export default async function ComparePage({ searchParams }: ComparePageProps) {
 
   const query = parsed.query;
   const view = await searchTrips(query, "best");
-  // Fresh links send "<groupKey>:<offerId>". Group keys themselves contain "|" and
-  // ">" (but no ":"), so search params arriving URL-decoded must be split from the
-  // RIGHT: everything before the last ":" is the key, after it the offer id.
-  const rawSelection = raw.groups ?? raw.compare ?? "";
-  const tokens = rawSelection
-    ? rawSelection
-        .split(",")
-        .map((token) => {
-          const index = token.lastIndexOf(":");
-          // Offer ids look like "provider:rawId" and *do* contain ":", so a token is
-          // only split when the left part is a real group key.
-          if (index <= 0 || !isGroupKey(token.slice(0, index))) {
-            return { groupKey: "", offerId: token };
-          }
-          return { groupKey: token.slice(0, index), offerId: token.slice(index + 1) };
-        })
-        .filter((token) => token.groupKey.length > 0 || token.offerId.length > 0)
-        .slice(0, 3)
-    : [];
+  // Fresh links send "<groupKey>:<offerId>". Both halves can contain ":" — group keys
+  // never do, but offer ids are "provider:rawId" and a raw id can hold a colon too — so the
+  // split is done from the LEFT: the first ":" that follows a valid group key separates the
+  // two halves. (Splitting from the right truncated `IR|IR3301|…|IFN>KIH:flightio:ifn-kih-ir-3301:2026-11-20`
+  // inside the offer id and silently lost the selection.)
+  const tokens = parseSelectionParam(raw.groups ?? raw.compare ?? "").slice(0, 3);
   // Accept whatever the URL carried: "<groupKey>:<offerId>" or a bare group key
   // (the latter is what old/bookmarked links contain). Resolve to a concrete offer
   // from normalized data only — never from the client's numbers.

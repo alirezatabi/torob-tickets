@@ -151,6 +151,18 @@ export function toSearchParams(query: TripQuery, sort?: SortKeyParam): URLSearch
   return params;
 }
 
+/**
+ * The per-ticket page for one offer: the same search plus `offer=<offerId>`.
+ *
+ * The detail page re-runs this search and looks the offer up, so the URL is shareable and the
+ * page can never show a price that the search did not produce.
+ */
+export function flightHref(query: TripQuery, offerId: string): string {
+  const params = toSearchParams(query);
+  params.set("offer", offerId);
+  return `/flight?${params.toString()}`;
+}
+
 export function searchHref(query: TripQuery, extra: Record<string, string | null | undefined> = {}): string {
   const params = toSearchParams(query, (extra.sort as SortKeyParam | undefined) ?? undefined);
   for (const [key, value] of Object.entries(extra)) {
