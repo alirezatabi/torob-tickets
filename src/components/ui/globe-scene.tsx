@@ -792,21 +792,17 @@ export function GlobeScene({
                 </g>
               </>
             )}
-            {planet && network.map((link, index) => {
-              const color = link.accent === "gold" ? "#efbd63" : "#43baff";
-              const opacity = link.accent === "gold" ? 0.58 : 0.68;
-              return (
-                <g key={`network-${index}`} fill="none" stroke={color} strokeLinecap="round">
-                  <path
-                    d={link.path}
-                    strokeOpacity={link.accent === "gold" ? "0.13" : "0.18"}
-                    strokeWidth="4"
-                    filter={`url(#${gradientId}-glow)`}
-                  />
-                  <path d={link.path} strokeOpacity={Math.min(0.92, opacity + 0.12)} strokeWidth="1.4" strokeDasharray="2 5" />
-                </g>
-              );
-            })}
+            {planet && network.map((link, index) => (
+              <g key={`network-${index}`} data-network-flight="true" fill="none" stroke="#43baff" strokeLinecap="round">
+                <path
+                  d={link.path}
+                  strokeOpacity="0.18"
+                  strokeWidth="4"
+                  filter={`url(#${gradientId}-glow)`}
+                />
+                <path d={link.path} strokeOpacity="0.8" strokeWidth="1.4" strokeDasharray="2 5" />
+              </g>
+            ))}
             {planet && serviceMarkers.map((marker, index) => (
               <NetworkNode key={`service-${index}`} marker={marker} glowId={`${gradientId}-glow`} />
             ))}
@@ -912,6 +908,12 @@ export function GlobeScene({
             strokeWidth={planet ? "1.4" : "1"}
             pointerEvents="none"
           />
+          {planet && network.map((link, index) => link.outerPath ? (
+            <g key={`network-flight-off-limb-${index}`} data-flight-extension="true" fill="none" stroke="#43baff" strokeLinecap="round">
+              <path d={link.outerPath} strokeOpacity="0.25" strokeWidth="4" filter={`url(#${gradientId}-glow)`} />
+              <path d={link.outerPath} strokeOpacity="0.92" strokeWidth="1.4" strokeDasharray="2 5" />
+            </g>
+          ) : null)}
         </svg>
 
         {controls && (
@@ -1284,45 +1286,47 @@ function projectRelief(camera: Camera): string[] {
 }
 
 
-const NETWORK_ROUTES: { from: number; to: number; accent: "gold" | "cyan" }[] = [
-  { from: 1, to: 0, accent: "gold" }, // New York–London
-  { from: 0, to: 13, accent: "cyan" }, // London–Paris
-  { from: 0, to: 10, accent: "cyan" }, // London–Cape Town
-  { from: 1, to: 9, accent: "cyan" }, // New York–Toronto
-  { from: 1, to: 8, accent: "gold" }, // New York–Los Angeles
-  { from: 1, to: 2, accent: "cyan" }, // New York–São Paulo
-  { from: 2, to: 10, accent: "gold" }, // São Paulo–Cape Town
-  { from: 3, to: 13, accent: "cyan" }, // Frankfurt–Paris
-  { from: 3, to: 4, accent: "gold" }, // Frankfurt–Dubai
-  { from: 3, to: 14, accent: "cyan" }, // Frankfurt–Istanbul
-  { from: 3, to: 11, accent: "gold" }, // Frankfurt–Mumbai
-  { from: 4, to: 11, accent: "cyan" }, // Dubai–Mumbai
-  { from: 4, to: 5, accent: "gold" }, // Dubai–Singapore
-  { from: 5, to: 12, accent: "cyan" }, // Singapore–Hong Kong
-  { from: 5, to: 7, accent: "gold" }, // Singapore–Sydney
-  { from: 12, to: 6, accent: "cyan" }, // Hong Kong–Tokyo
-  { from: 6, to: 15, accent: "gold" }, // Tokyo–Seoul
-  { from: 6, to: 7, accent: "cyan" }, // Tokyo–Sydney
-  { from: 8, to: 6, accent: "cyan" }, // Los Angeles–Tokyo
-  { from: 9, to: 3, accent: "gold" }, // Toronto–Frankfurt
-  { from: 10, to: 4, accent: "cyan" }, // Cape Town–Dubai
+const NETWORK_ROUTES: { from: number; to: number }[] = [
+  { from: 1, to: 0 }, // New York–London
+  { from: 0, to: 13 }, // London–Paris
+  { from: 0, to: 10 }, // London–Cape Town
+  { from: 1, to: 9 }, // New York–Toronto
+  { from: 1, to: 8 }, // New York–Los Angeles
+  { from: 1, to: 2 }, // New York–São Paulo
+  { from: 2, to: 10 }, // São Paulo–Cape Town
+  { from: 3, to: 13 }, // Frankfurt–Paris
+  { from: 3, to: 4 }, // Frankfurt–Dubai
+  { from: 3, to: 14 }, // Frankfurt–Istanbul
+  { from: 3, to: 11 }, // Frankfurt–Mumbai
+  { from: 4, to: 11 }, // Dubai–Mumbai
+  { from: 4, to: 5 }, // Dubai–Singapore
+  { from: 5, to: 12 }, // Singapore–Hong Kong
+  { from: 5, to: 7 }, // Singapore–Sydney
+  { from: 12, to: 6 }, // Hong Kong–Tokyo
+  { from: 6, to: 15 }, // Tokyo–Seoul
+  { from: 6, to: 7 }, // Tokyo–Sydney
+  { from: 8, to: 6 }, // Los Angeles–Tokyo
+  { from: 9, to: 3 }, // Toronto–Frankfurt
+  { from: 10, to: 4 }, // Cape Town–Dubai
 ];
 
 function projectNetwork(
   camera: Camera,
-): { path: string; accent: "gold" | "cyan"; plane?: { at: [number, number]; angle: number } }[] {
-  return NETWORK_ROUTES.flatMap(({ from, to, accent }, routeIndex) => {
+): { path: string; outerPath?: string; accent: "cyan"; plane?: { at: [number, number]; angle: number } }[] {
+  return NETWORK_ROUTES.flatMap(({ from, to }, routeIndex) => {
     const origin = NETWORK_LOCATIONS[from]!;
     const destination = NETWORK_LOCATIONS[to]!;
     const km = distanceKm(origin, destination);
     const angle = Math.min((km / 6371) * (180 / Math.PI), 175);
     const arc = flightArc(origin, destination, angle, camera, 96);
-    // Raise these decorative air lanes a little more than ticket-route arcs, so they read as
-    // elegant, separate flight corridors instead of short straight joins between map pins.
+    // Elevated, all-cyan lanes. The smooth lift is zero at real city endpoints and peaks mid-flight.
     const maxLift = Math.min(0.18, 0.06 + (angle / 180) * 0.11 + (routeIndex % 3) * 0.006);
     const liftAt = (t: number) => maxLift * Math.sin(Math.PI * t);
     let path = "";
     let run: string[] = [];
+    let outerPath = "";
+    let previous: [number, number] | null = null;
+    let previousOutside = false;
     const flush = () => {
       if (run.length > 1) path += `M${run.join("L")}`;
       run = [];
@@ -1334,18 +1338,29 @@ function projectNetwork(
       const z = point.ground.z * (1 + lift);
       if (y >= 0) {
         flush();
+        previous = null;
+        previousOutside = false;
         continue;
       }
-      run.push(
-        `${Math.round(camera.cx + camera.radius * x)} ${Math.round(camera.cy - camera.radius * z)}`,
-      );
+      const screenX = camera.cx + camera.radius * x;
+      const screenY = camera.cy - camera.radius * z;
+      const current: [number, number] = [screenX, screenY];
+      run.push(`${Math.round(screenX)} ${Math.round(screenY)}`);
+      const outsideGlobe = (screenX - camera.cx) ** 2 + (screenY - camera.cy) ** 2 > camera.radius ** 2;
+      if (outsideGlobe && !previousOutside) {
+        outerPath += flightLimbExtension(previous, current, camera);
+      } else if (!outsideGlobe && previousOutside && previous) {
+        outerPath += flightLimbExtension(current, previous, camera);
+      }
+      previous = current;
+      previousOutside = outsideGlobe;
     }
     flush();
 
     let plane: { at: [number, number]; angle: number } | undefined;
     if (routeIndex % 4 === 0) {
       const pointIndex = Math.round(arc.points.length * 0.44);
-      const previous = arc.points[Math.max(0, pointIndex - 1)]!;
+      const previousPoint = arc.points[Math.max(0, pointIndex - 1)]!;
       const current = arc.points[pointIndex]!;
       const next = arc.points[Math.min(arc.points.length - 1, pointIndex + 1)]!;
       if (current.ground.y * (1 + liftAt(current.t)) < -0.08) {
@@ -1356,7 +1371,7 @@ function projectNetwork(
             camera.cy - camera.radius * point.ground.z * (1 + lift),
           ];
         };
-        const [x0, y0] = screenPoint(previous);
+        const [x0, y0] = screenPoint(previousPoint);
         const [x, y] = screenPoint(current);
         const [x1, y1] = screenPoint(next);
         plane = {
@@ -1365,8 +1380,52 @@ function projectNetwork(
         };
       }
     }
-    return path ? [{ path, accent, ...(plane ? { plane } : {}) }] : [];
+    return path ? [{ path, ...(outerPath ? { outerPath } : {}), accent: "cyan" as const, ...(plane ? { plane } : {}) }] : [];
   });
+}
+
+/** Extend a lifted lane just beyond the limb so a route to the far side reads as a flight. */
+function flightLimbExtension(
+  inside: [number, number] | null,
+  outside: [number, number],
+  camera: Camera,
+): string {
+  const outerRadius = camera.radius + 18;
+  let edge: [number, number];
+  let tip: [number, number];
+  if (inside) {
+    edge = pointAtScreenRadius(inside, outside, camera, camera.radius) ?? outside;
+    tip = pointAtScreenRadius(inside, outside, camera, outerRadius) ?? outside;
+  } else {
+    const dx = outside[0] - camera.cx;
+    const dy = outside[1] - camera.cy;
+    const distance = Math.hypot(dx, dy) || 1;
+    edge = [camera.cx + (dx * camera.radius) / distance, camera.cy + (dy * camera.radius) / distance];
+    const tipRadius = Math.min(distance, outerRadius);
+    tip = [camera.cx + (dx * tipRadius) / distance, camera.cy + (dy * tipRadius) / distance];
+  }
+  return `M${Math.round(edge[0])} ${Math.round(edge[1])}L${Math.round(tip[0])} ${Math.round(tip[1])}`;
+}
+
+function pointAtScreenRadius(
+  from: [number, number],
+  to: [number, number],
+  camera: Camera,
+  radius: number,
+): [number, number] | null {
+  const dx = to[0] - from[0];
+  const dy = to[1] - from[1];
+  const ox = from[0] - camera.cx;
+  const oy = from[1] - camera.cy;
+  const a = dx * dx + dy * dy;
+  if (a === 0) return null;
+  const b = 2 * (ox * dx + oy * dy);
+  const c = ox * ox + oy * oy - radius * radius;
+  const discriminant = b * b - 4 * a * c;
+  if (discriminant < 0) return null;
+  const t = (-b + Math.sqrt(discriminant)) / (2 * a);
+  if (t < 0 || t > 1) return null;
+  return [from[0] + t * dx, from[1] + t * dy];
 }
 
 /** Graticule: 20° meridians and parallels, clipped by the horizon like everything else. */

@@ -32,6 +32,24 @@ describe("globe hydration", () => {
     document.body.appendChild(container);
     expect(container.querySelectorAll('[data-land-layer="planet"] path[fill]').length).toBeGreaterThan(0);
     expect(container.querySelector('[data-land-layer="planet"] path[stroke]')).toBeNull();
+    const networkLanes = [...container.querySelectorAll<SVGGElement>("[data-network-flight]")];
+    expect(networkLanes.length).toBeGreaterThan(0);
+    expect(networkLanes.every((lane) => lane.getAttribute("stroke") === "#43baff")).toBe(true);
+    const flightExtensions = [...container.querySelectorAll<SVGGElement>("[data-flight-extension]")];
+    expect(flightExtensions.length).toBeGreaterThan(0);
+    for (const extension of flightExtensions) {
+      const path = extension.querySelector("path")?.getAttribute("d") ?? "";
+      const segments = [...path.matchAll(/M(-?\d+(?:\.\d+)?) (-?\d+(?:\.\d+)?)L(-?\d+(?:\.\d+)?) (-?\d+(?:\.\d+)?)/g)];
+      expect(segments.length).toBeGreaterThan(0);
+      for (const segment of segments) {
+        const coordinates = segment.slice(1).map(Number);
+        const radii = [0, 2].map((index) =>
+          Math.hypot(coordinates[index]! - 110, coordinates[index + 1]! - 110),
+        );
+        expect(Math.max(...radii)).toBeGreaterThan(98);
+        expect(Math.max(...radii)).toBeLessThanOrEqual(118);
+      }
+    }
 
     // SVG transform attributes must use a canonical precision, not the raw result of atan2
     // (which may differ by the last floating-point bit between server and browser runtimes).

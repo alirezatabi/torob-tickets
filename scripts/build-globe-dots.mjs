@@ -6,36 +6,30 @@ const source = JSON.parse(await readFile(new URL("../src/lib/map/countries-50m.j
 const step = 1.5;
 const rings = [];
 
+function unwrapAtAntimeridian(ring) {
+  const unwrapped = [];
+  let previousLon = ring[0]?.[0] ?? 0;
+  for (let index = 0; index < ring.length; index += 1) {
+    const [rawLon, lat] = ring[index];
+    let lon = rawLon;
+    if (index > 0) {
+      while (lon - previousLon > 180) lon -= 360;
+      while (lon - previousLon < -180) lon += 360;
+    }
+    unwrapped.push([lon, lat]);
+    previousLon = lon;
+  }
+  return unwrapped;
+}
+
 for (const country of source.countries) {
   for (const raw of country.rings) {
-    let ring = raw;
-    // Split rings at the antimeridian before scan conversion; otherwise a polygon crossing ±180°
-    // incorrectly fills most of the world. The Natural Earth source has only a few such edges.
-    const split = [];
-    let current = [ring[0]];
-    for (let i = 1; i < ring.length; i += 1) {
-      const previous = ring[i - 1];
-      const point = ring[i];
-      if (Math.abs(point[0] - previous[0]) > 180) {
-        const shifted = point[0] > previous[0] ? point[0] - 360 : point[0] + 360;
-        const boundary = point[0] > previous[0] ? -180 : 180;
-        const denominator = shifted - previous[0];
-        if (Math.abs(denominator) < 1e-9) {
-          if (current.length > 2) split.push(current);
-          current = [point];
-          continue;
-        }
-        const t = (boundary - previous[0]) / denominator;
-        const lat = previous[1] + (point[1] - previous[1]) * t;
-        if (current.length > 2) split.push([...current, [boundary, lat]]);
-        current = [[-boundary, lat], point];
-      } else current.push(point);
-    }
-    if (current.length > 2) split.push(current);
-    for (ring of split) {
-      const ys = ring.map(([_, lat]) => lat);
-      rings.push({ minLat: Math.min(...ys), maxLat: Math.max(...ys), ring });
-    }
+    // Keep each polygon whole in an unwrapped longitude domain. Splitting a dateline-crossing
+    // country into separate rings loses scanline pairs (notably across Siberia) and leaves huge
+    // holes in the hero's land lights.
+    const ring = unwrapAtAntimeridian(raw);
+    const ys = ring.map(([_, lat]) => lat);
+    rings.push({ minLat: Math.min(...ys), maxLat: Math.max(...ys), ring });
   }
 }
 
@@ -54,11 +48,17 @@ for (let lat = -84 + step / 2; lat <= 84; lat += step, row += 1) {
     }
     crossings.sort((a, b) => a - b);
     for (let i = 0; i + 1 < crossings.length; i += 2) {
-      const lo = Math.ceil((crossings[i] + 180 - offset) / lonStep);
-      const hi = Math.floor((crossings[i + 1] + 180 - offset) / lonStep);
-      for (let k = lo; k <= hi; k += 1) {
-        const lon = -180 + offset + k * lonStep;
-        points.add(`${lon.toFixed(3)},${lat.toFixed(3)}`);
+      for (const shift of [-360, 0, 360]) {
+        const west = Math.max(-180, crossings[i] + shift);
+        const east = Math.min(180, crossings[i + 1] + shift);
+        if (west > east) continue;
+        const lo = Math.ceil((west + 180 - offset) / lonStep);
+        const hi = Math.floor((east + 180 - offset) / lonStep);
+        for (let k = lo; k <= hi; k += 1) {
+          let lon = -180 + offset + k * lonStep;
+          if (lon >= 180) lon -= 360;
+          points.add(`${lon.toFixed(3)},${lat.toFixed(3)}`);
+        }
       }
     }
   }
