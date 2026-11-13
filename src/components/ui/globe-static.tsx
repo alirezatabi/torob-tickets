@@ -1,6 +1,12 @@
 import { distanceKm, type Point } from "@/lib/geo";
-import { flightArc, projectRing, rotationMatrix } from "@/lib/globe3d";
-import { COAST } from "@/lib/land";
+import {
+  flightArc,
+  projectRing,
+  rotationMatrix,
+  routeZoom,
+} from "@/lib/globe3d";
+import { decodeAll } from "@/lib/land";
+import packed2 from "@/lib/map/land-2.json";
 
 /**
  * The no-JavaScript globe.
@@ -40,11 +46,7 @@ export function GlobeStatic({
 }: GlobeStaticProps) {
   const km = distanceKm(origin, destination);
   const spanDeg = Math.min((km / 6371) * (180 / Math.PI), 175);
-  // Cap the still figure at the detail tier that is already decoded on the server.
-  const zoom = Math.min(
-    Math.max(1, 0.62 / Math.sin((spanDeg * Math.PI) / 360)),
-    3.5,
-  );
+  const zoom = routeZoom(km);
   const centre: Point = [
     midpoint(origin[0], destination[0]),
     (origin[1] + destination[1]) / 2,
@@ -56,7 +58,13 @@ export function GlobeStatic({
     cy: C,
   };
 
-  const rings = COAST[1]
+  // The server-only fallback can afford tier 2: preserve sharp borders on short routes without
+  // adding the detailed data to the browser's shared JS chunk.
+  const packed = packed2 as unknown as {
+    scale: number;
+    rings: { n: number; p: string }[];
+  };
+  const rings = decodeAll(packed.rings, packed.scale)
     .map((ring) => projectRing(ring, camera))
     .filter((ring): ring is NonNullable<typeof ring> => ring !== null)
     .map((ring) => ({ ...ring, path: compact(ring.path, 0.6) }))
@@ -83,19 +91,20 @@ export function GlobeStatic({
         <title>{`مسیر ${originLabel} → ${destinationLabel} روی کرهٔ زمین`}</title>
         <defs>
           <radialGradient id="globe-static-ocean" cx="34%" cy="28%" r="90%">
-            <stop offset="0%" stopColor="#3f9d92" />
-            <stop offset="60%" stopColor="#256f67" />
-            <stop offset="100%" stopColor="#0d3f3a" />
+            <stop offset="0%" stopColor="#86d8ff" />
+            <stop offset="32%" stopColor="#398fc9" />
+            <stop offset="68%" stopColor="#145b9d" />
+            <stop offset="100%" stopColor="#071d48" />
           </radialGradient>
           <radialGradient id="globe-static-land" cx="30%" cy="20%" r="95%">
-            <stop offset="0%" stopColor="#f6f9ef" />
-            <stop offset="100%" stopColor="#b8cfc0" />
+            <stop offset="0%" stopColor="#f4f2df" />
+            <stop offset="100%" stopColor="#9eb79f" />
           </radialGradient>
           <clipPath id="globe-static-clip">
             <circle cx={C} cy={C} r={R} />
           </clipPath>
         </defs>
-        <circle cx={C} cy={C} r={R * 1.03} fill="#2f9d8e" fillOpacity="0.18" />
+        <circle cx={C} cy={C} r={R * 1.03} fill="#55bdff" fillOpacity="0.24" />
         <circle cx={C} cy={C} r={R} fill="url(#globe-static-ocean)" />
         <g clipPath="url(#globe-static-clip)">
           <g

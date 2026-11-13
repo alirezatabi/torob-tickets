@@ -14,6 +14,7 @@ import {
   lightAt,
   planeAt,
   projectRing,
+  routeZoom,
   rotate,
   rotationMatrix,
   toVec,
@@ -181,6 +182,16 @@ describe("coastline data", () => {
         }
       }
     }
+  });
+});
+
+describe("route framing", () => {
+  it("keeps short domestic routes at globe scale instead of magnifying away the sphere", () => {
+    const tehranMashhad = distanceKm([51.389, 35.689], [59.605, 36.297]);
+    expect(tehranMashhad).toBeLessThan(1_200);
+    expect(routeZoom(tehranMashhad)).toBeLessThanOrEqual(1.35);
+    expect(routeZoom(tehranMashhad)).toBeGreaterThan(1);
+    expect(routeZoom(3_000)).toBeGreaterThan(routeZoom(tehranMashhad));
   });
 });
 

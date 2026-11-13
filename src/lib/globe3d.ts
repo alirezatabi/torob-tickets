@@ -22,6 +22,16 @@ export interface Vec3 {
 
 const RAD = Math.PI / 180;
 
+/**
+ * Keep nearby domestic routes at globe scale rather than magnifying away the sphere.
+ * Longer routes retain distance-based framing, capped at 8×.
+ */
+export function routeZoom(km: number): number {
+  const spanDeg = Math.min((km / 6371) * (180 / Math.PI), 175);
+  const distanceZoom = Math.max(1, Math.min(8, 0.62 / Math.sin((spanDeg * Math.PI) / 360)));
+  return km < 1200 ? Math.min(distanceZoom, 1.35) : distanceZoom;
+}
+
 /** Geographic → unit sphere. lon 0 is at +y, lat 0 at +x… whichever, as long as it is consistent. */
 export function toVec(lon: number, lat: number): Vec3 {
   const phi = lat * RAD;

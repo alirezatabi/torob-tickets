@@ -15,6 +15,7 @@ import {
   planeAt,
   projectRing,
   rotationMatrix,
+  routeZoom,
   toVec,
   type Camera,
   type Vec3,
@@ -61,8 +62,6 @@ export interface GlobeSceneProps {
 }
 
 const DISC = 0.9; // disc radius as a fraction of the viewbox, leaving room for the halo
-const MIN_ZOOM = 1;
-const MAX_ZOOM = 8;
 
 export function GlobeScene({
   origin,
@@ -111,16 +110,8 @@ export function GlobeScene({
     ];
   }, [route]);
 
-  /** Zoom that makes the route fill a readable share of the disc (see docs/REPORT-02 §۱۲). */
-  const baseZoom = useMemo(() => {
-    if (!route) return 1;
-    const spanDeg = Math.min((km / 6371) * (180 / Math.PI), 175);
-    return clamp(
-      0.62 / Math.sin((spanDeg * Math.PI) / 360),
-      MIN_ZOOM,
-      MAX_ZOOM,
-    );
-  }, [route, km]);
+  /** Keep short domestic routes at globe scale; see routeZoom() and docs/REPORT-02 §۱۴. */
+  const baseZoom = useMemo(() => (route ? routeZoom(km) : 1), [route, km]);
 
   const [yaw, setYaw] = useState(planet ? 52 : centre[0]);
   const [pitch, setPitch] = useState(planet ? 22 : centre[1]);
@@ -185,7 +176,9 @@ export function GlobeScene({
     let cancelled = false;
     let raf = 0;
     const timers: number[] = [];
-    const needed = coastLevel(baseZoom);
+    // A domestic-route globe stays nearly full-frame, so load enough boundary detail for the
+    // small country shapes instead of magnifying the low-detail whole-world tier.
+    const needed = Math.max(2, coastLevel(baseZoom)) as CoastLevel;
 
     void loadCoast(needed).then((rings) => {
       if (cancelled || rings.length === 0) return;
@@ -359,7 +352,7 @@ export function GlobeScene({
       >
         <div
           aria-hidden="true"
-          className="absolute inset-[2%] rounded-full bg-teal-500/20 blur-2xl"
+          className="absolute inset-[2%] rounded-full bg-sky-400/25 blur-2xl"
           style={{ opacity: 0.55 }}
         />
         <svg
@@ -392,15 +385,15 @@ export function GlobeScene({
               cy="28%"
               r="90%"
             >
-              <stop offset="0%" stopColor="#3f9d92" />
-              <stop offset="42%" stopColor="#2b7f76" />
-              <stop offset="76%" stopColor="#1a5f58" />
-              <stop offset="100%" stopColor="#0d3f3a" />
+              <stop offset="0%" stopColor="#86d8ff" />
+              <stop offset="32%" stopColor="#398fc9" />
+              <stop offset="68%" stopColor="#145b9d" />
+              <stop offset="100%" stopColor="#071d48" />
             </radialGradient>
             <radialGradient id={`${gradientId}-land`} cx="30%" cy="20%" r="95%">
-              <stop offset="0%" stopColor="#f6f9ef" />
-              <stop offset="55%" stopColor="#dbe8d8" />
-              <stop offset="100%" stopColor="#b8cfc0" />
+              <stop offset="0%" stopColor="#f4f2df" />
+              <stop offset="55%" stopColor="#d4dfc6" />
+              <stop offset="100%" stopColor="#9eb79f" />
             </radialGradient>
             <radialGradient
               id={`${gradientId}-shade`}
@@ -447,8 +440,8 @@ export function GlobeScene({
             cx={cx}
             cy={cy}
             r={radius * 1.035}
-            fill="#2f9d8e"
-            fillOpacity="0.18"
+            fill="#55bdff"
+            fillOpacity="0.24"
           />
           <circle
             cx={cx}
