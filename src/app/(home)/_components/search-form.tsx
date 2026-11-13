@@ -20,11 +20,14 @@ import { INITIAL_INTENT_STATE } from "@/server/intent-state";
  * then rebuild the *same* URL the form would produce, so both entry points share
  * exactly one search implementation.
  */
-export function SearchForm({ initialOrigin = "THR", initialDestination = "IST" }: { initialOrigin?: string; initialDestination?: string }) {
+export function SearchForm({ initialOrigin = "", initialDestination = "" }: { initialOrigin?: string; initialDestination?: string }) {
   const router = useRouter();
   const today = isoToday();
   const [mode, setMode] = useState<"form" | "nl">("form");
   // Round-trip search is not implemented end to end (B9); the form stays one-way.
+  // Mubada/maghsad start **empty** on purpose: a prefilled route is a guess the user never
+  // made, and it hides the fact that the search is theirs. The date keeps a default (it is
+  // the one field with a sensible "soonest" answer), the two airports do not.
   const [origin, setOrigin] = useState(initialOrigin);
   const [destination, setDestination] = useState(initialDestination);
   const [departDate, setDepartDate] = useState(addDays(today, 7));
@@ -52,10 +55,15 @@ export function SearchForm({ initialOrigin = "THR", initialDestination = "IST" }
   }
 
   function submitForm() {
+    if (!origin || !destination) {
+      setFormError("برای جستجو، هم مبدأ و هم مقصد را انتخاب کنید.");
+      return;
+    }
     if (origin === destination) {
       setFormError("مبدأ و مقصد نمی‌توانند یکسان باشند.");
       return;
     }
+    setFormError(null);
     startTransition(() => router.push(buildSearchUrl()));
   }
 
@@ -188,9 +196,27 @@ export function SearchForm({ initialOrigin = "THR", initialDestination = "IST" }
       ) : (
         <div>
           <div className="grid gap-3 sm:grid-cols-[1fr_auto_1fr]">
-            <CitySelect id="origin" label="مبدأ" value={origin} onChange={setOrigin} placeholder="از کجا؟" />
-            <SwapButton onClick={() => { setOrigin(destination); setDestination(origin); }} />
-            <CitySelect id="destination" label="مقصد" value={destination} onChange={setDestination} placeholder="به کجا؟" />
+            <CitySelect
+              id="origin"
+              label="مبدأ"
+              value={origin}
+              onChange={(code) => {
+                setOrigin(code);
+                setFormError(null);
+              }}
+              placeholder="از کجا؟"
+            />
+            <SwapButton onClick={() => { setOrigin(destination); setDestination(origin); setFormError(null); }} />
+            <CitySelect
+              id="destination"
+              label="مقصد"
+              value={destination}
+              onChange={(code) => {
+                setDestination(code);
+                setFormError(null);
+              }}
+              placeholder="به کجا؟"
+            />
           </div>
 
           <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">

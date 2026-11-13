@@ -3,11 +3,20 @@ import { ArrowLeft } from "lucide-react";
 import { SearchForm } from "@/app/(home)/_components/search-form";
 import { DemoSearches } from "@/app/(home)/_components/demo-searches";
 import { RouteExplorer, CityIndex } from "@/app/(home)/_components/route-explorer";
+import { PopularRoutes } from "@/app/(home)/_components/popular-routes";
 import { listProviders } from "@/providers/registry";
 import { airlineCount } from "@/lib/airlines";
 import { routeCount, servedCities } from "@/lib/schedules";
 import { CITIES } from "@/lib/cities";
 import { toPersianDigits } from "@/lib/format";
+
+/**
+ * The fare strip prices the *current* week, so the page cannot be a build-time snapshot.
+ * A short revalidate keeps the homepage fast (prerendered) without freezing last week's prices:
+ * at most 15 minutes stale, and the card's link carries the day it priced, so a tap can never
+ * land on a different date than the one shown.
+ */
+export const revalidate = 900;
 
 export default function HomePage() {
   const providers = listProviders();
@@ -42,6 +51,9 @@ export default function HomePage() {
           <Metric value={toPersianDigits(servedCities().length)} label="شهر" />
           <Metric value={toPersianDigits(airlineCount())} label="ایرلاین" />
         </dl>
+
+        {/* Cheap fares now, not a “best seller” badge: the demo has no sales to count. */}
+        <PopularRoutes />
 
         <RouteExplorer />
         <CityIndex />

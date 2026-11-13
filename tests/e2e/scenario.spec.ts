@@ -22,8 +22,17 @@ async function openScenario(page: Page) {
 test.describe("Isfahan → Kish, no date chosen", () => {
   test("the homepage needs only origin and destination", async ({ page }) => {
     await page.goto("/");
-    // Origin/destination are prefilled; the date is prefilled with today, and the search
-    // button is the only required interaction.
+    // Origin and destination start empty on purpose: the route is the user's to choose.
+    // Submitting without them must say so instead of searching a guessed route.
+    await expect(page.getByRole("combobox", { name: "مبدأ" })).toContainText("از کجا؟");
+    await page.getByRole("button", { name: /جستجوی پرواز/ }).click();
+    await expect(page.getByRole("alert")).toContainText("هم مبدأ و هم مقصد");
+
+    // Choosing both is the only required interaction; the date still defaults to today.
+    await page.getByRole("combobox", { name: "مبدأ" }).click();
+    await page.getByRole("option", { name: /اصفهان/ }).click();
+    await page.getByRole("combobox", { name: "مقصد" }).click();
+    await page.getByRole("option", { name: /کیش/ }).click();
     await page.getByRole("button", { name: /جستجوی پرواز/ }).click();
     await page.waitForURL(/\/search\?/);
     await expect(page.getByTestId("results-list")).toBeVisible();

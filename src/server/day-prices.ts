@@ -32,6 +32,10 @@ export interface DayPrice {
   flightsCount: number;
   /** How many flights are sold out for the requested passenger count. */
   soldOutCount: number;
+  /** Carrier of the day's cheapest fare — `null` when the day has no purchasable fare. */
+  airlineCode: string | null;
+  /** Shortest block time among that day's flights, in minutes. */
+  fastestMinutes: number | null;
   state: DayPriceState;
   isToday: boolean;
 }
@@ -63,6 +67,8 @@ export async function getDayPrices(query: TripQuery, options: DayPricesOptions =
           cheapestToman: null,
           flightsCount: 0,
           soldOutCount: 0,
+          airlineCode: null,
+          fastestMinutes: null,
           state: "empty",
           isToday: false,
         };
@@ -72,8 +78,12 @@ export async function getDayPrices(query: TripQuery, options: DayPricesOptions =
         const outcome = await search(dayQuery, { now });
         const groups = groupOffers(outcome.offers);
         let cheapest: number | null = null;
+        let cheapestCarrier: string | null = null;
+        let fastest: number | null = null;
         let soldOut = 0;
         for (const group of groups) {
+          const block = group.primary.durationMinutes;
+          if (block > 0 && (fastest === null || block < fastest)) fastest = block;
           const selection = selectCheapestOffer(group, {
             passengers: query.passengers,
             cabin: query.cabin,
@@ -85,6 +95,7 @@ export async function getDayPrices(query: TripQuery, options: DayPricesOptions =
           }
           if (cheapest === null || selection.cheapest.price.toman < cheapest) {
             cheapest = selection.cheapest.price.toman;
+            cheapestCarrier = selection.cheapest.airlineCode;
           }
         }
         return {
@@ -93,6 +104,8 @@ export async function getDayPrices(query: TripQuery, options: DayPricesOptions =
           cheapestToman: cheapest,
           flightsCount: groups.length,
           soldOutCount: soldOut,
+          airlineCode: cheapestCarrier,
+          fastestMinutes: fastest,
           state: cheapest === null ? "empty" : "ok",
           isToday: date === today,
         };
@@ -104,6 +117,8 @@ export async function getDayPrices(query: TripQuery, options: DayPricesOptions =
           cheapestToman: null,
           flightsCount: 0,
           soldOutCount: 0,
+          airlineCode: null,
+          fastestMinutes: null,
           state: "error",
           isToday: date === today,
         };
