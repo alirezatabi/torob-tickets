@@ -747,7 +747,17 @@ export function GlobeScene({
               </>
             )}
             {planet && network.map((link, index) => (
-              <g key={`network-${index}`} data-network-flight="true" fill="none" stroke="#43baff" strokeLinecap="round">
+              <g
+                key={`network-${index}`}
+                data-network-flight="true"
+                data-network-from={link.from}
+                data-network-to={link.to}
+                data-origin-visible={link.originVisible}
+                data-destination-visible={link.destinationVisible}
+                fill="none"
+                stroke="#43baff"
+                strokeLinecap="round"
+              >
                 <path
                   d={link.path}
                   strokeOpacity="0.18"
@@ -758,7 +768,7 @@ export function GlobeScene({
               </g>
             ))}
             {planet && serviceMarkers.map((marker, index) => (
-              <NetworkNode key={`service-${index}`} marker={marker} glowId={`${gradientId}-glow`} />
+              <NetworkNode key={`service-${index}`} marker={marker} />
             ))}
             {planet && network.map((link, index) => (
               link.plane ? (
@@ -1191,32 +1201,36 @@ const NETWORK_ROUTES: { from: number; to: number }[] = [
   { from: 1, to: 0 }, // New York–London
   { from: 0, to: 13 }, // London–Paris
   { from: 0, to: 10 }, // London–Cape Town
-  { from: 1, to: 9 }, // New York–Toronto
   { from: 1, to: 8 }, // New York–Los Angeles
   { from: 1, to: 2 }, // New York–São Paulo
   { from: 2, to: 10 }, // São Paulo–Cape Town
-  { from: 3, to: 13 }, // Frankfurt–Paris
   { from: 3, to: 4 }, // Frankfurt–Dubai
-  { from: 3, to: 14 }, // Frankfurt–Istanbul
-  { from: 3, to: 11 }, // Frankfurt–Mumbai
-  { from: 4, to: 11 }, // Dubai–Mumbai
   { from: 4, to: 5 }, // Dubai–Singapore
   { from: 5, to: 12 }, // Singapore–Hong Kong
   { from: 5, to: 7 }, // Singapore–Sydney
   { from: 12, to: 6 }, // Hong Kong–Tokyo
-  { from: 6, to: 15 }, // Tokyo–Seoul
-  { from: 6, to: 7 }, // Tokyo–Sydney
   { from: 8, to: 6 }, // Los Angeles–Tokyo
-  { from: 9, to: 3 }, // Toronto–Frankfurt
   { from: 10, to: 4 }, // Cape Town–Dubai
 ];
 
 function projectNetwork(
   camera: Camera,
-): { path: string; outerPath?: string; plane?: { at: [number, number]; angle: number } }[] {
+): {
+  from: number;
+  to: number;
+  originVisible: boolean;
+  destinationVisible: boolean;
+  path: string;
+  outerPath?: string;
+  plane?: { at: [number, number]; angle: number };
+}[] {
   return NETWORK_ROUTES.flatMap(({ from, to }, routeIndex) => {
     const origin = NETWORK_LOCATIONS[from]!;
     const destination = NETWORK_LOCATIONS[to]!;
+    const originOnVisibleHemisphere = rotate(camera.m, toVec(origin[0], origin[1])).y < -0.08;
+    const destinationOnVisibleHemisphere = rotate(camera.m, toVec(destination[0], destination[1])).y < -0.08;
+    if (!originOnVisibleHemisphere && !destinationOnVisibleHemisphere) return [];
+
     const km = distanceKm(origin, destination);
     const angle = Math.min((km / 6371) * (180 / Math.PI), 175);
     const arc = flightArc(origin, destination, angle, camera, 96);
@@ -1272,7 +1286,17 @@ function projectNetwork(
         };
       }
     }
-    return path ? [{ path, ...(outerPath ? { outerPath } : {}), ...(plane ? { plane } : {}) }] : [];
+    return path
+      ? [{
+          from,
+          to,
+          originVisible: originOnVisibleHemisphere,
+          destinationVisible: destinationOnVisibleHemisphere,
+          path,
+          ...(outerPath ? { outerPath } : {}),
+          ...(plane ? { plane } : {}),
+        }]
+      : [];
   });
 }
 
@@ -1388,14 +1412,11 @@ function projectGraticule(camera: Camera): string {
   return path;
 }
 
-function NetworkNode({ marker, glowId }: { marker: ServiceMarkerData; glowId: string }) {
-  const color = "#62c6ff";
+function NetworkNode({ marker }: { marker: ServiceMarkerData }) {
   return (
-    <g data-service-marker="true" aria-hidden="true">
-      <circle cx={marker.x} cy={marker.y} r="30" fill="none" stroke={color} strokeOpacity="0.12" strokeWidth="1" />
-      <circle cx={marker.x} cy={marker.y} r="15" fill="none" stroke={color} strokeOpacity="0.42" strokeWidth="0.9" />
-      <circle cx={marker.x} cy={marker.y} r="6" fill={color} fillOpacity="0.24" />
-      <circle cx={marker.x} cy={marker.y} r="3" fill={color} filter={`url(#${glowId})`} />
+    <g transform={`translate(${marker.x} ${marker.y})`} data-service-marker="true" aria-hidden="true">
+      <circle r="8" fill="#08233d" fillOpacity="0.92" stroke="#62c6ff" strokeOpacity="0.82" strokeWidth="1" />
+      <path d="M-4 3V-1h2v-3h2v3h2v-2h2v6Z" fill="#b7ecff" />
     </g>
   );
 }

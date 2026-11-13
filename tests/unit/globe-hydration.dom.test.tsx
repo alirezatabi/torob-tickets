@@ -38,11 +38,17 @@ describe("globe hydration", () => {
     const networkLanes = [...container.querySelectorAll<SVGGElement>("[data-network-flight]")];
     expect(networkLanes.length).toBeGreaterThan(0);
     expect(networkLanes.every((lane) => lane.getAttribute("stroke") === "#43baff")).toBe(true);
+    expect(networkLanes.every((lane) =>
+      lane.getAttribute("data-origin-visible") === "true" || lane.getAttribute("data-destination-visible") === "true",
+    )).toBe(true);
+    expect(networkLanes.some((lane) =>
+      lane.getAttribute("data-network-from") === "6" && lane.getAttribute("data-network-to") === "15",
+    )).toBe(false);
     const serviceMarkers = [...container.querySelectorAll<SVGGElement>("[data-service-marker]")];
     expect(serviceMarkers.length).toBeGreaterThan(0);
-    expect(serviceMarkers.every((marker) => [...marker.querySelectorAll("circle")].every(
-      (circle) => circle.getAttribute("fill") === "#62c6ff" || circle.getAttribute("stroke") === "#62c6ff",
-    ))).toBe(true);
+    expect(serviceMarkers.every((marker) =>
+      marker.querySelector("circle")?.getAttribute("r") === "8" && marker.querySelector("path") !== null,
+    )).toBe(true);
     expect(container.querySelector('[stroke="#ffd17a"]')).toBeNull();
     const airplaneMarkers = [...container.querySelectorAll<SVGGElement>("[data-airplane-marker]")];
     expect(airplaneMarkers.length).toBeGreaterThan(0);
