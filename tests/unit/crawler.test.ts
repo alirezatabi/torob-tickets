@@ -22,8 +22,10 @@ describe("crawl source placeholders", () => {
     const offers = safarmarketSource.parseRaw(fixture, { route: "THR-MHD", date: "2026-11-22", url: "https://safarmarket.com/api/flight/v3/search" });
     expect(offers).toHaveLength(3);
     expect(offers.map((offer) => offer.amount)).toEqual([81_840_000, 82_568_798, 82_896_000]);
-    expect(offers[0]).toMatchObject({ origin: "THR", destination: "MHD", airline: "Fly Persia", airlineCode: "FP", flightNumber: "FP7438", departAt: null, arriveAt: null, departureLocal: "2026-11-22 14:20", arrivalLocal: "2026-11-22 15:40", amount: 81_840_000, currency: null, seats: 9, offerUrl: null, providerId: "faza24", flightClass: "ECONOMY", sellType: "CHARTER", aircraft: "Boeing", charter: true });
-    expect(normalizeRawOffers(offers)[0]?.warnings).toEqual(expect.arrayContaining(["currency-missing", "timezone-unresolved"]));
+    expect(offers[0]).toMatchObject({ origin: "THR", destination: "MHD", airline: "Fly Persia", airlineCode: "FP", flightNumber: "FP7438", departAt: "2026-11-22T10:50:00.000Z", arriveAt: "2026-11-22T12:10:00.000Z", departureLocal: "2026-11-22 14:20", arrivalLocal: "2026-11-22 15:40", amount: 81_840_000, currency: "IRT", seats: 9, offerUrl: null, providerId: "faza24", flightClass: "ECONOMY", sellType: "CHARTER", aircraft: "Boeing", charter: true });
+    const warnings = normalizeRawOffers(offers)[0]?.warnings ?? [];
+    expect(warnings).not.toContain("currency-missing");
+    expect(warnings).not.toContain("timezone-unresolved");
     expect(safarmarketSource.parseRaw(fixture, { route: "IKA-MHD", date: "2026-11-22", url: "" })).toEqual([]);
     expect(safarmarketSource.parseRaw(fixture, { route: "THR-MHD", date: "2026-11-23", url: "" })).toEqual([]);
   });
@@ -55,7 +57,7 @@ describe("crawl source placeholders", () => {
     const body = JSON.stringify({ code: 200, result: { flights: [{ flightId: "flight-x", leave: {}, providers: [{ price: 1200 }] }] } });
     const offers = safarmarketSource.parseRaw(body, { route: "", date: "", url: "" });
     expect(offers).toHaveLength(1);
-    expect(offers[0]).toMatchObject({ id: "flight-x", origin: null, destination: null, departAt: null, arriveAt: null, airline: null, flightNumber: null, currency: null, seats: null, offerUrl: null });
+    expect(offers[0]).toMatchObject({ id: "flight-x", origin: null, destination: null, departAt: null, arriveAt: null, airline: null, flightNumber: null, currency: "IRT", seats: null, offerUrl: null });
   });
 });
 

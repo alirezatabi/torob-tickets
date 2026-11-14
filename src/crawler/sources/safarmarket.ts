@@ -1,3 +1,4 @@
+import { localToUtcIso } from "../../lib/time";
 import type { CrawlSource, RawOffer } from "../types";
 
 const origin = "https://safarmarket.com";
@@ -60,6 +61,8 @@ export const safarmarketSource: CrawlSource = {
 
       const departureLocal = text(leave.departureTime) ?? text(firstLeg?.departureTime);
       const arrivalLocal = text(leave.arrivalTime) ?? text(firstLeg?.arrivalTime);
+      const departureAt = iranLocalToUtc(departureLocal);
+      const arrivalAt = iranLocalToUtc(arrivalLocal);
       const flightDate = departureLocal?.slice(0, 10) ?? null;
       if (context.date && flightDate !== context.date) continue;
 
@@ -86,15 +89,14 @@ export const safarmarketSource: CrawlSource = {
           id: rawId,
           origin: originCode,
           destination: destinationCode,
-          // Safarmarket gives unzoned local wall times. Preserve them as source facts below,
-          // and leave UTC instants null rather than assuming a timezone conversion.
-          departAt: null,
-          arriveAt: null,
+          // Per the operator's explicit instruction, Safarmarket wall times are interpreted in Iran time.
+          departAt: departureAt,
+          arriveAt: arrivalAt,
           airline: text(leave.airlineName) ?? text(firstLeg?.airlineName),
           flightNumber: flightNo,
           amount,
-          // The response excerpt does not state a currency code; do not infer rial/toman.
-          currency: null,
+          // The operator confirmed Safarmarket's price amounts are toman (IRT).
+          currency: "IRT",
           seats: capacity,
           // Provider URLs contain opaque booking/search identifiers; do not expose or persist them.
           offerUrl: null,
@@ -133,5 +135,16 @@ function record(value: unknown): Record<string, unknown> | null {
   return value !== null && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : null;
 }
 function text(value: unknown): string | null { return typeof value === "string" && value.trim() ? value.trim() : null; }
+function iranLocalToUtc(value: string | null): string | null {
+  if (!value) return null;
+  const match = /^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})$/.exec(value);
+  if (!match) return null;
+  const [, yearText, monthText, dayText, hourText, minuteText] = match;
+  const year = Number(yearText); const month = Number(monthText); const day = Number(dayText);
+  const hour = Number(hourText); const minute = Number(minuteText);
+  const calendarDate = new Date(Date.UTC(year, month - 1, day));
+  if (calendarDate.getUTCFullYear() !== year || calendarDate.getUTCMonth() !== month - 1 || calendarDate.getUTCDate() !== day || hour > 23 || minute > 59) return null;
+  return localToUtcIso(`${yearText}-${monthText}-${dayText}`, hour * 60 + minute, "Asia/Tehran");
+}
 function finiteNumber(value: unknown): number | null { return typeof value === "number" && Number.isFinite(value) ? value : null; }
 function nonNegativeNumber(value: unknown): number | null { const number = finiteNumber(value); return number !== null && number >= 0 ? number : null; }
