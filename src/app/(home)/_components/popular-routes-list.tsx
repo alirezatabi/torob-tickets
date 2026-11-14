@@ -14,7 +14,7 @@ export function PopularRoutesList({ children }: { children: React.ReactNode[] })
   const reduce = useReducedMotion();
 
   return (
-    <ul className="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-3" data-testid="popular-routes">
+    <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3" data-testid="popular-routes">
       {children.map((child, index) => (
         <motion.li
           key={index}
