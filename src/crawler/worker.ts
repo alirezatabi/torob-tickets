@@ -13,12 +13,14 @@ export interface WorkerConfig {
   routes: Array<{ originCode: string; destinationCode: string }>;
   intervalMs: number;
   horizonDays: number;
+  requestDelayMs: number;
 }
 
-export function loadWorkerConfig(env: { CRAWLER_ROUTES?: string; CRAWLER_INTERVAL_MINUTES?: string; CRAWLER_HORIZON_DAYS?: string } = {
+export function loadWorkerConfig(env: { CRAWLER_ROUTES?: string; CRAWLER_INTERVAL_MINUTES?: string; CRAWLER_HORIZON_DAYS?: string; CRAWLER_REQUEST_DELAY_MS?: string } = {
   CRAWLER_ROUTES: process.env.CRAWLER_ROUTES,
   CRAWLER_INTERVAL_MINUTES: process.env.CRAWLER_INTERVAL_MINUTES,
   CRAWLER_HORIZON_DAYS: process.env.CRAWLER_HORIZON_DAYS,
+  CRAWLER_REQUEST_DELAY_MS: process.env.CRAWLER_REQUEST_DELAY_MS,
 }): WorkerConfig {
   const value = env.CRAWLER_ROUTES?.trim();
   if (!value) throw new Error("Set CRAWLER_ROUTES explicitly to real domestic airport pairs (e.g. THR-MHD,THR-SYZ); demo timetable routes are not used.");
@@ -30,8 +32,9 @@ export function loadWorkerConfig(env: { CRAWLER_ROUTES?: string; CRAWLER_INTERVA
   const unique = [...new Map(routes.map((route) => [`${route.originCode}-${route.destinationCode}`, route])).values()];
   const intervalMs = parseBoundedInteger(env.CRAWLER_INTERVAL_MINUTES, 60, 60, 24 * 60) * 60_000;
   const horizonDays = parseBoundedInteger(env.CRAWLER_HORIZON_DAYS, 1, 1, 14);
+  const requestDelayMs = parseBoundedInteger(env.CRAWLER_REQUEST_DELAY_MS, 10_000, 3_000, 60_000);
   if (unique.length * horizonDays > MAX_QUERIES_PER_CYCLE) throw new Error(`At most ${MAX_QUERIES_PER_CYCLE} route/date queries fit the crawler's per-cycle HTTP request ceiling`);
-  return { routes: unique, intervalMs, horizonDays };
+  return { routes: unique, intervalMs, horizonDays, requestDelayMs };
 }
 
 /** One bounded sweep. Meant to be run by a dedicated persistent worker, never a page handler. */
@@ -40,7 +43,7 @@ export async function runWorkerCycle(config = loadWorkerConfig(), now = new Date
   const date = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Tehran", year: "numeric", month: "2-digit", day: "2-digit" }).format(now);
   let snapshotsWritten = 0;
   let observationsWritten = 0;
-  const client = new CrawlHttpClient();
+  const client = new CrawlHttpClient({ minHostDelayMs: config.requestDelayMs });
   for (const route of config.routes) {
     for (let offset = 0; offset < config.horizonDays; offset += 1) {
       const departDate = addDays(date, offset);

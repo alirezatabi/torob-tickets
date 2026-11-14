@@ -134,6 +134,23 @@ describe("crawler HTTP safeguards", () => {
     expect(attempts).toBe(2);
   });
 
+  it("spaces every request to the same host by the configured minimum delay", async () => {
+    let now = 0;
+    const sleeps: number[] = [];
+    const fetcher = vi.fn(async (input: string | URL) => String(input).endsWith("robots.txt")
+      ? new Response("User-agent: *\nAllow: /")
+      : new Response("ok"));
+    const client = new CrawlHttpClient({
+      fetch: fetcher,
+      minHostDelayMs: 10_000,
+      now: () => now,
+      sleep: async (ms) => { sleeps.push(ms); now += ms; },
+    });
+    await client.get("https://example.test/one");
+    await client.get("https://example.test/two");
+    expect(sleeps).toEqual([10_000, 10_000]);
+  });
+
   it("checks robots.txt on a redirect target before following it", async () => {
     const fetcher = vi.fn(async (input: string | URL) => {
       const url = new URL(String(input));

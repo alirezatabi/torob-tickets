@@ -20,10 +20,11 @@ The website never performs a crawl as a side effect of a page view. `/crawl`, `/
    CRAWLER_ROUTES=THR-MHD,THR-SYZ
    CRAWLER_INTERVAL_MINUTES=60
    CRAWLER_HORIZON_DAYS=1
+   CRAWLER_REQUEST_DELAY_MS=10000
    DATABASE_URL=postgresql://...
    ```
 
-   Do not copy the example airport pairs without verifying they are the routes you intend to query. Route pairs are directional. The worker validates IATA-shaped codes only; it cannot prove route availability. The horizon is 1–14 departure days, default 1 (today in Asia/Tehran). The route-count × horizon combination is capped at 39 queries because the shared HTTP client has a 40-request ceiling including robots.txt. One complete sweep is performed every configured interval; the worker shares the polite per-host delay and robots cache across the sweep, never overlaps cycles, and waits until the next interval after a longer sweep finishes.
+   Do not copy the example airport pairs without verifying they are the routes you intend to query. Route pairs are directional. The worker validates IATA-shaped codes only; it cannot prove route availability. The horizon is 1–14 departure days, default 1 (today in Asia/Tehran). The route-count × horizon combination is capped at 39 queries because the shared HTTP client has a 40-request ceiling including robots.txt. `CRAWLER_REQUEST_DELAY_MS` sets the minimum spacing between HTTP requests to the same host (default 10,000 ms, allowed range 3,000–60,000 ms); it applies to robots.txt and source requests. One complete sweep is performed every configured interval; the worker shares the polite per-host delay and robots cache across the sweep, never overlaps cycles, and waits until the next interval after a longer sweep finishes.
 
 4. Run once interactively only when explicitly intended:
 
