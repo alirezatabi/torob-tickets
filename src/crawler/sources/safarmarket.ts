@@ -8,14 +8,15 @@ export const safarmarketSource: CrawlSource = {
   name: "Safarmarket",
   origin,
   buildRequests(query) {
-    // The endpoint and POST method were copied from the user's DevTools capture. The request
-    // JSON body/parameter names were not included, so never send a guessed or empty search.
+    // A body was supplied, but the captured request also included client/session-bound fields and a
+    // transient reCAPTCHA header. Never replay browser credentials or challenge tokens; no verified
+    // unauthenticated request contract is available, so keep the source fail-closed.
     void query;
     return [{
       url: `${origin}/api/flight/v3/search`,
       method: "POST",
       body: null,
-      blockedReason: "Missing exact DevTools POST request payload; capture the request body before running a crawl.",
+      blockedReason: "Captured request uses client/session-bound fields and a reCAPTCHA header; credential/challenge replay is unsupported.",
     }];
   },
   parseRaw(body, context): RawOffer[] {

@@ -28,16 +28,16 @@ describe("crawl source placeholders", () => {
     expect(safarmarketSource.parseRaw(fixture, { route: "THR-MHD", date: "2026-11-23", url: "" })).toEqual([]);
   });
 
-  it("does not invent Safarmarket POST parameters when the request body is absent", () => {
+  it("keeps Safarmarket blocked rather than replaying session-bound or challenge fields", () => {
     const request = safarmarketSource.buildRequests({ originCode: "THR", destinationCode: "MHD", departDate: "2026-11-22", passengers: 1, cabin: "economy" })[0];
     expect(request).toMatchObject({ url: "https://safarmarket.com/api/flight/v3/search", method: "POST", body: null });
-    expect(request?.blockedReason).toContain("Missing exact DevTools POST request payload");
+    expect(request?.blockedReason).toContain("credential/challenge replay is unsupported");
   });
 
-  it("does not send a Safarmarket request when its captured POST body is missing", async () => {
+  it("does not send a Safarmarket request that requires replaying browser credentials or a challenge", async () => {
     const fetcher = vi.fn(async () => new Response("should not be called"));
     const client = new CrawlHttpClient({ fetch: fetcher, sleep: async () => undefined });
-    await expect(runSource(safarmarketSource, { originCode: "THR", destinationCode: "MHD", departDate: "2026-11-22", passengers: 1, cabin: "economy" }, { client, enabled: true })).rejects.toThrow("Missing exact DevTools POST request payload");
+    await expect(runSource(safarmarketSource, { originCode: "THR", destinationCode: "MHD", departDate: "2026-11-22", passengers: 1, cabin: "economy" }, { client, enabled: true })).rejects.toThrow("credential/challenge replay is unsupported");
     expect(fetcher).not.toHaveBeenCalled();
   });
 
