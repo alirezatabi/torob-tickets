@@ -51,7 +51,7 @@ export function Hero({
           <div className="relative order-2 h-[min(390px,96vw)] overflow-hidden sm:h-[480px] lg:order-none lg:h-full lg:overflow-visible">
             <motion.div
               aria-hidden="true"
-              className="pointer-events-none absolute left-1/2 top-0 w-[min(660px,120vw)] -translate-x-1/2 lg:left-[-80px] lg:right-auto lg:top-[-70px] lg:w-[900px] lg:max-w-none lg:translate-x-0"
+              className="pointer-events-auto absolute left-1/2 top-0 w-[min(660px,120vw)] -translate-x-1/2 lg:left-[-80px] lg:right-auto lg:top-[-70px] lg:w-[900px] lg:max-w-none lg:translate-x-0"
               initial={reduce ? false : { opacity: 0, scale: 0.96, y: 16 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               transition={{ duration: 1.1, delay: 0.12, ease: EASE }}

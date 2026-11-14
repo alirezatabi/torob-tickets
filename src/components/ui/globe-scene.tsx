@@ -347,7 +347,6 @@ export function GlobeScene({
 
   const onPointerDown = useCallback(
     (event: React.PointerEvent<SVGSVGElement>) => {
-      if (reduced) return;
       event.currentTarget.setPointerCapture(event.pointerId);
       drag.current = {
         x: event.clientX,
@@ -360,7 +359,7 @@ export function GlobeScene({
       inertia.current = { yaw: 0, pitch: 0 };
       touched.current = true;
     },
-    [reduced, yaw, pitch],
+    [yaw, pitch],
   );
 
   const onPointerMove = useCallback(
@@ -451,11 +450,7 @@ export function GlobeScene({
         />
         <svg
           viewBox={`0 0 ${size} ${size}`}
-          className={
-            reduced
-              ? "h-auto w-full"
-              : "h-auto w-full cursor-grab active:cursor-grabbing"
-          }
+          className="h-auto w-full cursor-grab select-none active:cursor-grabbing"
           role="img"
           aria-label={
             route
@@ -1215,6 +1210,10 @@ const NETWORK_ROUTES: { from: number; to: number }[] = [
   { from: 3, to: 14 }, // Frankfurt–Istanbul
   { from: 4, to: 11 }, // Dubai–Mumbai
   { from: 11, to: 5 }, // Mumbai–Singapore
+  { from: 3, to: 6 }, // Frankfurt–Tokyo
+  { from: 15, to: 5 }, // Seoul–Singapore
+  { from: 2, to: 13 }, // São Paulo–Paris
+  { from: 7, to: 12 }, // Sydney–Hong Kong
 ];
 
 const NETWORK_HORIZON_DEPTH = 0.08;
@@ -1286,7 +1285,7 @@ function projectNetwork(
     flush();
 
     let plane: { at: [number, number]; angle: number } | undefined;
-    if (routeIndex % 4 === 0) {
+    if (routeIndex % 5 === 0) {
       const pointIndex = Math.round(arc.points.length * 0.44);
       const previousPoint = arc.points[Math.max(0, pointIndex - 1)]!;
       const current = arc.points[pointIndex]!;

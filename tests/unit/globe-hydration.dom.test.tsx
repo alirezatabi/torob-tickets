@@ -1,5 +1,6 @@
+import { fireEvent } from "@testing-library/dom";
 import { act, createElement } from "react";
-import { hydrateRoot, type Root } from "react-dom/client";
+import { createRoot, hydrateRoot, type Root } from "react-dom/client";
 import { renderToString } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -26,6 +27,36 @@ describe("globe hydration", () => {
     expect(shouldShowNetworkRoute(-0.15, 0.51)).toBe(false);
     expect(shouldShowNetworkRoute(0.52, -0.15)).toBe(true);
     expect(shouldShowNetworkRoute(0.1, 0.12)).toBe(true);
+  });
+
+  it("rotates the globe when dragged with a mouse", async () => {
+    vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+    vi.stubGlobal("requestAnimationFrame", vi.fn(() => 1));
+    vi.stubGlobal("cancelAnimationFrame", vi.fn());
+    vi.stubGlobal("PointerEvent", MouseEvent);
+
+    container = document.createElement("div");
+    document.body.appendChild(container);
+    const globe = createElement(GlobeScene, { planet: true, size: 220, period: 150 });
+    await act(async () => {
+      root = createRoot(container!);
+      root.render(globe);
+    });
+
+    const svg = container.querySelector<SVGSVGElement>("svg");
+    const landDots = container.querySelector<SVGPathElement>("[data-globe-land-dots]");
+    expect(svg).not.toBeNull();
+    expect(landDots).not.toBeNull();
+    const originalProjection = landDots?.getAttribute("d");
+    Object.defineProperty(svg, "setPointerCapture", { configurable: true, value: vi.fn() });
+
+    await act(async () => {
+      fireEvent.pointerDown(svg!, { pointerId: 1, clientX: 50, clientY: 110 });
+      fireEvent.pointerMove(svg!, { pointerId: 1, clientX: 90, clientY: 110 });
+    });
+    expect(landDots?.getAttribute("d")).not.toBe(originalProjection);
+
+    await act(async () => fireEvent.pointerUp(svg!, { pointerId: 1 }));
   });
 
   it("keeps SVG ids and projected marker attributes identical between server and client", async () => {
