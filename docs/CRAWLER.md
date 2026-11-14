@@ -51,7 +51,7 @@ Raw fields are nullable. The conservative normalizer reports invalid facts inste
 3. Capture one permitted public response. For a request you already made in DevTools (especially Safarmarket's POST), save the response body locally and use offline import; this does not make another request or require `CRAWLER_ENABLED`:
 
    ```sh
-   npm run crawl:capture -- --source safarmarket --route THR-MHD --date 2026-11-22 --response-file /path/to/response.json
+   npm run crawl:capture -- --source safarmarket --route THR-MHD --date 2026-11-22 --response-file .\\response.json
    ```
 
    This writes under `tests/fixtures/crawl/<source>/` and drops URL/redirect fields plus common token/cookie fields. For a configured public GET URL, the same command without `--response-file` requires `CRAWLER_ENABLED=1`, uses robots checks, and performs a network capture. Review the full response for personal/session data before committing; sanitization is not a guarantee.
