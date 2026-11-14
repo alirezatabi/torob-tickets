@@ -23,7 +23,8 @@ export type Emblem =
   | "wave"
   | "kite"
   | "crown"
-  | "swan";
+  | "swan"
+  | "globe";
 
 export interface AirlineBrand {
   /** Gradient stops of the badge, in the carrier's livery colours. */
@@ -71,6 +72,19 @@ const FALLBACKS: Omit<AirlineBrand, "emblem">[] = [
 ];
 const EMBLEMS: Emblem[] = ["wing", "star", "kite", "swirl", "crown", "sun"];
 
+/** Original, name-aware visual identities for carriers seen without a bundled licensed mark.
+ * These are custom stand-ins, not copies or claims of the airlines' official trademarks. */
+const NAMED_BRANDS: { names: string[]; brand: AirlineBrand }[] = [
+  { names: ["flypersia", "فلایپرشیا"], brand: { from: "#d74735", to: "#642b39", emblem: "wing" } },
+  { names: ["meraj", "معراج"], brand: { from: "#087d79", to: "#064d61", emblem: "crescent" } },
+  { names: ["nasimair", "naseemair", "نسیمایر"], brand: { from: "#4897c8", to: "#28517c", emblem: "wave" } },
+  { names: ["atlasair", "اطلسایر"], brand: { from: "#263d6b", to: "#c87531", emblem: "globe" } },
+];
+
+function normalizeAirlineName(value: string): string {
+  return value.toLowerCase().replace(/[يى]/g, "ی").replace(/ك/g, "ک").replace(/[^a-z0-9\u0600-\u06ff]/g, "");
+}
+
 /** Code point sum — deterministic, so an unknown carrier keeps the same badge forever. */
 function seed(code: string): number {
   let sum = 0;
@@ -80,9 +94,13 @@ function seed(code: string): number {
 
 const FALLBACK_BRANDS = new Map<string, AirlineBrand>();
 
-export function airlineBrand(code: string): AirlineBrand {
+export function airlineBrand(code: string, airlineName?: string): AirlineBrand {
   const known = BRANDS[code.toUpperCase()];
   if (known) return known;
+
+  const nameKey = normalizeAirlineName(airlineName ?? "");
+  const named = NAMED_BRANDS.find((item) => item.names.some((name) => nameKey.includes(normalizeAirlineName(name))));
+  if (named) return named.brand;
 
   const key = code.toUpperCase();
   const cached = FALLBACK_BRANDS.get(key);
@@ -115,4 +133,5 @@ export const EMBLEM_PATHS: Record<string, string> = {
   crown: "M2.6 17.6 4.3 8.4l4.2 4.2L12 5.6l3.5 7 4.2-4.2 1.7 9.2z",
   swan:
     "M8.6 19.4c-2 0-3.4-1.3-3.4-3.2 0-2.4 2-3.6 4.2-4.6 2.6-1.2 4.4-2.2 4.4-4.1 0-1.5-1-2.6-2.6-2.9l.5-2.2c3.1.5 5.1 2.7 5.1 5.4 0 2.9-2.1 4.4-5 5.7-2 1-3.3 1.7-3.3 3 0 .8.6 1.3 1.5 1.3z",
+  globe: "M12 2.2a9.8 9.8 0 100 19.6 9.8 9.8 0 000-19.6zm0 2.1c1.1 1.3 1.8 3.5 2 6.6h-4c.2-3.1.9-5.3 2-6.6zm-3.9.9a15.2 15.2 0 00-.9 5.7H4.1a7.9 7.9 0 014-5.7zm-4 7.8h3.1c.1 2.1.4 4 .9 5.7a7.9 7.9 0 01-4-5.7zm7.9 7.7c-1.1-1.3-1.8-3.5-2-6.6h4c-.2 3.1-.9 5.3-2 6.6zm3.9-.9a15.2 15.2 0 00.9-5.7h3.1a7.9 7.9 0 01-4 5.7zm.9-7.8c-.1-2.1-.4-4-.9-5.7a7.9 7.9 0 014 5.7z",
 };

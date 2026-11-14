@@ -65,6 +65,9 @@ export type SearchDataFilter = "all" | "demo" | "real";
 export interface QueryPreferences {
   /** Show all offers, only demo examples, or only captured/live data. */
   dataSource: SearchDataFilter;
+  /** Inclusive departure-time window in Iran time (`Asia/Tehran`), `HH:mm`; wraps over midnight if start > end. */
+  departureTimeFrom: string | null;
+  departureTimeTo: string | null;
   pricePreference: PricePreference;
   maxStops: number | null;
   baggageRequired: boolean;
@@ -78,6 +81,8 @@ export interface QueryPreferences {
 
 export const DEFAULT_PREFERENCES: QueryPreferences = {
   dataSource: "all",
+  departureTimeFrom: null,
+  departureTimeTo: null,
   pricePreference: "balanced",
   maxStops: null,
   baggageRequired: false,

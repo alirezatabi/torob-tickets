@@ -83,6 +83,22 @@ describe("search parameters", () => {
     expect(result.query.filters.maxStops).toBe(0);
   });
 
+  it("accepts only valid local clock ranges and keeps them in the URL", () => {
+    const result = parseSearchParams({
+      origin: "THR", destination: "IST", date: "2026-11-20", time_from: "22:30", time_to: "01:15",
+    }, defaults);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.query.filters.departureTimeFrom).toBe("22:30");
+    expect(result.query.filters.departureTimeTo).toBe("01:15");
+    const params = toSearchParams(result.query);
+    expect(params.get("time_from")).toBe("22:30");
+    expect(params.get("time_to")).toBe("01:15");
+
+    const invalid = parseSearchParams({ origin: "THR", destination: "IST", date: "2026-11-20", time_from: "25:90" }, defaults);
+    expect(invalid.ok && invalid.query.filters.departureTimeFrom).toBeNull();
+  });
+
   it("round-trips through the URL representation", () => {
     const query = createQuery({
       originCode: "THR",
@@ -91,6 +107,8 @@ describe("search parameters", () => {
       passengers: 2,
       filters: {
         dataSource: "real",
+        departureTimeFrom: "08:15",
+        departureTimeTo: "11:30",
         pricePreference: "low",
         maxStops: 0,
         baggageRequired: true,

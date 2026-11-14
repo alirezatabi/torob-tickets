@@ -21,6 +21,7 @@
     "db:doctor": "tsx scripts/db-doctor.ts",
     "db:validate": "prisma validate",
     "crawl": "tsx scripts/crawl.ts",
+    "crawl:worker": "tsx scripts/crawl-worker.ts",
     "crawl:probe": "tsx scripts/crawl-probe.ts",
     "crawl:capture": "tsx scripts/crawl-capture.ts"
   },

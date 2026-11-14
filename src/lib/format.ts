@@ -70,14 +70,17 @@ export function formatDurationShort(minutes: number): string {
 }
 
 /** Local wall-clock time of a UTC instant in a given IANA timezone. */
-export function formatTimeInZone(isoUtc: string, timeZone: string): string {
-  const fmt = new Intl.DateTimeFormat("en-GB", {
+export function timeInZone(isoUtc: string, timeZone: string): string {
+  return new Intl.DateTimeFormat("en-GB", {
     timeZone,
     hour: "2-digit",
     minute: "2-digit",
-    hour12: false,
-  });
-  return toPersianDigits(fmt.format(new Date(isoUtc)));
+    hourCycle: "h23",
+  }).format(new Date(isoUtc));
+}
+
+export function formatTimeInZone(isoUtc: string, timeZone: string): string {
+  return toPersianDigits(timeInZone(isoUtc, timeZone));
 }
 
 /** Civil date (YYYY-MM-DD) of a UTC instant in a given IANA timezone. */

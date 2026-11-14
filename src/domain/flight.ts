@@ -137,6 +137,7 @@ export interface BaggageInfo {
 
 export type OfferWarning =
   | "price-converted"
+  | "rial-to-toman"
   | "currency-assumed"
   | "baggage-unknown"
   | "refund-unknown"
@@ -151,8 +152,9 @@ export type OfferWarning =
   | "source-test-environment";
 
 export const WARNING_LABELS: Record<OfferWarning, string> = {
-  "price-converted": "قیمت با نرخ نمونه به تومان تبدیل شده",
-  "currency-assumed": "واحد قیمت تومان طبق فرض اپراتور است",
+  "price-converted": "قیمت با نرخ تبدیل نمونه به تومان تبدیل شده",
+  "rial-to-toman": "قیمت ریالی به تومان تبدیل شده (هر ۱۰ ریال = ۱ تومان)",
+  "currency-assumed": "واحد قیمت از روی دادهٔ منبع مشخص نیست",
   "baggage-unknown": "اطلاعات بار ارائه‌دهنده در دسترس نیست",
   "refund-unknown": "شرایط استرداد اعلام نشده",
   "flight-number-missing": "شماره پرواز اعلام نشده",

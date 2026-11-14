@@ -81,7 +81,7 @@ function fakeDb() {
         return data;
       },
       async findFirst({ where } = {}) {
-        const matches = observations.filter((row) => row.offerKey === where?.offerKey);
+        const matches = observations.filter((row) => row.offerKey === where?.offerKey && (!where?.providerId || row.providerId === where.providerId));
         return matches.at(-1) ?? null;
       },
       async findMany({ where } = {}) {
@@ -258,10 +258,9 @@ describe("persistence invariants", () => {
     expect(offers.size).toBe(2);
   });
 
-  it("appends an observation only when the price changes or the last point is old", async () => {
+  it("records price changes and one hourly heartbeat independently for each seller", async () => {
     const { db, observations } = fakeDb();
     const base = {
-      providerId: "alpha",
       offerKey: "key",
       groupKey: "g",
       routeKey: "THR>MHD",
@@ -274,24 +273,27 @@ describe("persistence invariants", () => {
       fareClass: null,
       baggageSignature: "checked-unknown",
       ticketType: "unknown",
-      currency: "IRT",
-      freshness: "fresh",
+      currency: "IRR",
+      freshness: "unverified",
       searchId: null,
     };
 
-    const consider = async (priceToman: bigint, observedAt: Date) => {
-      const last = await db.priceObservation.findFirst({ where: { offerKey: base.offerKey }, orderBy: { observedAt: "desc" } });
+    const consider = async (providerId: string, priceToman: bigint, observedAt: Date) => {
+      const last = await db.priceObservation.findFirst({ where: { providerId, offerKey: base.offerKey }, orderBy: { observedAt: "desc" } });
       const changed = !last || last.priceToman !== priceToman;
-      const stale = !last || observedAt.getTime() - last.observedAt.getTime() > 6 * 60 * 60_000;
-      if (changed || stale) await db.priceObservation.create({ data: { ...base, priceToman, observedAt } });
+      const stale = !last || observedAt.getTime() - last.observedAt.getTime() >= 60 * 60_000;
+      if (changed || stale) await db.priceObservation.create({ data: { ...base, providerId, priceToman, observedAt } });
     };
 
-    await consider(5_000_000n, new Date("2026-11-12T10:00:00Z"));
-    await consider(5_000_000n, new Date("2026-11-12T10:05:00Z")); // same price, recent → no point
-    await consider(4_800_000n, new Date("2026-11-12T10:10:00Z")); // price change → point
-    await consider(4_800_000n, new Date("2026-11-12T18:00:00Z")); // same price, old → heartbeat
+    await consider("alpha", 5_000_000n, new Date("2026-11-12T10:00:00Z"));
+    await consider("alpha", 5_000_000n, new Date("2026-11-12T10:05:00Z")); // recent + unchanged → no point
+    await consider("beta", 5_000_000n, new Date("2026-11-12T10:05:00Z")); // same ticket, different seller → separate series
+    await consider("alpha", 4_800_000n, new Date("2026-11-12T10:10:00Z")); // price change → point
+    await consider("alpha", 4_800_000n, new Date("2026-11-12T11:10:00Z")); // one-hour heartbeat → point
 
-    expect(observations).toHaveLength(3);
-    expect(observations.map((row) => Number(row.priceToman))).toEqual([5_000_000, 4_800_000, 4_800_000]);
+    expect(observations).toHaveLength(4);
+    expect(observations.map((row) => `${row.providerId}:${Number(row.priceToman)}`)).toEqual([
+      "alpha:5000000", "beta:5000000", "alpha:4800000", "alpha:4800000",
+    ]);
   });
 });

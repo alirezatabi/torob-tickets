@@ -176,7 +176,7 @@ export async function getPriceHistory(query: HistoryQuery): Promise<HistoryResul
       };
     })
     .sort((a, b) => b.points.length - a.points.length)
-    .slice(0, query.maxSeries ?? 6);
+    .slice(0, query.maxSeries ?? (query.offerKey ? 5_000 : query.groupKey ? 50 : 6));
 
   return {
     available: true,

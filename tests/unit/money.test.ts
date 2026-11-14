@@ -11,6 +11,10 @@ describe("money normalization", () => {
     expect(toToman({ amount: 42_500_000, currency: "IRR" })).toBe(4_250_000);
   });
 
+  it("converts rial exactly to the nearest toman without FX-style 1 000 rounding", () => {
+    expect(toToman({ amount: 42_500_059, currency: "IRR" })).toBe(4_250_006);
+  });
+
   it("converts EUR using the demo FX table and rounds to 1 000 toman", () => {
     expect(toToman({ amount: 42.5, currency: "EUR" })).toBe(42.5 * DEMO_FX_TOMAN.EUR);
     expect(toToman({ amount: 42.53, currency: "EUR" }) % 1_000).toBe(0);

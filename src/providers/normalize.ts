@@ -91,7 +91,8 @@ export function assembleOffer(input: AssembleInput): FlightOffer {
   const toman = toToman({ amount: input.price.amount, currency });
 
   const warnings = new Set<OfferWarning>(input.extraWarnings ?? []);
-  if (needsConversion({ amount: input.price.amount, currency })) warnings.add("price-converted");
+  if (currency === "IRR") warnings.add("rial-to-toman");
+  else if (needsConversion({ amount: input.price.amount, currency })) warnings.add("price-converted");
   if (input.baggage.checked === "unknown") warnings.add("baggage-unknown");
   if (input.refundable === null) warnings.add("refund-unknown");
   if (!input.flightNumber) warnings.add("flight-number-missing");

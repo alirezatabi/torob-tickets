@@ -1,83 +1,46 @@
-# Crawler foundation (stage 1)
+# Continuous Safarmarket crawler
 
-## Status
+The website never performs a crawl as a side effect of a page view. `/crawl`, `/api/crawl`, health and search paths only read local snapshots/status. Continuous collection runs in the separate `crawl:worker` process.
 
-The crawler is **off by default**. No search page or browser/API request starts a crawl. `/crawl` only reports crawler status and local snapshot metadata; `/search` reads matching local snapshots and offers a demo/real source filter. `/api/crawl` remains status-only and `POST /api/crawl` is rejected. A local operator must set `CRAWLER_ENABLED=1` and start an explicit CLI job. Main search keeps demo offers marked as sample and separates crawled offers as real.
+## Operator-controlled setup
 
-The shared sandbox does not make live requests to candidate sites, so no live probe result is claimed here. A user-supplied Safarmarket DevTools JSON response excerpt is checked in as a sanitized fixture and supports a conservative response parser. The owner also supplied a representative POST payload; the local request builder uses its observed fields, with client-specific `IPInfo` set to null. It never replays browser cookies, auth values, or reCAPTCHA tokens. A local operator may explicitly test the credential-free request; if the endpoint requires a challenge or access is denied, the client stops without bypass or retry. Per the owner's explicit instruction, Safarmarket prices are treated as toman (`IRT`) and its local wall times as `Asia/Tehran`; this is an operator-supplied assumption, not a unit/timezone label found in the response. The other four parser modules deliberately throw `NOT_IMPLEMENTED: نیاز به fixture واقعی`; do not replace them with guessed markup or remembered endpoints.
-
-| Source | Parser | Status |
-|---|---|---|
-| Safarmarket | fixture-backed JSON response parser | captured POST; local test only; operator sets toman and `Asia/Tehran` assumptions |
-
-### Safarmarket fixture findings
-
-Fixture: `tests/fixtures/crawl/safarmarket/THR-MHD-2026-11-22.json`. It is a sanitized excerpt of the owner-provided DevTools response: the response says `providersCount: 5`, but this excerpt contains only three provider rows, so the parser test's expected count is **3 excerpt offers**, not the total live result count.
-
-- Envelope and nesting: numeric `code: 200` → `result.flights[]` → flight identity and `leave` → `leave.legs[0]` route/times → `providers[]` seller-specific prices.
-- Quote fields observed: `providers[].price`, `title`, `titleEn`, `id`, `coreId`, `outboundCapacity`, `outBoundBaggages`, and `outBoundCancellationPolicies`. The parser emits one raw quote per captured provider row. Missing values remain `null`.
-- Flight fields observed: `flightId`, `flightClass`, `leave.flightNo`, `airlineName`, `airlineCode`, `departureTime`, `arrivalTime`, `duration`, `stopsCount`, `sellType`, `capacity`; route IATA codes and leg facts are under `leave.legs[0]`.
-- Price units: the fixture itself does not state IRR or IRT. Per the owner's explicit instruction, `price` is treated as an original toman amount (`IRT`) with no conversion (for example `81840000` remains unchanged). This is an operator assumption, not a source-declared unit.
-- Time/date: source strings are Gregorian-looking local wall times (`2026-11-22 14:20`) without an offset or timezone, and no Jalali date field is present. Per the owner's explicit instruction, the parser preserves those local strings and converts them to UTC instants using `Asia/Tehran` timezone rules. The assumption is shown on the local data page.
-- Capacity is seller-specific `outboundCapacity` when present, then seller `capacity`, then flight `leave.capacity`; the source field and fallback are both retained as observed. `sellType` is preserved literally (`CHARTER` in the excerpt). Provider URLs were removed during fixture sanitization because their opaque booking/search identifiers were not needed for parsing, so `offerUrl` remains null.
-- Request finding: the owner supplied a representative one-way payload for `POST https://safarmarket.com/api/flight/v3/search`. The request builder uses the observed route/date/passenger fields and class flags; `IPInfo` is sent as null rather than copying the redacted, client-specific values. It sends no Cookie, auth, or reCAPTCHA headers. The local operator can test this credential-free request; if the endpoint rejects it or returns a challenge, stop there—do not add browser credentials or replay tokens.
-| Flightio | placeholder | needs real fixture |
-| MrBilit | placeholder | needs real fixture |
-| Alibaba | placeholder | needs real fixture |
-| Flytoday | placeholder | needs real fixture |
-
-## Safety and request policy
-
-`src/crawler/http.ts` provides injectable fetch and clock/sleep for deterministic tests. It serializes requests per host, manually checks redirects (including destination robots.txt), requires robots.txt to load (fail-closed), obeys the most-specific Allow/Disallow prefix, has a minimum three-second host interval, honors the full Retry-After delay, uses a 20-second per-request timeout, retries transient failures at most three times, applies a default total request ceiling of 40, and uses a transparent research User-Agent. Detected challenge/access blocks throw `CHALLENGE_DETECTED` and are not retried. No login, captcha, mobile token, header forgery, or challenge bypass is implemented. A crawl is an explicit local operation only.
-
-Raw fields are nullable. The Safarmarket local-snapshot adapter maps valid captured rows into the shared flight offer model; `/search` filters by data source and the existing detail, grouping, ranking, and comparison flows handle those offers. Crawled groups remain separate from demo groups, even for matching flight numbers. Search reads local snapshots only and never triggers a crawl. Synthetic tests are marked `source: "synthetic-test"`, rejected by snapshot storage, and excluded from snapshot reads/UI.
-
-## Local operator workflow
-
-1. Confirm the site permits the intended public request. Supply a known public search URL template yourself; the repository intentionally does not guess search endpoints. Use `{route}` and `{date}` placeholders if the URL needs them:
+1. Use a persistent host or container with Node.js, this checkout, outbound access to Safarmarket, and a PostgreSQL database. A serverless web deployment is not a persistent worker and does not satisfy this setup.
+2. Install and generate the database client, set up the schema, and provision `DATABASE_URL`:
 
    ```sh
-   export CRAWL_URL_ALIBABA='https://www.alibaba.ir/known-public-search?route={route}&date={date}'
+   npm ci
+   npm run db:generate
+   npm run db:push
    ```
 
-2. Probe, manually review the output, and note the result in this document. Probe uses a configured URL per source; the exact variable names are `CRAWL_URL_SAFARMARKET`, `CRAWL_URL_FLIGHTIO`, `CRAWL_URL_MRBILIT`, `CRAWL_URL_ALIBABA`, and `CRAWL_URL_FLYTODAY`. It will request robots.txt before the configured page.
+3. Supply an explicit list of real domestic airport pairs validated by your operator. The sample timetable in the app is not treated as verified route inventory:
+
+   ```env
+   CRAWLER_ENABLED=1
+   CRAWLER_ROUTES=THR-MHD,THR-SYZ
+   CRAWLER_INTERVAL_MINUTES=60
+   CRAWLER_HORIZON_DAYS=1
+   DATABASE_URL=postgresql://...
+   ```
+
+   Do not copy the example airport pairs without verifying they are the routes you intend to query. Route pairs are directional. The worker validates IATA-shaped codes only; it cannot prove route availability. The horizon is 1–14 departure days, default 1 (today in Asia/Tehran). The route-count × horizon combination is capped at 39 queries because the shared HTTP client has a 40-request ceiling including robots.txt. One complete sweep is performed every configured interval; the worker shares the polite per-host delay and robots cache across the sweep, never overlaps cycles, and waits until the next interval after a longer sweep finishes.
+
+4. Run once interactively only when explicitly intended:
 
    ```sh
-   CRAWLER_ENABLED=1 npm run crawl:probe
+   CRAWLER_ENABLED=1 CRAWLER_ROUTES=THR-MHD DATABASE_URL=... npm run crawl:worker
    ```
 
-   To append the report locally to this file, opt in with `CRAWL_PROBE_REPORT=1`; review/redact it before committing.
+5. For a persistent Linux host, adapt `deploy/torob-crawler.service` paths and service user, install it under `/etc/systemd/system/`, then use `systemctl enable --now torob-crawler`. Keep env secrets in a root-readable environment file, not Git. Worker status and raw snapshots are under ignored `data/crawl/` and should be backed up/retained according to your storage policy. PostgreSQL stores durable price history.
 
-3. Capture one permitted public response. For a request you already made in DevTools (especially Safarmarket's POST), save the response body locally and use offline import; this does not make another request or require `CRAWLER_ENABLED`:
+## Data and safety guarantees
 
-   ```sh
-   # PowerShell: after copying the Network response body in DevTools
-   Get-Clipboard | Set-Content -Path .\\response.json -Encoding utf8
-   npm run crawl:capture -- --source safarmarket --route THR-MHD --date 2026-11-22 --response-file .\\response.json
-   ```
+- Safarmarket is the only enabled crawl source. Other source parsers are not invoked by this worker.
+- Route inputs are operator-configured; there is no assumption that demo timetable routes are real.
+- The worker uses existing HTTP controls: robots.txt checks, rate limiting, bounded retries, and it stops on challenge responses. It does not replay browser cookies/tokens/sessions or bypass a challenge. A denied robots policy, a challenge, or a source schema change is an operational failure, not a signal to circumvent the control.
+- Raw Safarmarket amounts are treated as rial by the established adapter and converted once into toman. Hourly history stores the normalized toman value.
+- Each normalized seller/fare identity is tracked separately by providerId + offerKey. A point is appended on any price change or when at least one hour has passed since the prior point. If prices are unchanged, the hourly point is still stored. History begins at the first actual observation; no past prices are inferred.
+- File snapshots are latest values per source/route/departure date; PostgreSQL observations are the history of record. Use the existing `npm run db:history -- THR MHD [YYYY-MM-DD] [24h|7d|30d|90d|all]` report to inspect it.
+- Web requests never start a crawl. Continuous operation is only guaranteed while the separate host process and PostgreSQL remain available; a paused/ephemeral serverless function is not sufficient.
 
-   `response.json` must exist in the project directory; verify with `Test-Path .\\response.json`. A UTF-8 BOM from Windows PowerShell is handled. This writes a timestamped file under `tests/fixtures/crawl/<source>/` (so it will not overwrite an existing fixture, including on case-insensitive Windows filesystems) and drops URL/redirect fields plus common token/cookie fields. For a configured public GET URL, the same command without `--response-file` requires `CRAWLER_ENABLED=1`, uses robots checks, and performs a network capture. Review the full response for personal/session data before committing; sanitization is not a guarantee.
-
-4. For a source whose request builder is complete, parser is fixture-tested, and units/times are understood, run an explicit route/date job. The command writes `data/crawl/latest.json` as a source-keyed manifest (plus ignored per-source runtime snapshots); the root manifest is intentionally not ignored so the owner can review/commit it. Safarmarket can now be tested locally with the captured request shape, but the request omits browser credentials and sends `IPInfo: null`; if the server requires a challenge or denies access, the fail-closed client stops. The other four sources remain placeholders.
-
-   ```powershell
-   $env:CRAWLER_ENABLED = "1"
-   npm run crawl -- --source safarmarket --route THR-MHD --date 2026-11-22 --passengers 1
-   ```
-
-   This checks `robots.txt` first, then sends one JSON POST without cookies, auth tokens, or reCAPTCHA headers. The POST is never retried or redirected. Remove the opt-in afterward with `Remove-Item Env:CRAWLER_ENABLED`.
-
-Never enable scheduled or request-triggered crawling until robots/policies, price units, dates, time zones, route identity and refresh behavior have been established from evidence.
-
-Safarmarket's fixture-backed parser extracts provider-level raw quotes, assigns `IRT` and converts source local times under the owner's stated `Asia/Tehran` assumption. Matching local snapshots flow into the normal `/search` flight cards, `/flight` details, existing filters and comparison, with a source selector for sample versus real data. Search itself only reads files; the explicit local crawl CLI is the only path that sends the credential-free POST, and challenge/access failures remain terminal. The other four parsers still throw the required placeholder error. Capture saves a fixture for inspection; it does not itself create a snapshot. Snapshots are written only by a deliberate local job with `CRAWLER_ENABLED=1` and safe normalization. The snapshot store refuses `synthetic-test` data.
-
-## Commands and verification
-
-- `CRAWLER_ENABLED=1 npm run crawl -- --source safarmarket --route THR-MHD --date YYYY-MM-DD` — explicit credential-free Safarmarket POST test; the other sources remain placeholders. On PowerShell, set `$env:CRAWLER_ENABLED = "1"` before running and remove it afterward.
-- `npm run crawl:probe` — optional live, local-only status probe; requires per-source URL configuration, may fail due to network/site policy.
-- `CRAWLER_ENABLED=1 npm run crawl:capture -- --source <id> --route THR-MHD --date YYYY-MM-DD` — save a sanitized capture for fixture review.
-- `npm run typecheck && npm run lint && npm test && npm run build` — local project checks; tests must stay on mocked fetch and never access the network.
-
-## Stage 2
-
-For each candidate independently: collect a permitted real fixture, document robots and response behavior, manually validate/redact it, implement and test extraction against only that fixture, validate price/currency and timestamps, then explicitly review source quality and policy before considering a local crawl job. Keep unknown fields null and show provenance/freshness. Do not mix demo and crawled prices or label synthetic data as crawled.
+Check `/crawl` for a fresh worker heartbeat and latest local snapshot status. Absence of status is not proof that no prior snapshots exist; it means the worker has no recent heartbeat at this deployment.

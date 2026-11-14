@@ -113,8 +113,9 @@ export const safarmarketSource: CrawlSource = {
           airline: text(leave.airlineName) ?? text(firstLeg?.airlineName),
           flightNumber: flightNo,
           amount,
-          // The operator confirmed Safarmarket's price amounts are toman (IRT).
-          currency: "IRT",
+          // The operator clarified Safarmarket's captured price amounts are rial; conversion
+          // to toman happens once in the shared money normalizer.
+          currency: "IRR",
           seats: capacity,
           // Provider URLs contain opaque booking/search identifiers; do not expose or persist them.
           offerUrl: null,

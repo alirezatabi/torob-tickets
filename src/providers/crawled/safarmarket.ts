@@ -19,12 +19,12 @@ export const safarmarketSnapshotAdapter: ProviderAdapter<SnapshotQuote> = {
   name: "Safarmarket · snapshot",
   mode: "crawled",
   description: "نرخ‌های ذخیره‌شده از snapshot محلی Safarmarket",
-  quotedCurrency: "IRT",
+  quotedCurrency: "IRR",
 
   async search(query: TripQuery): Promise<SnapshotQuote[]> {
-    const snapshot = await readSnapshot("safarmarket");
     const route = `${query.originCode}-${query.destinationCode}`;
-    if (!snapshot || snapshot.route.toUpperCase() !== route || snapshot.date !== query.departDate) return [];
+    const snapshot = await readSnapshot("safarmarket", undefined, { route, date: query.departDate });
+    if (!snapshot) return [];
     return snapshot.offers.map((raw) => ({ raw, fetchedAt: snapshot.fetchedAt }));
   },
 
@@ -60,7 +60,9 @@ export const safarmarketSnapshotAdapter: ProviderAdapter<SnapshotQuote> = {
           airlineCode,
           flightNumber: readText(raw.flightNumber) ?? first.flightNumber,
           segments,
-          price: { amount, currency: "IRT" },
+          // The source sends rial. Older snapshots created before this correction were
+          // mislabeled IRT, so the Safarmarket adapter intentionally applies IRR semantics.
+          price: { amount, currency: "IRR" },
           baggage: baggage(checkedKg, null),
           refundable: null,
           cabin,
@@ -69,7 +71,7 @@ export const safarmarketSnapshotAdapter: ProviderAdapter<SnapshotQuote> = {
           fetchedAt,
           dataSource: "crawled",
           seatsAvailable: readNumber(raw.seats),
-          extraWarnings: ["currency-assumed", "timezone-assumed"],
+          extraWarnings: ["timezone-assumed"],
         });
         const sourceAirlineName = readText(raw.airlineNameFa) ?? readText(raw.airline);
         const sellType = readText(raw.sellType)?.toUpperCase();
@@ -90,7 +92,7 @@ export const safarmarketSnapshotAdapter: ProviderAdapter<SnapshotQuote> = {
             endpoint: "https://safarmarket.com/api/flight/v3/search",
             rawRecordId: readText(raw.providerRecordId),
             sellerLabel: providerName,
-            unitConverted: false,
+            unitConverted: true,
             mergedRows: 1,
             sellerCount: null,
           },

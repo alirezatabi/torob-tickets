@@ -27,6 +27,8 @@ export interface SearchParamsObject {
   bag?: string;
   refund?: string;
   time?: DayPart;
+  time_from?: string;
+  time_to?: string;
   airlines?: string;
   price_max?: string;
   source?: string;
@@ -120,6 +122,8 @@ export function parseSearchParams(
         baggageRequired: raw.bag === "1",
         refundableOnly: raw.refund === "1",
         dayPart: isDayPart(raw.time) ? raw.time : null,
+        departureTimeFrom: isClockTime(raw.time_from) ? raw.time_from : null,
+        departureTimeTo: isClockTime(raw.time_to) ? raw.time_to : null,
         maxPriceToman: parseBudget(raw.price_max),
         preferredAirlines: (raw.airlines ?? "")
           .split(",")
@@ -149,6 +153,8 @@ export function toSearchParams(query: TripQuery, sort?: SortKeyParam): URLSearch
   if (query.filters.baggageRequired) params.set("bag", "1");
   if (query.filters.refundableOnly) params.set("refund", "1");
   if (query.filters.dayPart) params.set("time", query.filters.dayPart);
+  if (query.filters.departureTimeFrom) params.set("time_from", query.filters.departureTimeFrom);
+  if (query.filters.departureTimeTo) params.set("time_to", query.filters.departureTimeTo);
   if (query.filters.preferredAirlines.length) params.set("airlines", query.filters.preferredAirlines.join(","));
   if (sort && sort !== "best") params.set("sort", sort);
   return params;
@@ -190,6 +196,10 @@ function isCabin(value: string | undefined): value is CabinClass {
 }
 function isPricePref(value: string | undefined): value is PricePreference {
   return value === "low" || value === "balanced" || value === "comfort";
+}
+function isClockTime(value: string | undefined): value is string {
+  if (!value || !/^([01]\d|2[0-3]):[0-5]\d$/.test(value)) return false;
+  return true;
 }
 function isDayPart(value: string | undefined): value is DayPart {
   return (

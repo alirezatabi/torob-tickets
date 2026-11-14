@@ -1,7 +1,7 @@
 import type { FlightOffer, OfferGroup } from "@/domain/flight";
 import { DAY_PART_RANGES, type QueryPreferences } from "@/domain/trip";
 import { getCity } from "./cities";
-import { hourInZone } from "./format";
+import { hourInZone, timeInZone } from "./format";
 import { rebuildGroup } from "@/dedupe/group";
 
 /**
@@ -28,7 +28,17 @@ export function offerMatchesFilters(offer: FlightOffer, filters: DisplayFilters)
     const hour = hourInZone(offer.departAt, getCity(offer.originCode)?.timezone ?? "Asia/Tehran");
     if (hour < start || hour >= end) return false;
   }
+  if (filters.departureTimeFrom || filters.departureTimeTo) {
+    const localTime = timeInZone(offer.departAt, "Asia/Tehran");
+    if (!timeRangeMatches(localTime, filters.departureTimeFrom, filters.departureTimeTo)) return false;
+  }
   return true;
+}
+
+/** Inclusive local-clock interval; a start later than end represents a window crossing midnight. */
+export function timeRangeMatches(time: string, from: string | null, to: string | null): boolean {
+  if (from && to && from > to) return time >= from || time <= to;
+  return (!from || time >= from) && (!to || time <= to);
 }
 
 /** Filter offers inside a group; drop groups with nothing left. */

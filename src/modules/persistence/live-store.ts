@@ -209,7 +209,7 @@ function toObservationRow(
  * `FORCE_OBSERVATION_AFTER_MS` (so a flat price still produces an occasional
  * heartbeat rather than a dense line of identical points).
  */
-const FORCE_OBSERVATION_AFTER_MS = 6 * 60 * 60_000;
+const FORCE_OBSERVATION_AFTER_MS = 60 * 60_000;
 
 export async function persistSearch(input: PersistSearchInput): Promise<PersistSearchResult> {
   try {
@@ -359,13 +359,13 @@ async function persistSearchOnce(input: PersistSearchInput): Promise<PersistSear
 
       const observation = toObservationRow(offer, search.id);
       const last = await tx.priceObservation.findFirst({
-        where: { offerKey: observation.offerKey },
+        where: { providerId: observation.providerId, offerKey: observation.offerKey },
         orderBy: { observedAt: "desc" },
         select: { priceToman: true, observedAt: true },
       });
 
       const priceChanged = !last || last.priceToman !== observation.priceToman;
-      const stale = !last || observation.observedAt.getTime() - last.observedAt.getTime() > FORCE_OBSERVATION_AFTER_MS;
+      const stale = !last || observation.observedAt.getTime() - last.observedAt.getTime() >= FORCE_OBSERVATION_AFTER_MS;
 
       if (priceChanged || stale) {
         await tx.priceObservation.create({ data: observation });

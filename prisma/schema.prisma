@@ -292,6 +292,7 @@ model PriceObservation {
   flightOfferId      String?
 
   @@index([offerKey, observedAt])
+  @@index([providerId, offerKey, observedAt])
   @@index([routeKey, departDate, observedAt])
   @@index([observedAt])
   @@map("price_observations")

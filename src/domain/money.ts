@@ -35,8 +35,8 @@ export function isCurrency(value: string): value is Currency {
 }
 
 /**
- * Convert any supported money value to toman, rounded to the nearest 1 000 toman
- * so that converted prices never look suspiciously precise.
+ * Convert supported money values to toman. Rial uses the exact 10:1 unit conversion,
+ * while foreign-currency demo rates are rounded to the nearest 1 000 toman.
  */
 export function toToman(money: Money, rates: Record<Currency, number> = DEMO_FX_TOMAN): number {
   if (!Number.isFinite(money.amount) || money.amount < 0) {
@@ -47,10 +47,9 @@ export function toToman(money: Money, rates: Record<Currency, number> = DEMO_FX_
     throw new Error(`Unknown currency: ${money.currency}`);
   }
   const raw = money.amount * rate;
-  if (money.currency === "IRT") return Math.round(raw);
+  if (money.currency === "IRT" || money.currency === "IRR") return Math.round(raw);
 
-  const step = money.currency === "IRR" ? 1_000 : 1_000;
-  return Math.round(raw / step) * step;
+  return Math.round(raw / 1_000) * 1_000;
 }
 
 /** True when the price needed an FX conversion (i.e. was not already in toman). */

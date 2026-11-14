@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import { CrawlHttpClient } from "@/crawler/http";
-import { writeSnapshot, readSnapshot } from "@/crawler/store";
+import { writeSnapshot, readSnapshot, readSnapshotsForSources } from "@/crawler/store";
 import { CRAWL_SOURCES } from "@/crawler/sources";
 import { safarmarketSource } from "@/crawler/sources/safarmarket";
 import { normalizeRawOffers } from "@/crawler/normalize";
@@ -22,7 +22,7 @@ describe("crawl source placeholders", () => {
     const offers = safarmarketSource.parseRaw(fixture, { route: "THR-MHD", date: "2026-11-22", url: "https://safarmarket.com/api/flight/v3/search" });
     expect(offers).toHaveLength(3);
     expect(offers.map((offer) => offer.amount)).toEqual([81_840_000, 82_568_798, 82_896_000]);
-    expect(offers[0]).toMatchObject({ origin: "THR", destination: "MHD", airline: "Fly Persia", airlineCode: "FP", flightNumber: "FP7438", departAt: "2026-11-22T10:50:00.000Z", arriveAt: "2026-11-22T12:10:00.000Z", departureLocal: "2026-11-22 14:20", arrivalLocal: "2026-11-22 15:40", amount: 81_840_000, currency: "IRT", seats: 9, offerUrl: null, providerId: "faza24", flightClass: "ECONOMY", sellType: "CHARTER", aircraft: "Boeing", charter: true });
+    expect(offers[0]).toMatchObject({ origin: "THR", destination: "MHD", airline: "Fly Persia", airlineCode: "FP", flightNumber: "FP7438", departAt: "2026-11-22T10:50:00.000Z", arriveAt: "2026-11-22T12:10:00.000Z", departureLocal: "2026-11-22 14:20", arrivalLocal: "2026-11-22 15:40", amount: 81_840_000, currency: "IRR", seats: 9, offerUrl: null, providerId: "faza24", flightClass: "ECONOMY", sellType: "CHARTER", aircraft: "Boeing", charter: true });
     const warnings = normalizeRawOffers(offers)[0]?.warnings ?? [];
     expect(warnings).not.toContain("currency-missing");
     expect(warnings).not.toContain("timezone-unresolved");
@@ -57,7 +57,7 @@ describe("crawl source placeholders", () => {
     const body = JSON.stringify({ code: 200, result: { flights: [{ flightId: "flight-x", leave: {}, providers: [{ price: 1200 }] }] } });
     const offers = safarmarketSource.parseRaw(body, { route: "", date: "", url: "" });
     expect(offers).toHaveLength(1);
-    expect(offers[0]).toMatchObject({ id: "flight-x", origin: null, destination: null, departAt: null, arriveAt: null, airline: null, flightNumber: null, currency: "IRT", seats: null, offerUrl: null });
+    expect(offers[0]).toMatchObject({ id: "flight-x", origin: null, destination: null, departAt: null, arriveAt: null, airline: null, flightNumber: null, currency: "IRR", seats: null, offerUrl: null });
   });
 });
 
@@ -184,9 +184,14 @@ describe("crawled raw normalization and storage guard", () => {
       const real = { ...synthetic, source: "fixture-real" };
       const outputPath = await writeSnapshot(real, root);
       expect((await readSnapshot("fixture-real", root))?.source).toBe("fixture-real");
+      const secondRoute = { ...real, route: "THR-SYZ", date: "2026-12-02", fetchedAt: new Date(1).toISOString() };
+      await writeSnapshot(secondRoute, root);
+      expect((await readSnapshot("fixture-real", root, { route: "THR-MHD", date: "2026-12-01" }))?.route).toBe("THR-MHD");
+      expect((await readSnapshot("fixture-real", root, { route: "THR-SYZ", date: "2026-12-02" }))?.route).toBe("THR-SYZ");
+      expect(await readSnapshotsForSources(["fixture-real", "synthetic-test"], root)).toHaveLength(2);
       expect(outputPath).toBe(join(root, "latest.json"));
       const latest = JSON.parse(await readFile(outputPath, "utf8")) as { snapshots: { source: string }[] };
-      expect(latest.snapshots.map((item) => item.source)).toEqual(["fixture-real"]);
+      expect(latest.snapshots.map((item) => item.source)).toEqual(["fixture-real", "fixture-real"]);
     } finally { await rm(root, { recursive: true, force: true }); }
   });
 });

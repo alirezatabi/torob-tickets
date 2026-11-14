@@ -56,7 +56,7 @@ describe("pars adapter (IRR, string stops, local times)", () => {
     // 08:40 Tehran (05:10Z) → 10:45 Istanbul (07:45Z) = 2h35m of real time.
     expect(offer.durationMinutes).toBe(155);
     expect(offer.baggage).toEqual({ checked: "included", cabinKg: 8, checkedKg: 23 });
-    expect(offer.warnings).toContain("price-converted");
+    expect(offer.warnings).toContain("rial-to-toman");
   });
 
   it("rejects a record with an unparsable price instead of guessing", () => {

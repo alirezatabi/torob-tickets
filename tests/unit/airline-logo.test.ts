@@ -64,11 +64,24 @@ describe("airline logos", () => {
     expect(EMBLEM_PATHS[first.emblem]).toBeTruthy();
   });
 
+  it("draws distinct custom brand identities for named carriers with no licensed logo asset", () => {
+    const flyPersia = airlineBrand("FP", "Fly Persia");
+    const meraj = airlineBrand("JI", "معراج ایرلاین");
+    const nasim = airlineBrand("XX", "Nasim Air");
+    const atlas = airlineBrand("5Y", "Atlas Air");
+    expect(new Set([flyPersia.from, meraj.from, nasim.from, atlas.from]).size).toBe(4);
+    expect(flyPersia).toEqual(airlineBrand("FP", "فلای‌پرشیا"));
+    expect(meraj.emblem).toBe("crescent");
+    expect(nasim.emblem).toBe("wave");
+    expect(atlas.emblem).toBe("globe");
+    expect(airlineLogoPath("FP")).toBeNull();
+  });
+
   it("claims in the README only what is actually bundled", () => {
     // The README says every carrier has its real logo, so the count must match the bundle.
     expect(AIRLINES.length).toBe(23);
     expect(readme).toContain("۲۳ ایرلاین");
-    expect(readme).toContain("لوگوی اصلی هر شرکت");
+    expect(readme).toContain("لوگوی اصلی ۲۳ ایرلاین");
     expect(Object.keys(AIRLINE_LOGO_ASSETS).length).toBe(AIRLINES.length);
   });
 });

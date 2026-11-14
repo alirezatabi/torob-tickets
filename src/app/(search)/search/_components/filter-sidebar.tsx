@@ -75,7 +75,7 @@ export function FilterPanel({ query, groups, totalOffers }: FilterPanelProps) {
     (activeStops !== null ? 1 : 0) +
     (activeBag ? 1 : 0) +
     (activeRefund ? 1 : 0) +
-    (activeTime ? 1 : 0) +
+    (activeTime || current.departureTimeFrom || current.departureTimeTo ? 1 : 0) +
     (activeDataSource !== "all" ? 1 : 0) +
     activeAirlines.length +
     (priceCap < bounds.max ? 1 : 0);
@@ -95,7 +95,7 @@ export function FilterPanel({ query, groups, totalOffers }: FilterPanelProps) {
         {activeCount > 0 && (
           <button
             type="button"
-            onClick={() => apply({ stops: null, bag: null, refund: null, time: null, airlines: null, price_max: null, source: null })}
+            onClick={() => apply({ stops: null, bag: null, refund: null, time: null, time_from: null, time_to: null, airlines: null, price_max: null, source: null })}
             className="inline-flex items-center gap-1 text-[0.68rem] text-ink-400 hover:text-teal-700"
           >
             <RotateCcw className="size-3" aria-hidden="true" />
@@ -192,18 +192,38 @@ export function FilterPanel({ query, groups, totalOffers }: FilterPanelProps) {
         </label>
       </FilterSection>
 
-      <FilterSection title="ساعت پرواز">
-        <div className="flex flex-wrap gap-1.5">
+      <FilterSection title="بازهٔ دقیق ساعت حرکت">
+        <p className="mb-2 text-[0.62rem] leading-5 text-ink-400">ساعت ایران (Asia/Tehran) برای تاریخ پرواز انتخاب‌شده؛ بازهٔ شبانه می‌تواند از نیمه‌شب عبور کند.</p>
+        <div className="grid grid-cols-2 gap-2">
+          <label className="text-[0.65rem] text-ink-500">
+            از
+            <input
+              type="time"
+              value={current.departureTimeFrom ?? ""}
+              onChange={(event) => apply({ time_from: event.target.value || null })}
+              aria-label="زمان شروع حرکت"
+              className="mt-1 block w-full rounded-lg border border-ink-200 bg-white px-2 py-1.5 text-sm text-ink-800"
+            />
+          </label>
+          <label className="text-[0.65rem] text-ink-500">
+            تا
+            <input
+              type="time"
+              value={current.departureTimeTo ?? ""}
+              onChange={(event) => apply({ time_to: event.target.value || null })}
+              aria-label="زمان پایان حرکت"
+              className="mt-1 block w-full rounded-lg border border-ink-200 bg-white px-2 py-1.5 text-sm text-ink-800"
+            />
+          </label>
+        </div>
+        <div className="mt-3 flex flex-wrap gap-1.5">
           {DAY_PARTS.map((part) => (
             <button
               key={part.key}
               type="button"
               onClick={() => apply({ time: activeTime === part.key ? null : part.key })}
               aria-pressed={activeTime === part.key}
-              className={cn(
-                CHIP,
-                activeTime === part.key ? CHIP_ON : CHIP_OFF,
-              )}
+              className={cn(CHIP, activeTime === part.key ? CHIP_ON : CHIP_OFF)}
             >
               {part.label}
             </button>

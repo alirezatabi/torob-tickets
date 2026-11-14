@@ -86,7 +86,7 @@ function DrawnBadge({
   size: number;
   className?: string;
 }) {
-  const brand = airlineBrand(code);
+  const brand = airlineBrand(code, label);
   const emblem = EMBLEM_PATHS[brand.emblem] ?? EMBLEM_PATHS.wing!;
   const gradientId = `airline-${code.replace(/[^A-Za-z0-9]/g, "") || "xx"}-${size}`;
   const showCode = size >= 38;
@@ -103,7 +103,7 @@ function DrawnBadge({
       data-airline={code}
       data-logo="drawn"
     >
-      <title>{`${label} (${code})`}</title>
+      <title>{`${label} (${code}) · نشان گرافیکی طراحی‌شده`}</title>
       <defs>
         <linearGradient id={gradientId} x1="0" y1="0" x2="0.6" y2="1">
           <stop offset="0%" stopColor={brand.from} />

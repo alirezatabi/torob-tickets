@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowRight, BadgeCheck, CalendarDays, Info, Plane, Timer, Users } from "lucide-react";
 
-import { parseSearchParams, searchHref } from "@/lib/search-params";
+import { parseSearchParams, searchHref, toSearchParams } from "@/lib/search-params";
 import { cityLabel, getCity } from "@/lib/cities";
 import { formatJalaliFull } from "@/lib/jalali";
 import {
@@ -91,15 +91,8 @@ export default async function FlightPage({ searchParams }: FlightPageProps) {
   const originTz = origin?.timezone ?? "Asia/Tehran";
   const destinationTz = destination?.timezone ?? "Asia/Tehran";
   const arrivalNextDay = isoDateInZone(offer.arriveAt, destinationTz) !== isoDateInZone(offer.departAt, originTz);
-  const compareParams = new URLSearchParams({
-    origin: query.originCode,
-    destination: query.destinationCode,
-    date: query.departDate,
-    ...(query.passengers > 1 ? { pax: String(query.passengers) } : {}),
-    ...(query.cabin !== "economy" ? { cabin: query.cabin } : {}),
-    ...(query.filters.dataSource !== "all" ? { source: query.filters.dataSource } : {}),
-    groups: `${offer.groupKey}:${offer.id}`,
-  });
+  const compareParams = toSearchParams(query);
+  compareParams.set("groups", `${offer.groupKey}:${offer.id}`);
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-8" data-testid="flight-page">
