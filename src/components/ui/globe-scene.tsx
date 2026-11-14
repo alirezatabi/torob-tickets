@@ -346,7 +346,8 @@ export function GlobeScene({
   const plane = arc ? planeAt(arc, progress, camera) : null;
 
   const onPointerDown = useCallback(
-    (event: React.PointerEvent<SVGSVGElement>) => {
+    (event: React.PointerEvent<HTMLDivElement>) => {
+      if ((event.target as Element).closest("button")) return;
       event.currentTarget.setPointerCapture(event.pointerId);
       drag.current = {
         x: event.clientX,
@@ -363,7 +364,7 @@ export function GlobeScene({
   );
 
   const onPointerMove = useCallback(
-    (event: React.PointerEvent<SVGSVGElement>) => {
+    (event: React.PointerEvent<HTMLDivElement>) => {
       const current = drag.current;
       if (!current) return;
       // A drag across the disc is roughly half a turn, which is how a globe on a desk behaves.
@@ -404,7 +405,7 @@ export function GlobeScene({
   );
 
   const onWheel = useCallback(
-    (event: React.WheelEvent<SVGSVGElement>) => {
+    (event: React.WheelEvent<HTMLDivElement>) => {
       event.preventDefault();
       zoomBy(Math.exp(-event.deltaY * 0.0012));
     },
@@ -440,8 +441,13 @@ export function GlobeScene({
       data-zoom={zoom.toFixed(2)}
     >
       <div
-        className="relative mx-auto aspect-square w-full"
-        style={{ maxWidth: size }}
+        className="relative mx-auto aspect-square w-full cursor-grab select-none active:cursor-grabbing"
+        style={{ maxWidth: size, touchAction: "none" }}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        onPointerCancel={onPointerUp}
+        onWheel={onWheel}
       >
         <div
           aria-hidden="true"
@@ -450,18 +456,13 @@ export function GlobeScene({
         />
         <svg
           viewBox={`0 0 ${size} ${size}`}
-          className="h-auto w-full cursor-grab select-none active:cursor-grabbing"
+          className="h-auto w-full select-none"
           role="img"
           aria-label={
             route
               ? `کرهٔ زمین سه‌بعدی با مسیر ${originLabel} به ${destinationLabel}`
               : "کرهٔ زمین در حال چرخش"
           }
-          onPointerDown={onPointerDown}
-          onPointerMove={onPointerMove}
-          onPointerUp={onPointerUp}
-          onPointerCancel={onPointerUp}
-          onWheel={onWheel}
         >
           <title>
             {route

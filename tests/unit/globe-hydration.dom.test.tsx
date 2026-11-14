@@ -48,15 +48,16 @@ describe("globe hydration", () => {
     expect(svg).not.toBeNull();
     expect(landDots).not.toBeNull();
     const originalProjection = landDots?.getAttribute("d");
-    Object.defineProperty(svg, "setPointerCapture", { configurable: true, value: vi.fn() });
+    const interactionSurface = svg!.parentElement!;
+    Object.defineProperty(interactionSurface, "setPointerCapture", { configurable: true, value: vi.fn() });
 
     await act(async () => {
-      fireEvent.pointerDown(svg!, { pointerId: 1, clientX: 50, clientY: 110 });
-      fireEvent.pointerMove(svg!, { pointerId: 1, clientX: 90, clientY: 110 });
+      fireEvent.pointerDown(interactionSurface, { pointerId: 1, clientX: 50, clientY: 110 });
+      fireEvent.pointerMove(interactionSurface, { pointerId: 1, clientX: 90, clientY: 110 });
     });
     expect(landDots?.getAttribute("d")).not.toBe(originalProjection);
 
-    await act(async () => fireEvent.pointerUp(svg!, { pointerId: 1 }));
+    await act(async () => fireEvent.pointerUp(interactionSurface, { pointerId: 1 }));
   });
 
   it("keeps SVG ids and projected marker attributes identical between server and client", async () => {
