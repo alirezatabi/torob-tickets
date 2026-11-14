@@ -75,7 +75,10 @@ function baseCoverage(providerId: string, patternId: string): boolean {
 export function guaranteedCoverage(providerId: string, patternId: string): boolean {
   const carriers: string[] = DEMO_SELLER_PRIORITY.filter((id) => baseCoverage(id, patternId));
   if (carriers.includes(providerId)) return true;
-  const missing = Math.max(0, minSellers() - carriers.length);
+  // Expanded timetable rotations get one extra source so the intentionally numberless
+  // Mahan rows still leave the normal three-seller minimum for that physical flight.
+  const sellerFloor = patternId.includes("-rotation-") ? Math.min(DEMO_SELLER_PRIORITY.length, minSellers() + 1) : minSellers();
+  const missing = Math.max(0, sellerFloor - carriers.length);
   if (missing === 0) return false;
 
   // Which sellers fill the gap is *also* deterministic, but varies per flight, so the top-up

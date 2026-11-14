@@ -1393,7 +1393,82 @@ function buildPatterns(): FlightPattern[] {
   return patterns;
 }
 
-export const FLIGHT_PATTERNS: FlightPattern[] = buildPatterns();
+/**
+ * Expand the hand-curated core timetable into a dense, deterministic demo schedule.
+ *
+ * Every city pair gets at least eight schedule patterns spread across the clock (subject
+ * to each pattern's operating weekdays); the busiest routes can have up to sixteen. Clones keep a coherent airline/aircraft and
+ * operating-week pattern, but receive their own flight number and fare, so aggregation,
+ * sorting, filters and ticket details all exercise a substantial set of distinct trips.
+ */
+function expandDemoRotations(basePatterns: FlightPattern[]): FlightPattern[] {
+  const byRoute = new Map<string, FlightPattern[]>();
+  for (const pattern of basePatterns) {
+    const key = `${pattern.originCode}-${pattern.destinationCode}`;
+    const route = byRoute.get(key) ?? [];
+    route.push(pattern);
+    byRoute.set(key, route);
+  }
+
+  const expanded: FlightPattern[] = [];
+  for (const [routeKey, routePatterns] of byRoute) {
+    const ordered = [...routePatterns].sort(
+      (a, b) => a.departMinutes - b.departMinutes || a.flightNumber.localeCompare(b.flightNumber),
+    );
+    expanded.push(...ordered);
+    const target = Math.min(16, Math.max(8, ordered.length * 2));
+    const occupied = ordered.map((pattern) => pattern.departMinutes);
+    const usedIds = new Set(ordered.map((pattern) => pattern.id));
+    const copies = new Map<string, number>();
+
+    while (occupied.length < target) {
+      // Pick the half-hour slot farthest from existing departures. This fills the day
+      // evenly rather than piling every synthetic ticket into a single time window.
+      let departure = 0;
+      let bestDistance = -1;
+      let bestTie = Number.POSITIVE_INFINITY;
+      for (let candidate = 0; candidate < 24 * 60; candidate += 30) {
+        const nearest = Math.min(
+          ...occupied.map((minute) => {
+            const distance = Math.abs(candidate - minute);
+            return Math.min(distance, 24 * 60 - distance);
+          }),
+        );
+        const tie = seededUnit(`${routeKey}:departure:${candidate}`);
+        if (nearest > bestDistance || (nearest === bestDistance && tie < bestTie)) {
+          departure = candidate;
+          bestDistance = nearest;
+          bestTie = tie;
+        }
+      }
+      occupied.push(departure);
+
+      const source = ordered[(occupied.length - ordered.length - 1) % ordered.length]!;
+      const copyNumber = (copies.get(source.id) ?? 0) + 1;
+      copies.set(source.id, copyNumber);
+      let flightNumberValue = Number(source.flightNumber.slice(source.flightNumber.lastIndexOf("-") + 1)) + copyNumber * 1000;
+      let id = `${patternId(source.originCode, source.destinationCode, source.airlineCode, flightNumberValue)}-rotation-${copyNumber}`;
+      while (usedIds.has(id)) {
+        flightNumberValue += 1;
+        id = `${patternId(source.originCode, source.destinationCode, source.airlineCode, flightNumberValue)}-rotation-${copyNumber}`;
+      }
+      usedIds.add(id);
+
+      const variation = seededUnit(`${routeKey}:${source.id}:fare:${copyNumber}`);
+      const basePriceToman = Math.round((source.basePriceToman * (1.05 + variation * 0.25)) / 10_000) * 10_000;
+      expanded.push({
+        ...source,
+        id,
+        flightNumber: `${source.airlineCode}-${flightNumberValue}`,
+        departMinutes: departure,
+        basePriceToman,
+      });
+    }
+  }
+  return expanded;
+}
+
+export const FLIGHT_PATTERNS: FlightPattern[] = expandDemoRotations(buildPatterns());
 
 export interface MaterializedFlight {
   pattern: FlightPattern;

@@ -46,6 +46,17 @@ describe("demo timetable coverage", () => {
     expect(routeCount()).toBeGreaterThanOrEqual(100);
   });
 
+  it("provides a dense, deterministic schedule with unique flight numbers throughout the day", () => {
+    expect(FLIGHT_PATTERNS.length).toBeGreaterThan(1_000);
+    const date = "2026-11-20";
+    const first = patternsForRoute("IFN", "KIH", date);
+    const second = patternsForRoute("IFN", "KIH", date);
+    expect(first.length).toBeGreaterThanOrEqual(8);
+    expect(first.map((pattern) => pattern.id)).toEqual(second.map((pattern) => pattern.id));
+    expect(new Set(first.map((pattern) => pattern.flightNumber)).size).toBe(first.length);
+    expect(Math.max(...first.map((pattern) => pattern.departMinutes)) - Math.min(...first.map((pattern) => pattern.departMinutes))).toBeGreaterThan(18 * 60);
+  });
+
   it("materializes every pattern on a day it actually operates", () => {
     // Some routes are not daily, so a single test date is not enough: pick a date
     // inside each pattern's own operating weekdays.

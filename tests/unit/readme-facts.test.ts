@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { availableRoutes, routeCount, servedCities } from "@/lib/schedules";
+import { availableRoutes, FLIGHT_PATTERNS, routeCount, servedCities } from "@/lib/schedules";
 import { airlineCount } from "@/lib/airlines";
 import { CITIES } from "@/lib/cities";
 import { toPersianDigits } from "@/lib/format";
@@ -22,6 +22,11 @@ function fa(n: number): string {
 describe("README matches the code", () => {
   it("states the real number of routes", () => {
     expect(readme).toContain(`${fa(routeCount())} مسیر`);
+  });
+
+  it("documents the expanded demo timetable", () => {
+    expect(FLIGHT_PATTERNS.length).toBeGreaterThan(1_100);
+    expect(readme).toContain("بیش از ۱٬۱۰۰ برنامهٔ پرواز");
   });
 
   it("states the real number of cities and airlines", () => {

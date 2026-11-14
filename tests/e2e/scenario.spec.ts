@@ -64,7 +64,7 @@ test.describe("Isfahan → Kish, no date chosen", () => {
     await expect(cards.first()).toBeVisible();
     expect(await cards.count()).toBeGreaterThanOrEqual(2);
 
-    // The two physical flights of this route: Iran Air ~13:00 and Kish Air ~19:00.
+    // The dense timetable retains the two curated reference flights among the extra rotations.
     await expect(cards.filter({ hasText: "IR-3301" })).toHaveCount(1);
     await expect(cards.filter({ hasText: "Y9-7204" })).toHaveCount(1);
 
@@ -189,7 +189,7 @@ test.describe("Isfahan → Kish, no date chosen", () => {
     const earliestOrder = await keys();
 
     expect(cheapestOrder.length).toBe(earliestOrder.length);
-    // The cheapest flight of this route departs at 19:00, the earliest at 13:00.
+    // The expanded timetable keeps price order distinct from chronological departure order.
     expect(earliestOrder[0]).not.toBe(cheapestOrder[0]);
   });
 

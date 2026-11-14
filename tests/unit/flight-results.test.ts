@@ -24,7 +24,7 @@ async function pipeline(sort: "best" | "cheapest" | "earliest" | "fastest" = "ch
 describe("flight-level pipeline", () => {
   it("returns one result per physical flight, priced at its cheapest purchasable seller", async () => {
     const results = await pipeline("cheapest");
-    expect(results.flights.length).toBeGreaterThanOrEqual(2);
+    expect(results.flights.length).toBeGreaterThanOrEqual(8);
     for (const flight of results.flights) {
       expect(flight.group.providers.length).toBeGreaterThanOrEqual(3);
       expect(flight.selection.cheapest).not.toBeNull();
