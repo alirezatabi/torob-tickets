@@ -15,6 +15,7 @@
     "db:generate": "prisma generate && node scripts/ensure-prisma-marker.mjs",
     "db:push": "prisma db push",
     "db:seed": "prisma db seed",
+    "db:clear-demo-seed": "tsx scripts/clear-demo-seed.ts",
     "db:studio": "prisma studio",
     "db:reset": "prisma migrate reset --force",
     "db:history": "tsx scripts/db-history.ts",
