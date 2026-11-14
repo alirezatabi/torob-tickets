@@ -56,7 +56,7 @@ export function Hero({
               animate={{ opacity: 1, scale: 1, y: 0 }}
               transition={{ duration: 1.1, delay: 0.12, ease: EASE }}
             >
-              <GlobeScene planet size={900} period={100} className="mx-auto w-full max-w-[900px]" />
+              <GlobeScene planet size={900} period={90} className="mx-auto w-full max-w-[900px]" />
             </motion.div>
           </div>
         </div>

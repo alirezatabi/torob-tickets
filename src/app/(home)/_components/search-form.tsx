@@ -104,7 +104,7 @@ export function SearchForm({ initialOrigin = "", initialDestination = "" }: { in
   const busy = pending || intentPending;
 
   return (
-    <div className="card home-search-panel relative overflow-hidden p-4 sm:p-5">
+    <div className="card home-search-panel relative overflow-hidden p-[18px] sm:p-[22px]">
       <div aria-hidden="true" className="absolute inset-x-0 top-0 h-px bg-gradient-to-l from-transparent via-teal-400/60 to-transparent" />
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div className="segmented" role="tablist" aria-label="نوع جستجو">

@@ -23,6 +23,18 @@ import {
   type Vec3,
 } from "@/lib/globe3d";
 
+const GLOBE_DOT_VECTORS = (() => {
+  const dots = globeDots as Point[];
+  const vectors = new Float64Array(dots.length * 3);
+  dots.forEach(([lon, lat], index) => {
+    const vector = toVec(lon, lat);
+    vectors[index * 3] = vector.x;
+    vectors[index * 3 + 1] = vector.y;
+    vectors[index * 3 + 2] = vector.z;
+  });
+  return vectors;
+})();
+
 /**
  * The globe. One component, two jobs:
  *
@@ -155,6 +167,8 @@ export function GlobeScene({
   const [spinning, setSpinning] = useState(true);
   const [level, setLevel] = useState<CoastLevel>(initialLevel);
   const [reduced, setReduced] = useState(false);
+  const [inView, setInView] = useState(true);
+  const figureRef = useRef<HTMLElement>(null);
   /** Server and first client paint are identical; this flips once if the visitor asked for less motion. */
 
   const drag = useRef<{ x: number; yaw: number; vx: number } | null>(null);
@@ -183,6 +197,18 @@ export function GlobeScene({
     apply();
     query.addEventListener("change", apply);
     return () => query.removeEventListener("change", apply);
+  }, []);
+
+  // Stop doing expensive globe projection work while the illustration is scrolled off-screen.
+  useEffect(() => {
+    const figure = figureRef.current;
+    if (!figure || typeof IntersectionObserver === "undefined") return;
+    const observer = new IntersectionObserver(
+      ([entry]) => setInView(entry?.isIntersecting ?? true),
+      { rootMargin: "100px" },
+    );
+    observer.observe(figure);
+    return () => observer.disconnect();
   }, []);
 
   /**
@@ -249,7 +275,7 @@ export function GlobeScene({
 
   // One animation loop: inertia first, then the idle motion.
   useEffect(() => {
-    if (reduced) return;
+    if (reduced || !inView) return;
     let last = performance.now();
     const tick = (now: number) => {
       const delta = Math.min(now - last, 80) / 1000;
@@ -300,7 +326,7 @@ export function GlobeScene({
     return () => {
       if (frame.current !== null) cancelAnimationFrame(frame.current);
     };
-  }, [reduced, spinning, planet, period]);
+  }, [reduced, inView, spinning, planet, period]);
 
   const camera: Camera = useMemo(
     () => ({
@@ -453,6 +479,7 @@ export function GlobeScene({
 
   return (
     <figure
+      ref={figureRef}
       className={className}
       data-globe={planet ? "planet" : "live"}
       data-testid={planet ? undefined : "route-globe"}
@@ -1129,15 +1156,19 @@ const SERVICE_LOCATIONS: Point[] = [
 ];
 
 function projectDottedLand(camera: Camera): { land: string } {
-  let land = "";
-  for (const [lon, lat] of globeDots as [number, number][]) {
-    const point = rotate(camera.m, toVec(lon, lat));
-    if (point.y >= -0.025) continue;
-    const x = (camera.cx + camera.radius * point.x).toFixed(1);
-    const y = (camera.cy - camera.radius * point.z).toFixed(1);
-    land += `M${x} ${y}h0.01`;
+  const commands: string[] = [];
+  const matrix = camera.m;
+  for (let index = 0; index < GLOBE_DOT_VECTORS.length; index += 3) {
+    const vx = GLOBE_DOT_VECTORS[index]!;
+    const vy = GLOBE_DOT_VECTORS[index + 1]!;
+    const vz = GLOBE_DOT_VECTORS[index + 2]!;
+    const x = matrix[0]! * vx + matrix[1]! * vy + matrix[2]! * vz;
+    const y = matrix[3]! * vx + matrix[4]! * vy + matrix[5]! * vz;
+    if (y >= -0.025) continue;
+    const z = matrix[6]! * vx + matrix[7]! * vy + matrix[8]! * vz;
+    commands.push(`M${(camera.cx + camera.radius * x).toFixed(1)} ${(camera.cy - camera.radius * z).toFixed(1)}h0.01`);
   }
-  return { land };
+  return { land: commands.join("") };
 }
 
 function projectServiceMarkers(camera: Camera): ServiceMarkerData[] {
@@ -1438,48 +1469,38 @@ function circleIntersections(
   return [(-b - root) / (2 * a), (-b + root) / (2 * a)].filter((t) => t > 0 && t < 1);
 }
 
+const GRATICULE_LINES: Vec3[][] = [
+  ...Array.from({ length: 7 }, (_, line) =>
+    Array.from({ length: 121 }, (_, index) => toVec(-180 + index * 3, -60 + line * 20)),
+  ),
+  ...Array.from({ length: 18 }, (_, line) =>
+    Array.from({ length: 59 }, (_, index) => toVec(-180 + line * 20, -88 + index * 3)),
+  ),
+];
+
 /** Graticule: 20° meridians and parallels, clipped by the horizon like everything else. */
 function projectGraticule(camera: Camera): string {
-  let path = "";
+  const paths: string[] = [];
+  const matrix = camera.m;
   const push = (run: string[]) => {
-    if (run.length > 1) path += `M${run.join("L")}`;
+    if (run.length > 1) paths.push(`M${run.join("L")}`);
   };
-  const project = (lon: number, lat: number): [number, number] | null => {
-    const v = toVec(lon, lat);
-    const y = camera.m[3]! * v.x + camera.m[4]! * v.y + camera.m[5]! * v.z;
-    if (y >= 0) return null;
-    const x = camera.m[0]! * v.x + camera.m[1]! * v.y + camera.m[2]! * v.z;
-    const z = camera.m[6]! * v.x + camera.m[7]! * v.y + camera.m[8]! * v.z;
-    return [camera.cx + camera.radius * x, camera.cy - camera.radius * z];
-  };
-
-  for (let lat = -60; lat <= 60; lat += 20) {
+  for (const line of GRATICULE_LINES) {
     let run: string[] = [];
-    for (let lon = -180; lon <= 180; lon += 3) {
-      const point = project(lon, lat);
-      if (!point) {
+    for (const vector of line) {
+      const x = matrix[0]! * vector.x + matrix[1]! * vector.y + matrix[2]! * vector.z;
+      const y = matrix[3]! * vector.x + matrix[4]! * vector.y + matrix[5]! * vector.z;
+      if (y >= 0) {
         push(run);
         run = [];
         continue;
       }
-      run.push(`${point[0].toFixed(1)} ${point[1].toFixed(1)}`);
+      const z = matrix[6]! * vector.x + matrix[7]! * vector.y + matrix[8]! * vector.z;
+      run.push(`${(camera.cx + camera.radius * x).toFixed(1)} ${(camera.cy - camera.radius * z).toFixed(1)}`);
     }
     push(run);
   }
-  for (let lon = -180; lon < 180; lon += 20) {
-    let run: string[] = [];
-    for (let lat = -88; lat <= 88; lat += 3) {
-      const point = project(lon, lat);
-      if (!point) {
-        push(run);
-        run = [];
-        continue;
-      }
-      run.push(`${point[0].toFixed(1)} ${point[1].toFixed(1)}`);
-    }
-    push(run);
-  }
-  return path;
+  return paths.join("");
 }
 
 function NetworkNode({ marker, glowId }: { marker: ServiceMarkerData; glowId: string }) {

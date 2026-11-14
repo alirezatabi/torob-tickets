@@ -134,6 +134,23 @@ export interface ProjectedRing {
 
 /** A ring is dozens of vertices; a fixed-point stream is much cheaper than array-of-objects. */
 const coord = (value: number): number => Math.round(value * 10) / 10;
+const ringVectorCache = new WeakMap<Float64Array, Float64Array>();
+
+function vectorsForRing(ring: Float64Array): Float64Array {
+  const cached = ringVectorCache.get(ring);
+  if (cached) return cached;
+  const vectors = new Float64Array(ring.length / 2 * 3);
+  for (let index = 0; index < ring.length / 2; index += 1) {
+    const phi = ring[index * 2 + 1]! * RAD;
+    const lambda = ring[index * 2]! * RAD;
+    const cosPhi = Math.cos(phi);
+    vectors[index * 3] = cosPhi * Math.cos(lambda);
+    vectors[index * 3 + 1] = cosPhi * Math.sin(lambda);
+    vectors[index * 3 + 2] = Math.sin(phi);
+  }
+  ringVectorCache.set(ring, vectors);
+  return vectors;
+}
 
 /**
  * Project one closed coastline ring.
@@ -149,6 +166,7 @@ export function projectRing(
 ): ProjectedRing | null {
   const count = ring.length / 2;
   if (count < 3) return null;
+  const vectors = vectorsForRing(ring);
 
   let depthSum = 0;
   let visible = 0;
@@ -157,14 +175,9 @@ export function projectRing(
   let runLength = 0;
 
   for (let index = 0; index < count; index += 1) {
-    const lon = ring[index * 2]!;
-    const lat = ring[index * 2 + 1]!;
-    const phi = lat * RAD;
-    const lambda = lon * RAD;
-    const cosPhi = Math.cos(phi);
-    const vx = cosPhi * Math.cos(lambda);
-    const vy = cosPhi * Math.sin(lambda);
-    const vz = Math.sin(phi);
+    const vx = vectors[index * 3]!;
+    const vy = vectors[index * 3 + 1]!;
+    const vz = vectors[index * 3 + 2]!;
     const y = camera.m[3]! * vx + camera.m[4]! * vy + camera.m[5]! * vz;
     if (y >= 0) {
       if (runLength > 1) {
