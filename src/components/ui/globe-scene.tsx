@@ -1319,6 +1319,7 @@ function smoothCurveCommands(
   points: [number, number][],
   format: (point: [number, number]) => string,
   tension = 0.85,
+  constrainControl?: (point: [number, number]) => [number, number],
 ): string {
   const extrapolate = (edge: [number, number], adjacent: [number, number]): [number, number] => [
     2 * edge[0] - adjacent[0],
@@ -1359,7 +1360,7 @@ function smoothCurveCommands(
       end[0] - (endTangent[0] * segmentLength * tension) / 3,
       end[1] - (endTangent[1] * segmentLength * tension) / 3,
     ];
-    commands += `C${format(controlA)} ${format(controlB)} ${format(end)}`;
+    commands += `C${format(constrainControl?.(controlA) ?? controlA)} ${format(constrainControl?.(controlB) ?? controlB)} ${format(end)}`;
   }
   return commands;
 }
@@ -1375,6 +1376,14 @@ function projectFlightLimb(points: [number, number][], camera: Camera): string {
   const formatPoint = (point: [number, number]) =>
     `${Math.round(point[0])} ${Math.round(point[1])}`;
   const radiusOf = (point: [number, number]) => Math.hypot(point[0] - camera.cx, point[1] - camera.cy);
+  const constrainToLimb = (point: [number, number]): [number, number] => {
+    const dx = point[0] - camera.cx;
+    const dy = point[1] - camera.cy;
+    const distance = Math.hypot(dx, dy) || 1;
+    const radius = Math.min(outerRadius - 0.5, Math.max(innerRadius, distance));
+    const scale = radius / distance;
+    return [camera.cx + dx * scale, camera.cy + dy * scale];
+  };
   const projectToSurface = (point: [number, number]): [number, number] => {
     const dx = point[0] - camera.cx;
     const dy = point[1] - camera.cy;
@@ -1411,9 +1420,10 @@ function projectFlightLimb(points: [number, number][], camera: Camera): string {
         const reach = radiusOf(first) - innerRadius;
         const controlA: [number, number] = [surface[0] + tangent[0] * reach * 0.55, surface[1] + tangent[1] * reach * 0.55];
         const controlB: [number, number] = [first[0] - direction[0] * reach * 0.55, first[1] - direction[1] * reach * 0.55];
-        commands += `C${formatPoint(controlA)} ${formatPoint(controlB)} ${formatPoint(first)}`;
+        commands += `C${formatPoint(constrainToLimb(controlA))} ${formatPoint(constrainToLimb(controlB))} ${formatPoint(first)}`;
       }
-      commands += smoothCurveCommands(run, formatPoint, 0.82);
+      // Keep spline handles inside the limb shell; unconstrained handles can form spikes as the globe turns.
+      commands += smoothCurveCommands(run, formatPoint, 0.62, constrainToLimb);
       if (endTouchesSurface) {
         const surface = projectToSurface(last);
         const direction = normalize([last[0] - previous[0], last[1] - previous[1]]);
@@ -1421,7 +1431,7 @@ function projectFlightLimb(points: [number, number][], camera: Camera): string {
         const reach = radiusOf(last) - innerRadius;
         const controlA: [number, number] = [last[0] + direction[0] * reach * 0.55, last[1] + direction[1] * reach * 0.55];
         const controlB: [number, number] = [surface[0] - tangent[0] * reach * 0.55, surface[1] - tangent[1] * reach * 0.55];
-        commands += `C${formatPoint(controlA)} ${formatPoint(controlB)} ${formatPoint(surface)}`;
+        commands += `C${formatPoint(constrainToLimb(controlA))} ${formatPoint(constrainToLimb(controlB))} ${formatPoint(surface)}`;
       }
       path += commands;
     }
