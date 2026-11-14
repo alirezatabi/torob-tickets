@@ -60,6 +60,9 @@ describe("globe hydration", () => {
     })).toBe(true);
     const flightExtensions = [...container.querySelectorAll<SVGGElement>("[data-flight-extension]")];
     expect(flightExtensions.length).toBeGreaterThan(0);
+    expect(flightExtensions.some((extension) =>
+      [...extension.querySelectorAll("path")].some((path) => path.getAttribute("d")?.includes("C")),
+    )).toBe(true);
     for (const extension of flightExtensions) {
       const path = extension.querySelector("path")?.getAttribute("d") ?? "";
       const coordinates = path.match(/-?\d+(?:\.\d+)?/g)?.map(Number) ?? [];

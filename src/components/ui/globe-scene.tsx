@@ -1317,17 +1317,51 @@ function projectFlightLimb(points: [number, number][], camera: Camera): string {
     const scale = innerRadius / (Math.hypot(dx, dy) || 1);
     return [camera.cx + dx * scale, camera.cy + dy * scale];
   };
+  const normalize = (vector: [number, number]): [number, number] => {
+    const length = Math.hypot(vector[0], vector[1]) || 1;
+    return [vector[0] / length, vector[1] / length];
+  };
+  const surfaceTangent = (point: [number, number], direction: [number, number]): [number, number] => {
+    const normal = normalize([point[0] - camera.cx, point[1] - camera.cy]);
+    const projection = direction[0] * normal[0] + direction[1] * normal[1];
+    const tangent: [number, number] = [
+      direction[0] - normal[0] * projection,
+      direction[1] - normal[1] * projection,
+    ];
+    if (Math.hypot(tangent[0], tangent[1]) < 0.1) return [-normal[1], normal[0]];
+    return normalize(tangent);
+  };
   const flush = () => {
     if (run.length > 1) {
-      const connected = [...run];
-      if (radiusOf(connected[0]!) > innerRadius + 0.25) {
-        connected.unshift(projectToSurface(connected[0]!));
+      const first = run[0]!;
+      const second = run[1]!;
+      const last = run[run.length - 1]!;
+      const previous = run[run.length - 2]!;
+      const startTouchesSurface = radiusOf(first) > innerRadius + 0.25;
+      const endTouchesSurface = radiusOf(last) > innerRadius + 0.25;
+      let commands = `M${formatPoint(startTouchesSurface ? projectToSurface(first) : first)}`;
+      if (startTouchesSurface) {
+        const surface = projectToSurface(first);
+        const direction = normalize([second[0] - first[0], second[1] - first[1]]);
+        const tangent = surfaceTangent(surface, direction);
+        const reach = radiusOf(first) - innerRadius;
+        const controlA: [number, number] = [surface[0] + tangent[0] * reach * 0.55, surface[1] + tangent[1] * reach * 0.55];
+        const controlB: [number, number] = [first[0] - direction[0] * reach * 0.55, first[1] - direction[1] * reach * 0.55];
+        commands += `C${formatPoint(controlA)} ${formatPoint(controlB)} ${formatPoint(first)}`;
       }
-      const last = connected[connected.length - 1]!;
-      if (radiusOf(last) > innerRadius + 0.25) {
-        connected.push(projectToSurface(last));
+      for (let index = 1; index < run.length; index += 1) {
+        commands += `L${formatPoint(run[index]!)}`;
       }
-      path += `M${connected.map(formatPoint).join("L")}`;
+      if (endTouchesSurface) {
+        const surface = projectToSurface(last);
+        const direction = normalize([last[0] - previous[0], last[1] - previous[1]]);
+        const tangent = surfaceTangent(surface, direction);
+        const reach = radiusOf(last) - innerRadius;
+        const controlA: [number, number] = [last[0] + direction[0] * reach * 0.55, last[1] + direction[1] * reach * 0.55];
+        const controlB: [number, number] = [surface[0] - tangent[0] * reach * 0.55, surface[1] - tangent[1] * reach * 0.55];
+        commands += `C${formatPoint(controlA)} ${formatPoint(controlB)} ${formatPoint(surface)}`;
+      }
+      path += commands;
     }
     run = [];
   };
