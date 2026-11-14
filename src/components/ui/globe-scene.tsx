@@ -1211,6 +1211,10 @@ const NETWORK_ROUTES: { from: number; to: number }[] = [
   { from: 12, to: 6 }, // Hong Kong–Tokyo
   { from: 8, to: 6 }, // Los Angeles–Tokyo
   { from: 10, to: 4 }, // Cape Town–Dubai
+  { from: 0, to: 9 }, // London–Toronto
+  { from: 3, to: 14 }, // Frankfurt–Istanbul
+  { from: 4, to: 11 }, // Dubai–Mumbai
+  { from: 11, to: 5 }, // Mumbai–Singapore
 ];
 
 function projectNetwork(
@@ -1316,19 +1320,44 @@ function smoothCurveCommands(
   format: (point: [number, number]) => string,
   tension = 0.85,
 ): string {
+  const extrapolate = (edge: [number, number], adjacent: [number, number]): [number, number] => [
+    2 * edge[0] - adjacent[0],
+    2 * edge[1] - adjacent[1],
+  ];
+  const chordParameter = (a: [number, number], b: [number, number]) =>
+    Math.max(1e-3, Math.sqrt(Math.hypot(b[0] - a[0], b[1] - a[1])));
   let commands = "";
   for (let index = 0; index < points.length - 1; index += 1) {
-    const previous = points[Math.max(0, index - 1)]!;
     const start = points[index]!;
     const end = points[index + 1]!;
-    const next = points[Math.min(points.length - 1, index + 2)]!;
+    const previous = index > 0 ? points[index - 1]! : extrapolate(start, end);
+    const next = index + 2 < points.length ? points[index + 2]! : extrapolate(end, start);
+    const beforeLength = chordParameter(previous, start);
+    const segmentLength = chordParameter(start, end);
+    const afterLength = chordParameter(end, next);
+    const startTangent: [number, number] = [
+      (start[0] - previous[0]) / beforeLength -
+        (end[0] - previous[0]) / (beforeLength + segmentLength) +
+        (end[0] - start[0]) / segmentLength,
+      (start[1] - previous[1]) / beforeLength -
+        (end[1] - previous[1]) / (beforeLength + segmentLength) +
+        (end[1] - start[1]) / segmentLength,
+    ];
+    const endTangent: [number, number] = [
+      (end[0] - start[0]) / segmentLength -
+        (next[0] - start[0]) / (segmentLength + afterLength) +
+        (next[0] - end[0]) / afterLength,
+      (end[1] - start[1]) / segmentLength -
+        (next[1] - start[1]) / (segmentLength + afterLength) +
+        (next[1] - end[1]) / afterLength,
+    ];
     const controlA: [number, number] = [
-      start[0] + ((end[0] - previous[0]) * tension) / 6,
-      start[1] + ((end[1] - previous[1]) * tension) / 6,
+      start[0] + (startTangent[0] * segmentLength * tension) / 3,
+      start[1] + (startTangent[1] * segmentLength * tension) / 3,
     ];
     const controlB: [number, number] = [
-      end[0] - ((next[0] - start[0]) * tension) / 6,
-      end[1] - ((next[1] - start[1]) * tension) / 6,
+      end[0] - (endTangent[0] * segmentLength * tension) / 3,
+      end[1] - (endTangent[1] * segmentLength * tension) / 3,
     ];
     commands += `C${format(controlA)} ${format(controlB)} ${format(end)}`;
   }

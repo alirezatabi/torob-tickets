@@ -38,6 +38,7 @@ describe("globe hydration", () => {
     const networkLanes = [...container.querySelectorAll<SVGGElement>("[data-network-flight]")];
     expect(networkLanes.length).toBeGreaterThan(0);
     expect(networkLanes.every((lane) => lane.getAttribute("stroke") === "#43baff")).toBe(true);
+    expect(networkLanes.every((lane) => lane.querySelector("path")?.getAttribute("d")?.includes("C"))).toBe(true);
     expect(networkLanes.every((lane) =>
       lane.getAttribute("data-origin-visible") === "true" || lane.getAttribute("data-destination-visible") === "true",
     )).toBe(true);
