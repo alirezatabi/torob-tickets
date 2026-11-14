@@ -88,7 +88,7 @@ describe("globe hydration", () => {
       lane.getAttribute("data-origin-visible") === "true" || lane.getAttribute("data-destination-visible") === "true",
     )).toBe(true);
     expect(networkLanes.some((lane) =>
-      lane.getAttribute("data-network-from") === "6" && lane.getAttribute("data-network-to") === "15",
+      lane.getAttribute("data-network-from") === "15" || lane.getAttribute("data-network-to") === "15",
     )).toBe(false);
     const serviceMarkers = [...container.querySelectorAll<SVGGElement>("[data-service-marker]")];
     expect(serviceMarkers.length).toBeGreaterThan(0);

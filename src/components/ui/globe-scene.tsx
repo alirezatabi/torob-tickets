@@ -161,6 +161,7 @@ export function GlobeScene({
   const settlingYaw = useRef<number | null>(null);
   const inertia = useRef({ yaw: 0, pitch: 0 });
   const touched = useRef(false);
+  const idleYaw = useRef(planet ? 18 : centre[0]);
   // Keep the render path deterministic; the idle sway starts at a neutral phase after hydration.
   const phase = useRef(0);
   const frame = useRef<number | null>(null);
@@ -271,7 +272,9 @@ export function GlobeScene({
           const inertiaMagnitude =
             Math.abs(inertia.current.yaw) + Math.abs(inertia.current.pitch);
           if (inertiaMagnitude > 0.05) {
-            setYaw((value) => value + inertia.current.yaw * delta);
+            const yawStep = inertia.current.yaw * delta;
+            setYaw((value) => value + yawStep);
+            if (!planet) idleYaw.current += yawStep;
             setPitch((value) =>
               clamp(value + inertia.current.pitch * delta, -70, 70),
             );
@@ -285,7 +288,7 @@ export function GlobeScene({
             } else {
               // A ±9° sway: it shows the sphere is real without carrying the route off the disc.
               phase.current += delta;
-              setYaw(startYaw.current + Math.sin(phase.current * 0.5) * 9);
+              setYaw(idleYaw.current + Math.sin(phase.current * 0.5) * 9);
               setPitch(startPitch.current + Math.sin(phase.current * 0.31) * 2.5);
             }
           }
@@ -382,9 +385,10 @@ export function GlobeScene({
       current.vx = -deltaYaw;
       // Track the pointer target and ease the rendered yaw on animation frames to avoid jitter.
       current.yaw -= deltaYaw;
+      if (!planet) idleYaw.current = current.yaw;
       if (reduced) setYaw(current.yaw);
     },
-    [radius, reduced],
+    [radius, reduced, planet],
   );
 
   const zoomBy = useCallback(
@@ -420,6 +424,7 @@ export function GlobeScene({
     const current = drag.current;
     if (!current) return;
     drag.current = null;
+    touched.current = false;
     if (reduced) {
       settlingYaw.current = null;
       inertia.current = { yaw: 0, pitch: 0 };
@@ -434,6 +439,7 @@ export function GlobeScene({
     touched.current = false;
     phase.current = 0;
     settlingYaw.current = null;
+    idleYaw.current = startYaw.current;
     inertia.current = { yaw: 0, pitch: 0 };
     setYaw(startYaw.current);
     setPitch(startPitch.current);
@@ -1221,12 +1227,8 @@ const NETWORK_ROUTES: { from: number; to: number }[] = [
   { from: 10, to: 4 }, // Cape Town–Dubai
   { from: 0, to: 9 }, // London–Toronto
   { from: 3, to: 14 }, // Frankfurt–Istanbul
-  { from: 4, to: 11 }, // Dubai–Mumbai
-  { from: 11, to: 5 }, // Mumbai–Singapore
   { from: 3, to: 6 }, // Frankfurt–Tokyo
-  { from: 15, to: 5 }, // Seoul–Singapore
   { from: 2, to: 13 }, // São Paulo–Paris
-  { from: 7, to: 12 }, // Sydney–Hong Kong
 ];
 
 const NETWORK_HORIZON_DEPTH = 0.08;
