@@ -4,8 +4,6 @@ import {
   screen,
   within,
   cleanup,
-  fireEvent,
-  waitFor,
 } from "@testing-library/react";
 import { createElement } from "react";
 import { afterEach } from "vitest";
@@ -82,30 +80,16 @@ describe("/flight — the per-ticket page", () => {
     );
   });
 
-  it("shows the facts the results list no longer shows: globe, baggage, refund, segments", async () => {
+  it("shows the flight facts without rendering the globe", async () => {
     const flight = await firstFlight();
     await renderFor(flight.selection.cheapest?.id ?? flight.display.id);
 
-    const text = screen.getByTestId("flight-page").textContent ?? "";
+    const page = screen.getByTestId("flight-page");
+    const text = page.textContent ?? "";
     expect(text).toContain("بار همراه");
     expect(text).toContain("شرایط استرداد");
     expect(text).toContain("پله‌های پرواز");
-    // The globe is a real drawing, not a placeholder: it projects the great-circle route.
-    const globe = screen.getByTestId("route-globe");
-    expect(globe.querySelectorAll("circle").length).toBeGreaterThan(1);
-    expect(within(globe).getByTestId("globe-zoom-in")).toBeTruthy();
-    expect(within(globe).getByTestId("globe-zoom-out")).toBeTruthy();
-    const beforeZoom = Number(globe.getAttribute("data-zoom"));
-    fireEvent.click(within(globe).getByTestId("globe-zoom-in"));
-    expect(Number(globe.getAttribute("data-zoom"))).toBeGreaterThan(beforeZoom);
-    const afterButtonZoom = Number(globe.getAttribute("data-zoom"));
-    fireEvent.wheel(globe.querySelector("svg")!, { deltaY: -100 });
-    await waitFor(() => {
-      expect(Number(globe.getAttribute("data-zoom"))).toBeGreaterThan(
-        afterButtonZoom,
-      );
-    });
-    expect(globe.textContent).toContain("کیلومتر");
+    expect(within(page).queryByTestId("route-globe")).toBeNull();
     // Unknown values are labelled, never guessed.
     expect(text).toMatch(/نامشخص|اعلام نشده|شامل|ندارد|استرداد/);
     // And the honesty note is there.

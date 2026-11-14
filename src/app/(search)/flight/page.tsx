@@ -20,7 +20,6 @@ import { baggageLabel, refundLabel } from "@/ranking/explain";
 import { INELIGIBLE_LABELS, LOW_SEATS_THRESHOLD } from "@/modules/pricing/select-cheapest";
 import { DemoBadge } from "@/components/ui/demo-badge";
 import { AirlineLogo } from "@/components/ui/airline-logo";
-import { Globe } from "./_components/route-globe";
 import { NO_SOURCE_REASON_FA } from "@/modules/catalog/demo-link";
 import { cn } from "@/lib/cn";
 
@@ -107,7 +106,7 @@ export default async function FlightPage({ searchParams }: FlightPageProps) {
         <DemoBadge />
       </nav>
 
-      {/* ——— identity: who flies it, the two clocks, and the route on the globe ——— */}
+      {/* ——— identity: who flies it and the two clocks ——— */}
       <header className="card overflow-hidden">
         <div className="flex flex-wrap items-start justify-between gap-4 p-4 sm:p-5">
           <div className="flex min-w-0 items-start gap-3">
@@ -182,17 +181,6 @@ export default async function FlightPage({ searchParams }: FlightPageProps) {
           </div>
         </div>
 
-        {/* ——— the route on the planet ——— */}
-        {origin?.lat != null && destination?.lat != null && origin?.lon != null && destination?.lon != null && (
-          <div className="border-t border-ink-100 bg-gradient-to-b from-ink-50/80 to-white px-4 py-4 sm:px-5">
-            <Globe
-              origin={[origin.lon, origin.lat]}
-              destination={[destination.lon, destination.lat]}
-              originLabel={origin.fa}
-              destinationLabel={destination.fa}
-            />
-          </div>
-        )}
       </header>
 
       <div className="mt-4 grid gap-4 lg:grid-cols-[1fr_20rem] lg:items-start">
