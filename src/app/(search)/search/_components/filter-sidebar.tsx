@@ -50,6 +50,7 @@ export function FilterPanel({ query, groups, totalOffers }: FilterPanelProps) {
   const activeStops = current.maxStops;
   const activeTime = current.dayPart;
   const activeAirlines = current.preferredAirlines;
+  const activeDataSource = current.dataSource;
 
   const [priceCap, setPriceCap] = useState<number>(bounds.max);
   useEffect(() => setPriceCap(bounds.max), [bounds.max]);
@@ -75,6 +76,7 @@ export function FilterPanel({ query, groups, totalOffers }: FilterPanelProps) {
     (activeBag ? 1 : 0) +
     (activeRefund ? 1 : 0) +
     (activeTime ? 1 : 0) +
+    (activeDataSource !== "all" ? 1 : 0) +
     activeAirlines.length +
     (priceCap < bounds.max ? 1 : 0);
 
@@ -93,7 +95,7 @@ export function FilterPanel({ query, groups, totalOffers }: FilterPanelProps) {
         {activeCount > 0 && (
           <button
             type="button"
-            onClick={() => apply({ stops: null, bag: null, refund: null, time: null, airlines: null, price_max: null })}
+            onClick={() => apply({ stops: null, bag: null, refund: null, time: null, airlines: null, price_max: null, source: null })}
             className="inline-flex items-center gap-1 text-[0.68rem] text-ink-400 hover:text-teal-700"
           >
             <RotateCcw className="size-3" aria-hidden="true" />
@@ -124,6 +126,26 @@ export function FilterPanel({ query, groups, totalOffers }: FilterPanelProps) {
           <span className="font-semibold text-ink-700">{formatTomanCompact(priceCap)}</span>
         </div>
         <p className="mt-1 text-[0.62rem] text-ink-400">تومان · هر نفر</p>
+      </FilterSection>
+
+      <FilterSection title="نوع داده">
+        <div className="flex flex-wrap gap-1.5">
+          {[
+            { value: "all", label: "همه" },
+            { value: "demo", label: "نمونه" },
+            { value: "real", label: "واقعی" },
+          ].map((option) => (
+            <button
+              key={option.value}
+              type="button"
+              onClick={() => apply({ source: option.value === "all" ? null : option.value })}
+              aria-pressed={activeDataSource === option.value}
+              className={cn(CHIP, activeDataSource === option.value ? CHIP_ON : CHIP_OFF)}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
       </FilterSection>
 
       <FilterSection title="تعداد توقف">

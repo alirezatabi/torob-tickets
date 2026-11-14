@@ -57,7 +57,25 @@ export const safarmarketSource: CrawlSource = {
       const leave = record(flight?.leave);
       const legs = Array.isArray(leave?.legs) ? leave.legs : [];
       const firstLeg = record(legs[0]);
+      const lastLeg = record(legs[legs.length - 1]);
       if (!flight || !leave) continue;
+      const sourceSegments = legs.flatMap((legValue) => {
+        const leg = record(legValue);
+        if (!leg) return [];
+        const legDepartureLocal = text(leg.departureTime);
+        const legArrivalLocal = text(leg.arrivalTime);
+        return [{
+          originCode: text(leg.departureAirportCode),
+          destinationCode: text(leg.arrivalAirportCode),
+          flightNumber: text(leg.flightNo),
+          airlineCode: text(leg.airlineCode),
+          departureLocal: legDepartureLocal,
+          arrivalLocal: legArrivalLocal,
+          departAt: iranLocalToUtc(legDepartureLocal),
+          arriveAt: iranLocalToUtc(legArrivalLocal),
+          aircraft: text(leg.airPlaneType),
+        }];
+      });
 
       const departureLocal = text(leave.departureTime) ?? text(firstLeg?.departureTime);
       const arrivalLocal = text(leave.arrivalTime) ?? text(firstLeg?.arrivalTime);
@@ -67,7 +85,7 @@ export const safarmarketSource: CrawlSource = {
       if (context.date && flightDate !== context.date) continue;
 
       const originCode = text(firstLeg?.departureAirportCode);
-      const destinationCode = text(firstLeg?.arrivalAirportCode);
+      const destinationCode = text(lastLeg?.arrivalAirportCode);
       if (routeMatch && (originCode !== routeMatch[1] || destinationCode !== routeMatch[2])) continue;
 
       const airlineCode = text(leave.airlineCode) ?? text(firstLeg?.airlineCode);
@@ -111,6 +129,7 @@ export const safarmarketSource: CrawlSource = {
           flightClass: text(flight.flightClass),
           sellType: text(leave.sellType),
           sourceDurationMinutes: nonNegativeNumber(leave.duration) ?? nonNegativeNumber(firstLeg?.flightDuration),
+          sourceSegments,
           aircraft: text(firstLeg?.airPlaneType),
           charter: typeof leave.charter === "boolean" ? leave.charter : null,
           stopsCount: nonNegativeNumber(leave.stopsCount),

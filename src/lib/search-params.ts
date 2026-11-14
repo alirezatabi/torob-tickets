@@ -1,4 +1,4 @@
-import type { CabinClass, DayPart, PricePreference, TripQuery, TripType } from "@/domain/trip";
+import type { CabinClass, DayPart, PricePreference, SearchDataFilter, TripQuery, TripType } from "@/domain/trip";
 import { DEFAULT_PREFERENCES } from "@/domain/trip";
 import { isoToday, isValidCivilDate } from "./jalali";
 import { isKnownCity } from "./cities";
@@ -29,6 +29,7 @@ export interface SearchParamsObject {
   time?: DayPart;
   airlines?: string;
   price_max?: string;
+  source?: string;
   sort?: SortKeyParam;
   q?: string;
 }
@@ -113,6 +114,7 @@ export function parseSearchParams(
       cabin: isCabin(raw.cabin) ? raw.cabin : "economy",
       filters: {
         ...DEFAULT_PREFERENCES,
+        dataSource: isDataSourceFilter(raw.source) ? raw.source : "all",
         pricePreference: isPricePref(raw.price) ? raw.price : "balanced",
         maxStops: stopsRaw !== null && Number.isFinite(stopsRaw) ? clampInt(String(stopsRaw), 0, 3, 0) : null,
         baggageRequired: raw.bag === "1",
@@ -140,6 +142,7 @@ export function toSearchParams(query: TripQuery, sort?: SortKeyParam): URLSearch
   if (query.returnDate) params.set("return", query.returnDate);
   if (query.passengers !== 1) params.set("pax", String(query.passengers));
   if (query.cabin !== "economy") params.set("cabin", query.cabin);
+  if (query.filters.dataSource !== "all") params.set("source", query.filters.dataSource);
   if (query.filters.pricePreference !== "balanced") params.set("price", query.filters.pricePreference);
   if (query.filters.maxStops !== null) params.set("stops", String(query.filters.maxStops));
   if (query.filters.maxPriceToman !== null) params.set("price_max", String(query.filters.maxPriceToman));
@@ -179,6 +182,9 @@ function parseBudget(value: string | undefined): number | null {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
 }
 
+function isDataSourceFilter(value: string | undefined): value is SearchDataFilter {
+  return value === "all" || value === "demo" || value === "real";
+}
 function isCabin(value: string | undefined): value is CabinClass {
   return value === "economy" || value === "premium" || value === "business";
 }

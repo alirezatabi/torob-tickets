@@ -16,6 +16,8 @@ export interface DisplayFilters extends QueryPreferences {
 }
 
 export function offerMatchesFilters(offer: FlightOffer, filters: DisplayFilters): boolean {
+  if (filters.dataSource === "demo" && offer.dataSource !== "demo") return false;
+  if (filters.dataSource === "real" && offer.dataSource === "demo") return false;
   if (filters.maxPriceToman !== null && offer.price.toman > filters.maxPriceToman) return false;
   if (filters.maxStops !== null && offer.stops > filters.maxStops) return false;
   if (filters.baggageRequired && offer.baggage.checked !== "included") return false;

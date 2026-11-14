@@ -137,6 +137,7 @@ export interface BaggageInfo {
 
 export type OfferWarning =
   | "price-converted"
+  | "currency-assumed"
   | "baggage-unknown"
   | "refund-unknown"
   | "flight-number-missing"
@@ -151,10 +152,11 @@ export type OfferWarning =
 
 export const WARNING_LABELS: Record<OfferWarning, string> = {
   "price-converted": "قیمت با نرخ نمونه به تومان تبدیل شده",
+  "currency-assumed": "واحد قیمت تومان طبق فرض اپراتور است",
   "baggage-unknown": "اطلاعات بار ارائه‌دهنده در دسترس نیست",
   "refund-unknown": "شرایط استرداد اعلام نشده",
   "flight-number-missing": "شماره پرواز اعلام نشده",
-  "timezone-assumed": "منطقهٔ زمانی از روی فرودگاه فرض شده",
+  "timezone-assumed": "زمان‌های محلی با منطقهٔ Asia/Tehran تفسیر شده‌اند",
   "duration-inferred": "مدت سفر از روی ساعت حرکت و رسیدن محاسبه شده",
   "airport-unknown": "فرودگاه دقیق اعلام نشده (سطح شهر)",
   "availability-unverified": "موجودی این نرخ توسط منبع اعلام نشده است",

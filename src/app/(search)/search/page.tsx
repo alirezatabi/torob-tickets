@@ -69,6 +69,15 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
   }
 
   const providersOk = outcome.health.filter((health) => health.ok).length;
+  const hasSampleData = outcome.offers.some((offer) => offer.dataSource === "demo");
+  const hasRealData = outcome.offers.some((offer) => offer.dataSource === "live" || offer.dataSource === "crawled");
+  const hasLocalSnapshot = (outcome.rawCounts.safarmarket ?? 0) > 0;
+  const sourceLabel = query.filters.dataSource === "demo"
+    ? "فقط دادهٔ نمونه"
+    : query.filters.dataSource === "real"
+      ? hasRealData ? "فقط دادهٔ واقعی" : hasLocalSnapshot ? "snapshot موجود · نرخ قابل نمایش نیست" : "دادهٔ واقعی · snapshotی برای این مسیر/تاریخ نیست"
+      : hasSampleData && hasRealData ? "دادهٔ نمونه و واقعی"
+        : hasRealData ? "دادهٔ واقعی" : "دادهٔ نمونه";
   const hasResults = flights.length > 0;
   // The strip's position travels in `?strip=`, so tapping a chip does not re-anchor the strip
   // (`resolveStripStart` rejects a start that would hide the selected day or point into the past).
@@ -123,8 +132,8 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
                     <span className="mx-1.5 text-ink-300">·</span>
                     ارزان‌ترین اول
                   </p>
-                  <p className="text-[0.62rem] text-ink-400" title="قیمت‌ها از دادهٔ نمونهٔ درون‌برنامه ساخته می‌شوند، نه از منبع زنده.">
-                    دادهٔ نمونه
+                  <p className="text-[0.62rem] text-ink-400" title={hasRealData ? "دادهٔ واقعی از snapshot محلی است و موجودی یا تازه‌بودن آن در این صفحه دوباره تأیید نمی‌شود." : "این نتایج از دادهٔ نمونهٔ درون‌برنامه هستند."}>
+                    {sourceLabel}
                   </p>
                 </div>
 
@@ -139,7 +148,7 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
                 )}
               </>
             ) : (
-              <EmptyState query={query} />
+              <EmptyState query={query} hasLocalSnapshot={hasLocalSnapshot} />
             )}
           </div>
         </div>
@@ -237,7 +246,7 @@ function SearchProblem({ reason, missing, invalidDate }: { reason: string; missi
   );
 }
 
-function EmptyState({ query }: { query: { originCode: string; destinationCode: string; departDate: string } }) {
+function EmptyState({ query, hasLocalSnapshot }: { query: { originCode: string; destinationCode: string; departDate: string; filters: { dataSource: "all" | "demo" | "real" } }; hasLocalSnapshot: boolean }) {
   return (
     <div className="card p-10 text-center">
       <span className="mx-auto grid size-11 place-items-center rounded-full bg-ink-100 text-ink-500">
@@ -245,7 +254,11 @@ function EmptyState({ query }: { query: { originCode: string; destinationCode: s
       </span>
       <h2 className="mt-4 text-base font-bold">برای این مسیر و تاریخ پروازی پیدا نشد</h2>
       <p className="mx-auto mt-2 max-w-sm text-sm leading-6 text-ink-500">
-        دادهٔ نمونه مسیرهای داخلی و منطقه‌ای را پوشش می‌دهد. روز دیگری را از نوار تاریخ بالا انتخاب کنید.
+        {query.filters.dataSource === "real"
+          ? hasLocalSnapshot
+            ? "snapshot محلی برای این مسیر و تاریخ خوانده شد، اما در این جست‌وجو نرخ قابل نمایش پیدا نشد؛ ممکن است cabin یا اطلاعات ضروری ثبت‌شده با درخواست سازگار نباشد."
+            : "برای این مسیر و تاریخ snapshot واقعی محلی در دسترس نیست. snapshotهای ذخیره‌شده در جست‌وجوی اصلی نمایش داده می‌شوند؛ روز دیگری را انتخاب کنید."
+          : "دادهٔ نمونه مسیرهای داخلی و منطقه‌ای را پوشش می‌دهد. روز دیگری را از نوار تاریخ بالا انتخاب کنید."}
       </p>
       <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
         <Link

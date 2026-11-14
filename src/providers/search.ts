@@ -23,7 +23,7 @@ export interface SearchOutcome {
   offers: FlightOffer[];
   ranked: RankedResult;
   health: ProviderHealth[];
-  /** How many raw rows each demo provider produced, before normalization and before the
+  /** How many raw rows each included provider produced, before normalization and before the
    *  requested-day / on-sale filters — the audit trail the `/live` page shows. */
   rawCounts: Record<string, number>;
   issues: NormalizationIssue[];
@@ -49,10 +49,16 @@ async function withTimeout<T>(promise: Promise<T>, ms: number, label: string): P
 
 export async function runSearch(
   query: TripQuery,
-  options: { now?: Date; providers?: typeof FLIGHT_PROVIDERS } = {},
+  options: { now?: Date; providers?: typeof FLIGHT_PROVIDERS; includeCrawled?: boolean } = {},
 ): Promise<SearchOutcome> {
   const now = options.now ?? new Date();
-  const providers = options.providers ?? FLIGHT_PROVIDERS;
+  const allowCrawled = options.includeCrawled ?? process.env.NODE_ENV !== "test";
+  const allProviders = (options.providers ?? FLIGHT_PROVIDERS).filter((provider) => provider.mode !== "crawled" || allowCrawled);
+  const providers = allProviders.filter((provider) => {
+    if (query.filters.dataSource === "demo") return provider.mode === "demo";
+    if (query.filters.dataSource === "real") return provider.mode !== "demo";
+    return true;
+  });
   const startedAt = Date.now();
 
   const results = await Promise.all(
@@ -90,6 +96,9 @@ export async function runSearch(
   const rawCounts: Record<string, number> = {};
 
   for (const result of results) {
+    // No matching local snapshot is the normal state on a fresh checkout; keep the demo
+    // provider report unchanged until a real snapshot exists for this exact route/date.
+    if (result.adapter.mode === "crawled" && result.rawCount === 0 && result.error === undefined) continue;
     offers.push(...result.offers);
     rawCounts[result.adapter.id] = result.rawCount;
     issues.push(...result.issues);

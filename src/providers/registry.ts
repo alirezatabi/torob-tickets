@@ -1,6 +1,7 @@
 import type { ProviderAdapter } from "./types";
 import { parsAdapter, type ParsRawOffer } from "./flight/pars";
 import { alibabaAdapter, flightioAdapter, mahanAdapter } from "./flight/adapters";
+import { safarmarketSnapshotAdapter } from "./crawled/safarmarket";
 import { CRAWL_SOURCES, CRAWLER_PARSER_STATUS } from "@/crawler/sources";
 import type { CrawlSourceId } from "@/crawler/types";
 
@@ -14,14 +15,15 @@ export const FLIGHT_PROVIDERS: ProviderAdapter<any>[] = [
   alibabaAdapter,
   flightioAdapter,
   mahanAdapter,
+  safarmarketSnapshotAdapter,
 ];
 
-/** Separate from the active demo registry: candidates are not search providers until fixtures and parsers exist. */
-export const CRAWLED_PROVIDER_REGISTRY: { id: CrawlSourceId; name: string; mode: "crawled"; enabled: false; status: string }[] = CRAWL_SOURCES.map((source) => ({
+/** Crawl candidates stay out of the network registry; Safarmarket search reads only a local snapshot. */
+export const CRAWLED_PROVIDER_REGISTRY: { id: CrawlSourceId; name: string; mode: "crawled"; enabled: boolean; status: string }[] = CRAWL_SOURCES.map((source) => ({
   id: source.id,
   name: source.name,
   mode: "crawled",
-  enabled: false,
+  enabled: source.id === "safarmarket",
   status: CRAWLER_PARSER_STATUS[source.id],
 }));
 

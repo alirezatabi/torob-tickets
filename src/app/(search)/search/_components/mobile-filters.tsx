@@ -13,6 +13,7 @@ export function MobileFilters(props: FilterPanelProps) {
     (props.query.filters.baggageRequired ? 1 : 0) +
     (props.query.filters.refundableOnly ? 1 : 0) +
     (props.query.filters.dayPart ? 1 : 0) +
+    (props.query.filters.dataSource !== "all" ? 1 : 0) +
     props.query.filters.preferredAirlines.length;
 
   return (

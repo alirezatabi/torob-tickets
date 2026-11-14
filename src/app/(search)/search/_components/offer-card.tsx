@@ -15,6 +15,7 @@ import {
 } from "@/lib/format";
 import { flightHref } from "@/lib/search-params";
 import { AirlineLogo } from "@/components/ui/airline-logo";
+import { DataSourceBadge } from "@/components/ui/data-source-badge";
 import { cn } from "@/lib/cn";
 
 /**
@@ -102,6 +103,7 @@ export function OfferCard({
               {aircraft ?? "نوع هواپیما نامشخص"}
               {offer.flightNumber ? ` · ${offer.flightNumber}` : ""}
             </p>
+            <div className="mt-1"><DataSourceBadge source={offer.dataSource} variant="inline" /></div>
           </div>
         </div>
 

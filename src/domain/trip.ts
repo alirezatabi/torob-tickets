@@ -60,7 +60,11 @@ export interface TripQuery {
   rawText?: string;
 }
 
+export type SearchDataFilter = "all" | "demo" | "real";
+
 export interface QueryPreferences {
+  /** Show all offers, only demo examples, or only captured/live data. */
+  dataSource: SearchDataFilter;
   pricePreference: PricePreference;
   maxStops: number | null;
   baggageRequired: boolean;
@@ -73,6 +77,7 @@ export interface QueryPreferences {
 }
 
 export const DEFAULT_PREFERENCES: QueryPreferences = {
+  dataSource: "all",
   pricePreference: "balanced",
   maxStops: null,
   baggageRequired: false,

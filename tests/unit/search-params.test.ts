@@ -90,6 +90,7 @@ describe("search parameters", () => {
       departDate: "2026-11-20",
       passengers: 2,
       filters: {
+        dataSource: "real",
         pricePreference: "low",
         maxStops: 0,
         baggageRequired: true,

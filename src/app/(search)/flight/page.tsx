@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowRight, BadgeCheck, CalendarDays, Info, Plane, Sparkles, Timer, Users } from "lucide-react";
+import { ArrowRight, BadgeCheck, CalendarDays, Info, Plane, Timer, Users } from "lucide-react";
 
 import { parseSearchParams, searchHref } from "@/lib/search-params";
 import { cityLabel, getCity } from "@/lib/cities";
@@ -18,7 +18,7 @@ import { WARNING_LABELS, type FlightSegment } from "@/domain/flight";
 import { searchTrips } from "@/server/search-service";
 import { baggageLabel, refundLabel } from "@/ranking/explain";
 import { INELIGIBLE_LABELS, LOW_SEATS_THRESHOLD } from "@/modules/pricing/select-cheapest";
-import { DemoBadge } from "@/components/ui/demo-badge";
+import { DataSourceBadge } from "@/components/ui/data-source-badge";
 import { AirlineLogo } from "@/components/ui/airline-logo";
 import { NO_SOURCE_REASON_FA } from "@/modules/catalog/demo-link";
 import { cn } from "@/lib/cn";
@@ -80,7 +80,11 @@ export default async function FlightPage({ searchParams }: FlightPageProps) {
     );
   }
 
-  const flight = view.flights.find((candidate) => candidate.group.groupKey === offer.groupKey) ?? null;
+  // Crawled groups use a source-scoped canonical key, while the normalized offer keeps its
+  // provider identity key. Resolve by member ID as well so the detail view finds the same group.
+  const flight = view.flights.find((candidate) =>
+    candidate.group.groupKey === offer.groupKey || candidate.group.offers.some((member) => member.id === offer.id),
+  ) ?? null;
   const sellers = flight?.sellers ?? [];
   const origin = getCity(offer.originCode);
   const destination = getCity(offer.destinationCode);
@@ -93,6 +97,7 @@ export default async function FlightPage({ searchParams }: FlightPageProps) {
     date: query.departDate,
     ...(query.passengers > 1 ? { pax: String(query.passengers) } : {}),
     ...(query.cabin !== "economy" ? { cabin: query.cabin } : {}),
+    ...(query.filters.dataSource !== "all" ? { source: query.filters.dataSource } : {}),
     groups: `${offer.groupKey}:${offer.id}`,
   });
 
@@ -103,7 +108,7 @@ export default async function FlightPage({ searchParams }: FlightPageProps) {
           <ArrowRight className="size-3.5" aria-hidden="true" />
           بازگشت به نتایج
         </Link>
-        <DemoBadge />
+        <DataSourceBadge source={offer.dataSource} />
       </nav>
 
       {/* ——— flight identity and itinerary ——— */}
@@ -117,7 +122,7 @@ export default async function FlightPage({ searchParams }: FlightPageProps) {
               </div>
               <div className="min-w-0 pt-0.5">
                 <p className="inline-flex items-center gap-1.5 text-[0.63rem] font-bold text-teal-700">
-                  <Sparkles className="size-3.5" aria-hidden="true" /> جزئیات بلیت · دادهٔ نمونه
+                  جزئیات بلیت · <DataSourceBadge source={offer.dataSource} variant="inline" />
                 </p>
                 <h1 className="mt-1 text-lg font-black leading-7 text-ink-900 sm:text-xl" data-testid="flight-title">
                   {offer.airlineName}
