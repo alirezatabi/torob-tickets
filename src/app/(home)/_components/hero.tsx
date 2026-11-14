@@ -25,7 +25,7 @@ export function Hero({
       />
       <div className="relative mx-auto max-w-[1500px] px-0 pt-[4.75rem] sm:pt-20 lg:h-full lg:px-8 lg:pt-0">
         <div dir="rtl" className="grid items-center gap-0 lg:h-full lg:grid-cols-[minmax(0,1.2fr)_minmax(25rem,0.8fr)] lg:items-start lg:pt-24">
-          <div dir="rtl" className="relative z-10 order-1 px-5 pt-3 text-center sm:px-8 lg:order-none lg:mt-10 lg:pl-8 lg:pr-10 lg:text-right">
+          <div dir="rtl" className="relative z-10 order-1 px-5 pt-3 text-center sm:px-8 lg:order-none lg:mt-4 lg:pl-8 lg:pr-10 lg:text-right">
             <motion.h1
               initial={reduce ? false : { opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
