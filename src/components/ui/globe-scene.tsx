@@ -137,6 +137,8 @@ export function GlobeScene({
 
   const [yaw, setYaw] = useState(planet ? 18 : centre[0]);
   const [pitch, setPitch] = useState(planet ? 22 : centre[1]);
+  const yawRef = useRef(yaw);
+  yawRef.current = yaw;
   /**
    * The server's first paint is the whole planet with the whole route, drawn from the one tier that
    * is already decoded at module load. That keeps the HTML small, makes the first client frame
@@ -155,14 +157,8 @@ export function GlobeScene({
   const [reduced, setReduced] = useState(false);
   /** Server and first client paint are identical; this flips once if the visitor asked for less motion. */
 
-  const drag = useRef<{
-    x: number;
-    y: number;
-    yaw: number;
-    pitch: number;
-    vx: number;
-    vy: number;
-  } | null>(null);
+  const drag = useRef<{ x: number; yaw: number; vx: number } | null>(null);
+  const settlingYaw = useRef<number | null>(null);
   const inertia = useRef({ yaw: 0, pitch: 0 });
   const touched = useRef(false);
   // Keep the render path deterministic; the idle sway starts at a neutral phase after hydration.
@@ -257,26 +253,41 @@ export function GlobeScene({
     const tick = (now: number) => {
       const delta = Math.min(now - last, 80) / 1000;
       last = now;
-      if (document.visibilityState === "visible" && !drag.current) {
-        const inertiaMagnitude =
-          Math.abs(inertia.current.yaw) + Math.abs(inertia.current.pitch);
-        if (inertiaMagnitude > 0.05) {
-          setYaw((value) => value + inertia.current.yaw * delta);
-          setPitch((value) =>
-            clamp(value + inertia.current.pitch * delta, -70, 70),
-          );
-          const decay = 0.92 ** (delta * 60);
-          inertia.current.yaw *= decay;
-          inertia.current.pitch *= decay;
-        } else if (spinning && !touched.current) {
-          if (planet) {
-            // A full, slow revolution — the planet is the subject here.
-            setYaw((value) => value + (360 / period) * delta);
+      if (document.visibilityState === "visible") {
+        const blend = 1 - Math.exp(-18 * delta);
+        if (drag.current) {
+          const target = drag.current.yaw;
+          setYaw((value) => value + (target - value) * blend);
+        } else if (settlingYaw.current !== null) {
+          const target = settlingYaw.current;
+          const next = yawRef.current + (target - yawRef.current) * blend;
+          if (Math.abs(target - next) < 0.08) {
+            settlingYaw.current = null;
+            setYaw(target);
           } else {
-            // A ±9° sway: it shows the sphere is real without carrying the route off the disc.
-            phase.current += delta;
-            setYaw(startYaw.current + Math.sin(phase.current * 0.5) * 9);
-            setPitch(startPitch.current + Math.sin(phase.current * 0.31) * 2.5);
+            setYaw(next);
+          }
+        } else {
+          const inertiaMagnitude =
+            Math.abs(inertia.current.yaw) + Math.abs(inertia.current.pitch);
+          if (inertiaMagnitude > 0.05) {
+            setYaw((value) => value + inertia.current.yaw * delta);
+            setPitch((value) =>
+              clamp(value + inertia.current.pitch * delta, -70, 70),
+            );
+            const decay = 0.92 ** (delta * 60);
+            inertia.current.yaw *= decay;
+            inertia.current.pitch *= decay;
+          } else if (spinning && !touched.current) {
+            if (planet) {
+              // A full, slow revolution — the planet is the subject here.
+              setYaw((value) => value + (360 / period) * delta);
+            } else {
+              // A ±9° sway: it shows the sphere is real without carrying the route off the disc.
+              phase.current += delta;
+              setYaw(startYaw.current + Math.sin(phase.current * 0.5) * 9);
+              setPitch(startPitch.current + Math.sin(phase.current * 0.31) * 2.5);
+            }
           }
         }
       }
@@ -351,36 +362,29 @@ export function GlobeScene({
       event.currentTarget.setPointerCapture(event.pointerId);
       drag.current = {
         x: event.clientX,
-        y: event.clientY,
-        yaw,
-        pitch,
+        yaw: settlingYaw.current ?? yaw,
         vx: 0,
-        vy: 0,
       };
+      settlingYaw.current = null;
       inertia.current = { yaw: 0, pitch: 0 };
       touched.current = true;
     },
-    [yaw, pitch],
+    [yaw],
   );
 
   const onPointerMove = useCallback(
     (event: React.PointerEvent<HTMLDivElement>) => {
       const current = drag.current;
       if (!current) return;
-      // A drag across the disc is roughly half a turn, which is how a globe on a desk behaves.
-      const deltaYaw = ((event.clientX - current.x) / (radius * 2)) * 260;
-      const deltaPitch = ((event.clientY - current.y) / (radius * 2)) * 130;
+      // Horizontal-only rotation: one full disc drag turns the globe a little over half a revolution.
+      const deltaYaw = ((event.clientX - current.x) / (radius * 2)) * 220;
       current.x = event.clientX;
-      current.y = event.clientY;
       current.vx = -deltaYaw;
-      current.vy = -deltaPitch;
-      // The globe follows the hand: dragging right brings eastern longitudes into view.
+      // Track the pointer target and ease the rendered yaw on animation frames to avoid jitter.
       current.yaw -= deltaYaw;
-      current.pitch = clamp(current.pitch + deltaPitch, -70, 70);
-      setYaw(current.yaw);
-      setPitch(current.pitch);
+      if (reduced) setYaw(current.yaw);
     },
-    [radius],
+    [radius, reduced],
   );
 
   const zoomBy = useCallback(
@@ -415,13 +419,21 @@ export function GlobeScene({
   const onPointerUp = useCallback(() => {
     const current = drag.current;
     if (!current) return;
-    inertia.current = { yaw: current.vx * 22, pitch: current.vy * 18 };
     drag.current = null;
-  }, []);
+    if (reduced) {
+      settlingYaw.current = null;
+      inertia.current = { yaw: 0, pitch: 0 };
+      setYaw(current.yaw);
+      return;
+    }
+    settlingYaw.current = current.yaw;
+    inertia.current = { yaw: current.vx * 15, pitch: 0 };
+  }, [reduced]);
 
   const reset = useCallback(() => {
     touched.current = false;
     phase.current = 0;
+    settlingYaw.current = null;
     inertia.current = { yaw: 0, pitch: 0 };
     setYaw(startYaw.current);
     setPitch(startPitch.current);

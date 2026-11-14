@@ -31,7 +31,11 @@ describe("globe hydration", () => {
 
   it("rotates the globe when dragged with a mouse", async () => {
     vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
-    vi.stubGlobal("requestAnimationFrame", vi.fn(() => 1));
+    const animationFrames: FrameRequestCallback[] = [];
+    vi.stubGlobal("requestAnimationFrame", vi.fn((callback: FrameRequestCallback) => {
+      animationFrames.push(callback);
+      return animationFrames.length;
+    }));
     vi.stubGlobal("cancelAnimationFrame", vi.fn());
     vi.stubGlobal("PointerEvent", MouseEvent);
 
@@ -54,6 +58,7 @@ describe("globe hydration", () => {
     await act(async () => {
       fireEvent.pointerDown(interactionSurface, { pointerId: 1, clientX: 50, clientY: 110 });
       fireEvent.pointerMove(interactionSurface, { pointerId: 1, clientX: 90, clientY: 110 });
+      animationFrames.shift()?.(performance.now() + 16);
     });
     expect(landDots?.getAttribute("d")).not.toBe(originalProjection);
 
