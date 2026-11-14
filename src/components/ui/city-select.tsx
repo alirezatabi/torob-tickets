@@ -1,9 +1,11 @@
 "use client";
 
 import { useMemo, useState, useRef, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { ArrowLeftRight, Search } from "lucide-react";
 import { CITIES } from "@/lib/cities";
 import { cn } from "@/lib/cn";
+import { useFloatingPanel } from "@/hooks/use-floating-panel";
 
 /**
  * Searchable city combobox with Persian + English matching.
@@ -25,6 +27,9 @@ export function CitySelect({
   const [open, setOpen] = useState(false);
   const [term, setTerm] = useState("");
   const containerRef = useRef<HTMLDivElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const panelPosition = useFloatingPanel(open, buttonRef, { preferredWidth: 288, minWidth: 256, preferredHeight: 360 });
 
   const selected = CITIES.find((c) => c.code === value);
   const filtered = useMemo(() => {
@@ -38,7 +43,8 @@ export function CitySelect({
   useEffect(() => {
     if (!open) return;
     function onPointerDown(event: MouseEvent) {
-      if (!containerRef.current?.contains(event.target as Node)) setOpen(false);
+      const target = event.target as Node;
+      if (!containerRef.current?.contains(target) && !panelRef.current?.contains(target)) setOpen(false);
     }
     document.addEventListener("mousedown", onPointerDown);
     return () => document.removeEventListener("mousedown", onPointerDown);
@@ -50,6 +56,7 @@ export function CitySelect({
         {label}
       </label>
       <button
+        ref={buttonRef}
         id={id}
         type="button"
         role="combobox"
@@ -68,8 +75,18 @@ export function CitySelect({
         <Search className="size-4 shrink-0 text-ink-400" aria-hidden="true" />
       </button>
 
-      {open && (
-        <div className="absolute z-40 mt-2 w-full min-w-[16rem] overflow-hidden rounded-2xl border border-ink-200 bg-white shadow-[var(--shadow-lifted)] animate-rise">
+      {open && panelPosition && typeof document !== "undefined" && createPortal(
+        <div
+          ref={panelRef}
+          style={{
+            position: panelPosition.position,
+            top: panelPosition.top,
+            left: panelPosition.left,
+            width: panelPosition.width,
+            maxHeight: panelPosition.maxHeight,
+          }}
+          className="z-[10000] overflow-hidden rounded-2xl border border-ink-200 bg-white shadow-[var(--shadow-lifted)] animate-rise"
+        >
           <div className="border-b border-ink-100 p-2">
             <input
               autoFocus
@@ -80,7 +97,12 @@ export function CitySelect({
               aria-label="جستجوی شهر"
             />
           </div>
-          <ul id={`${id}-listbox`} role="listbox" className="max-h-64 overflow-auto p-1">
+          <ul
+            id={`${id}-listbox`}
+            role="listbox"
+            style={{ maxHeight: Math.max(48, panelPosition.maxHeight - 58) }}
+            className="overflow-auto p-1"
+          >
             {filtered.length === 0 && (
               <li className="px-3 py-6 text-center text-xs text-ink-400">شهری با این نام پیدا نشد.</li>
             )}
@@ -108,7 +130,8 @@ export function CitySelect({
               </li>
             ))}
           </ul>
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   );

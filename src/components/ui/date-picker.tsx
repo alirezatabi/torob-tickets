@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { CalendarDays, ChevronLeft, ChevronRight } from "lucide-react";
 import {
   formatJalaliFull,
@@ -14,6 +15,7 @@ import {
 } from "@/lib/jalali";
 import { toPersianDigits } from "@/lib/format";
 import { cn } from "@/lib/cn";
+import { useFloatingPanel } from "@/hooks/use-floating-panel";
 
 const WEEKDAY_HEADERS = ["ش", "ی", "د", "س", "چ", "پ", "ج"];
 
@@ -39,12 +41,16 @@ export function DatePicker({
   const [open, setOpen] = useState(false);
   const [viewJalali, setViewJalali] = useState(() => isoToJalali(value || isoToday()));
   const containerRef = useRef<HTMLDivElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const panelPosition = useFloatingPanel(open, buttonRef, { preferredWidth: 304, preferredHeight: 376 });
   const today = useMemo(() => isoToday(), []);
 
   useEffect(() => {
     if (!open) return;
     function onPointerDown(event: MouseEvent) {
-      if (!containerRef.current?.contains(event.target as Node)) setOpen(false);
+      const target = event.target as Node;
+      if (!containerRef.current?.contains(target) && !panelRef.current?.contains(target)) setOpen(false);
     }
     function onKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") setOpen(false);
@@ -85,6 +91,7 @@ export function DatePicker({
         {label}
       </label>
       <button
+        ref={buttonRef}
         id={id}
         type="button"
         onClick={() => setOpen((v) => !v)}
@@ -98,11 +105,19 @@ export function DatePicker({
         <CalendarDays className="size-4 shrink-0 text-ink-400" aria-hidden="true" />
       </button>
 
-      {open && (
+      {open && panelPosition && typeof document !== "undefined" && createPortal(
         <div
+          ref={panelRef}
           role="dialog"
           aria-label="تقویم شمسی"
-          className="absolute z-40 mt-2 w-[19rem] rounded-2xl border border-ink-200 bg-white p-3 shadow-[var(--shadow-lifted)] animate-rise"
+          style={{
+            position: panelPosition.position,
+            top: panelPosition.top,
+            left: panelPosition.left,
+            width: panelPosition.width,
+            maxHeight: panelPosition.maxHeight,
+          }}
+          className="z-[10000] overflow-auto rounded-2xl border border-ink-200 bg-white p-3 shadow-[var(--shadow-lifted)] animate-rise"
         >
           <div className="flex items-center justify-between px-1 pb-2">
             <button
@@ -188,7 +203,8 @@ export function DatePicker({
               فردا
             </button>
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   );
