@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { CrawlHttpClient } from "../src/crawler/http";
@@ -35,9 +36,12 @@ async function main(): Promise<void> {
   }
   const isJson = isJsonText(body);
   const dir = resolve("tests/fixtures/crawl", sourceId); await mkdir(dir, { recursive: true });
-  const file = resolve(dir, `${route.toLowerCase()}-${validDate}.${isJson ? "json" : "html"}`);
-  const metadata = `<!-- Capture metadata: source=${sourceId}; route=${route}; date=${validDate}; capturedAt=${new Date().toISOString()}; status=${status}; URL and request headers omitted -->\n`;
-  await writeFile(file, `${isJson ? "" : metadata}${body}\n`, { mode: 0o600 });
+  // Unique names and exclusive creation avoid overwriting fixtures, even on case-insensitive Windows paths.
+  const capturedAt = new Date().toISOString();
+  const captureId = `${capturedAt.replace(/[:.]/g, "-")}-${randomUUID()}`;
+  const file = resolve(dir, `${route.toLowerCase()}-${validDate}-capture-${captureId}.${isJson ? "json" : "html"}`);
+  const metadata = `<!-- Capture metadata: source=${sourceId}; route=${route}; date=${validDate}; capturedAt=${capturedAt}; status=${status}; URL and request headers omitted -->\n`;
+  await writeFile(file, `${isJson ? "" : metadata}${body}\n`, { mode: 0o600, flag: "wx" });
   console.log(`Saved sanitized response fixture: ${file} (${body.length} chars). Review manually before committing.`);
 }
 
