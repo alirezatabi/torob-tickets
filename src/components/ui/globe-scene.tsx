@@ -1307,13 +1307,30 @@ function projectFlightLimb(points: [number, number][], camera: Camera): string {
   const innerSquared = innerRadius * innerRadius;
   const outerSquared = outerRadius * outerRadius;
   let path = "";
-  let run: string[] = [];
-  const flush = () => {
-    if (run.length > 1) path += `M${run.join("L")}`;
-    run = [];
-  };
+  let run: [number, number][] = [];
   const formatPoint = (point: [number, number]) =>
     `${Math.round(point[0])} ${Math.round(point[1])}`;
+  const radiusOf = (point: [number, number]) => Math.hypot(point[0] - camera.cx, point[1] - camera.cy);
+  const projectToSurface = (point: [number, number]): [number, number] => {
+    const dx = point[0] - camera.cx;
+    const dy = point[1] - camera.cy;
+    const scale = innerRadius / (Math.hypot(dx, dy) || 1);
+    return [camera.cx + dx * scale, camera.cy + dy * scale];
+  };
+  const flush = () => {
+    if (run.length > 1) {
+      const connected = [...run];
+      if (radiusOf(connected[0]!) > innerRadius + 0.25) {
+        connected.unshift(projectToSurface(connected[0]!));
+      }
+      const last = connected[connected.length - 1]!;
+      if (radiusOf(last) > innerRadius + 0.25) {
+        connected.push(projectToSurface(last));
+      }
+      path += `M${connected.map(formatPoint).join("L")}`;
+    }
+    run = [];
+  };
 
   for (let index = 1; index < points.length; index += 1) {
     const from = points[index - 1]!;
@@ -1333,12 +1350,11 @@ function projectFlightLimb(points: [number, number][], camera: Camera): string {
       const start: [number, number] = [from[0] + (to[0] - from[0]) * t0, from[1] + (to[1] - from[1]) * t0];
       const end: [number, number] = [from[0] + (to[0] - from[0]) * t1, from[1] + (to[1] - from[1]) * t1];
       const startText = formatPoint(start);
-      const endText = formatPoint(end);
-      if (run.length === 0) run.push(startText, endText);
-      else if (run[run.length - 1] === startText) run.push(endText);
+      if (run.length === 0) run.push(start, end);
+      else if (formatPoint(run[run.length - 1]!) === startText) run.push(end);
       else {
         flush();
-        run.push(startText, endText);
+        run.push(start, end);
       }
       keptSegment = true;
     }
