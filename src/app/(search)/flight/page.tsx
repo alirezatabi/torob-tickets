@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowRight, BadgeCheck, CalendarDays, Info, Plane, Timer, Users } from "lucide-react";
+import { ArrowRight, BadgeCheck, CalendarDays, ExternalLink, Info, Plane, Timer, Users } from "lucide-react";
 
 import { parseSearchParams, searchHref, toSearchParams } from "@/lib/search-params";
 import { cityLabel, getCity } from "@/lib/cities";
@@ -20,7 +20,7 @@ import { baggageLabel, refundLabel } from "@/ranking/explain";
 import { INELIGIBLE_LABELS, LOW_SEATS_THRESHOLD } from "@/modules/pricing/select-cheapest";
 import { DataSourceBadge } from "@/components/ui/data-source-badge";
 import { AirlineLogo } from "@/components/ui/airline-logo";
-import { NO_SOURCE_REASON_FA } from "@/modules/catalog/demo-link";
+import { sourceReferenceFor } from "@/modules/catalog/source-reference";
 import { cn } from "@/lib/cn";
 
 export const metadata: Metadata = {
@@ -79,6 +79,8 @@ export default async function FlightPage({ searchParams }: FlightPageProps) {
       />
     );
   }
+
+  const sourceReference = sourceReferenceFor(offer);
 
   // Crawled groups use a source-scoped canonical key, while the normalized offer keeps its
   // provider identity key. Resolve by member ID as well so the detail view finds the same group.
@@ -333,7 +335,7 @@ export default async function FlightPage({ searchParams }: FlightPageProps) {
 
             <p className="mt-3 flex items-start gap-1.5 rounded-xl bg-ink-50 px-3 py-2 text-[0.65rem] leading-5 text-ink-500">
               <Info className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
-              {NO_SOURCE_REASON_FA} «نامشخص» یعنی منبع آن را اعلام نکرده؛ ما حدس نمی‌زنیم.
+              این صفحه فقط snapshot ذخیره‌شده را نشان می‌دهد؛ خرید یا تأیید موجودی اینجا انجام نمی‌شود. «نامشخص» یعنی منبع آن را اعلام نکرده؛ ما حدس نمی‌زنیم.
             </p>
           </section>
         </div>
@@ -366,6 +368,23 @@ export default async function FlightPage({ searchParams }: FlightPageProps) {
               <li>· نرخ‌ها از snapshot محلی Safarmarket آمده‌اند و هنگام بازشدن صفحه دوباره از منبع استعلام نمی‌شوند.</li>
               <li>· قیمت نهایی و موجودی بلیت را پیش از خرید در Safarmarket بررسی کنید.</li>
               <li>· فقط نرخ‌هایی که اطلاعات ضروری‌شان قابل‌تطبیق باشد نمایش داده می‌شوند.</li>
+              {sourceReference && (
+                <li className="border-t border-ink-100 pt-2">
+                  <a
+                    href={sourceReference.href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 font-bold text-teal-700 underline decoration-teal-300 underline-offset-2 hover:text-teal-900"
+                    data-testid="source-reference-link"
+                  >
+                    بازکردن مرجع {sourceReference.sourceName}
+                    <ExternalLink className="size-3" aria-hidden="true" />
+                  </a>
+                  <p className="mt-1 text-[0.61rem] text-ink-400">
+                    snapshot لینک مستقیم همین نرخ را ندارد؛ مسیر و تاریخ را در منبع دوباره بررسی کنید.
+                  </p>
+                </li>
+              )}
             </ul>
           </div>
         </aside>

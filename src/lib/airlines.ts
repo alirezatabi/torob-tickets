@@ -1,3 +1,5 @@
+import { canonicalAirlineCode } from "@/lib/airlines/logos";
+
 export interface Airline {
   code: string;
   fa: string;
@@ -21,6 +23,8 @@ export const AIRLINES: Airline[] = [
   { code: "WY", fa: "عمان ایر", en: "Oman Air", shortHaul: false },
   { code: "ZV", fa: "زاگرس ایر", en: "Zagros Airlines", shortHaul: true },
   { code: "EP", fa: "آسمان", en: "Aseman", shortHaul: true },
+  { code: "IJ", fa: "معراج", en: "Meraj Airlines", shortHaul: false },
+  { code: "MEH", fa: "مهر", en: "Mehr Airways", shortHaul: true },
   { code: "LH", fa: "لوفت‌هانزا", en: "Lufthansa", shortHaul: false },
   { code: "OS", fa: "اتریش ایرلاینز", en: "Austrian Airlines", shortHaul: false },
   { code: "G9", fa: "العربیه", en: "Air Arabia", shortHaul: true },
@@ -36,7 +40,7 @@ export const AIRLINES: Airline[] = [
 const BY_CODE = new Map(AIRLINES.map((a) => [a.code, a]));
 
 export function getAirline(code: string): Airline | null {
-  return BY_CODE.get(code) ?? null;
+  return BY_CODE.get(canonicalAirlineCode(code)) ?? null;
 }
 
 export function airlineLabel(code: string): string {
@@ -60,7 +64,7 @@ export function findAirlineInText(text: string, options: { strict?: boolean } = 
   for (const airline of AIRLINES) {
     const aliases = [airline.fa, airline.en, airline.code.toLowerCase(), ...airline.fa.split(/[\s()]+/)]
       .map((alias) => alias.toLowerCase().trim())
-      .filter((alias) => alias.length >= 2);
+      .filter((alias) => alias.length >= 2 && !(airline.code === "MEH" && alias === "مهر"));
 
     for (const alias of aliases) {
       // In strict mode only the brand itself counts — "ماهان" yes, but not the

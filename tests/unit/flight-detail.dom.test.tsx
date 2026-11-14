@@ -93,7 +93,7 @@ describe("/flight — the per-ticket page", () => {
     // Unknown values are labelled, never guessed.
     expect(text).toMatch(/نامشخص|اعلام نشده|شامل|ندارد|استرداد/);
     // And the honesty note is there.
-    expect(text).toContain("دادهٔ نمونه");
+    expect(text).toContain("خرید یا تأیید موجودی اینجا انجام نمی‌شود");
   });
 
   it("falls back to the flight when the URL carries a group key instead of an offer id", async () => {

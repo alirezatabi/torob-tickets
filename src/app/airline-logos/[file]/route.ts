@@ -24,7 +24,7 @@ export async function GET(
   { params }: { params: Promise<{ file: string }> },
 ) {
   const { file } = await params;
-  const match = /^([A-Z0-9]{2})\.(svg|png)$/.exec(file);
+  const match = /^([A-Z0-9]{2,3})\.(svg|png)$/.exec(file);
   const asset = match ? AIRLINE_LOGO_ASSETS[match[1]!] : undefined;
 
   if (!match || !asset || asset.format !== match[2] || airlineLogoPath(match[1]!) !== `/airline-logos/${file}`) {
