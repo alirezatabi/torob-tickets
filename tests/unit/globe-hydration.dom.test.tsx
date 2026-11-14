@@ -72,7 +72,7 @@ describe("globe hydration", () => {
         Math.hypot(coordinates[index * 2]! - 110, coordinates[index * 2 + 1]! - 110),
       );
       expect(Math.min(...radii)).toBeGreaterThan(98);
-      expect(Math.max(...radii)).toBeLessThanOrEqual(109);
+      expect(Math.max(...radii)).toBeLessThanOrEqual(104);
       for (const subpath of path.split("M").filter(Boolean)) {
         const values = subpath.match(/-?\d+(?:\.\d+)?/g)?.map(Number) ?? [];
         const points = Array.from({ length: values.length / 2 }, (_, index) => [values[index * 2]!, values[index * 2 + 1]!] as const);

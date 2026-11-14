@@ -1235,7 +1235,8 @@ function projectNetwork(
     const angle = Math.min((km / 6371) * (180 / Math.PI), 175);
     const arc = flightArc(origin, destination, angle, camera, 96);
     // Elevated, all-cyan lanes. The smooth lift is zero at real city endpoints and peaks mid-flight.
-    const maxLift = Math.min(0.18, 0.06 + (angle / 180) * 0.11 + (routeIndex % 3) * 0.006);
+    // Keep the flight arc gently elevated; a high dome can look like a loop when it meets the limb.
+    const maxLift = Math.min(0.11, 0.035 + (angle / 180) * 0.07 + (routeIndex % 3) * 0.004);
     const liftAt = (t: number) => maxLift * Math.sin(Math.PI * t);
     let path = "";
     let run: string[] = [];
@@ -1303,7 +1304,8 @@ function projectNetwork(
 /** Keep only the first short shell outside the disc, following the real arc tangent. */
 function projectFlightLimb(points: [number, number][], camera: Camera): string {
   const innerRadius = camera.radius;
-  const outerRadius = innerRadius * 1.085;
+  // Keep the off-limb lane close to the silhouette instead of drawing a tall, unnatural hump.
+  const outerRadius = innerRadius * 1.045;
   const innerSquared = innerRadius * innerRadius;
   const outerSquared = outerRadius * outerRadius;
   let path = "";
