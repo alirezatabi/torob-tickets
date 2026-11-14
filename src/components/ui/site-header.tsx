@@ -37,6 +37,12 @@ export function SiteHeader() {
             <Sparkles className="size-3.5" aria-hidden="true" />
             جستجوهای نمونه
           </Link>
+          <Link
+            href="/crawl"
+            className={`hidden rounded-full px-3 py-1.5 text-xs font-medium transition-colors sm:inline-flex ${isHome ? "text-slate-200 hover:bg-white/10 hover:text-white" : "text-ink-600 hover:bg-ink-100 hover:text-ink-900"}`}
+          >
+            خزندهٔ محلی
+          </Link>
           <DataModeBadge dark={isHome} />
         </nav>
       </div>

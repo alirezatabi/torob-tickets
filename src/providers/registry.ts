@@ -1,6 +1,8 @@
 import type { ProviderAdapter } from "./types";
 import { parsAdapter, type ParsRawOffer } from "./flight/pars";
 import { alibabaAdapter, flightioAdapter, mahanAdapter } from "./flight/adapters";
+import { CRAWL_SOURCES, CRAWLER_PARSER_STATUS } from "@/crawler/sources";
+import type { CrawlSourceId } from "@/crawler/types";
 
 /**
  * The provider registry. Adding a provider = writing an adapter + one line here.
@@ -14,7 +16,16 @@ export const FLIGHT_PROVIDERS: ProviderAdapter<any>[] = [
   mahanAdapter,
 ];
 
-export function listProviders(): { id: string; name: string; mode: "demo" | "live"; description: string; quotedCurrency: string }[] {
+/** Separate from the active demo registry: candidates are not search providers until fixtures and parsers exist. */
+export const CRAWLED_PROVIDER_REGISTRY: { id: CrawlSourceId; name: string; mode: "crawled"; enabled: false; status: string }[] = CRAWL_SOURCES.map((source) => ({
+  id: source.id,
+  name: source.name,
+  mode: "crawled",
+  enabled: false,
+  status: CRAWLER_PARSER_STATUS[source.id],
+}));
+
+export function listProviders(): { id: string; name: string; mode: "demo" | "live" | "crawled"; description: string; quotedCurrency: string }[] {
   return FLIGHT_PROVIDERS.map((p) => ({
     id: p.id,
     name: p.name,

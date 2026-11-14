@@ -66,6 +66,10 @@ pnpm-debug.log*
 # ESM, which is what silences the MODULE_TYPELESS_PACKAGE_JSON warning. See the script that writes it.
 !/src/generated/prisma/package.json
 
+# ————— Local crawler snapshots (runtime data; review before any sharing) —————
+/data/crawl/*
+!/data/crawl/latest.json
+
 # ————— Provider diagnostics (opt-in; may contain source content) —————
 /.provider-snapshots/
 

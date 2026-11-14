@@ -46,7 +46,7 @@ export interface FlightOffer {
   providerUpdatedAt: string;
   /** When *we* fetched it (drives the demo-data disclosure). */
   fetchedAt: string;
-  dataSource: "demo" | "live";
+  dataSource: "demo" | "live" | "crawled";
   warnings: OfferWarning[];
 
   // ——— live-only facts (absent on demo offers) ———

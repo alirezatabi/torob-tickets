@@ -10,7 +10,7 @@
  * of the weights, the factors and the tie-breaks.
  */
 
-export type PriceSource = "demo" | "live";
+export type PriceSource = "demo" | "live" | "crawled";
 
 export interface RankInputSegment {
   airlineCode: string;

@@ -28,7 +28,7 @@ export interface AssembleInput {
   offerUrl: string;
   providerUpdatedAt: string;
   fetchedAt: string;
-  dataSource: "demo" | "live";
+  dataSource: "demo" | "live" | "crawled";
   /**
    * Bookable seats, only when the source states them. `null`/absent means *unknown* —
    * never "some default", because an invented number would gate a real purchase.

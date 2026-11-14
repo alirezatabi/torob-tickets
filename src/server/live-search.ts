@@ -84,7 +84,7 @@ export interface LiveOfferView {
   score: number;
   feasible: boolean;
   violations: string[];
-  dataSource: "live" | "demo";
+  dataSource: "live" | "demo" | "crawled";
 }
 
 /**

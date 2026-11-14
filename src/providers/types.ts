@@ -14,7 +14,7 @@ import type { TripQuery } from "@/domain/trip";
 export interface ProviderAdapter<TRaw> {
   readonly id: string;
   readonly name: string;
-  readonly mode: "demo" | "live";
+  readonly mode: "demo" | "live" | "crawled";
   /** Human-readable note shown in the UI's provider list. */
   readonly description: string;
   /** Currency the provider quotes in, for transparency. */
@@ -44,7 +44,7 @@ export interface NormalizationIssue {
 export interface ProviderHealth {
   id: string;
   name: string;
-  mode: "demo" | "live";
+  mode: "demo" | "live" | "crawled";
   description: string;
   quotedCurrency: string;
   ok: boolean;

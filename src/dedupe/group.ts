@@ -129,7 +129,10 @@ export function groupOffers(offers: FlightOffer[]): OfferGroup[] {
       if (!primary) continue;
 
       const identity: GroupIdentity = cluster.flightNumber ? "flight-number" : "same-departure";
-      const key = canonicalGroupKey(primary);
+      const baseKey = canonicalGroupKey(primary);
+      // Crawled snapshots are a separate comparison universe from demos; never let identical
+      // flight identities cause a demo fare to be compared against a real captured fare.
+      const key = primary.dataSource === "crawled" ? `${baseKey}|crawled` : baseKey;
       // Pure: the returned offers carry the canonical key, the caller's objects are untouched
       // (the old code mutated `offer.groupKey` on the way in — B13).
       const stamped = sorted.map((offer) => (offer.groupKey === key ? offer : { ...offer, groupKey: key }));
@@ -187,7 +190,7 @@ function compareGroups(a: OfferGroup, b: OfferGroup): number {
 
 /** Carrier + route + departure day. Route and day are part of what a flight *is*. */
 function bucketKeyOf(offer: FlightOffer): string {
-  return `${offer.airlineCode}|${offer.originCode}>${offer.destinationCode}|${departDayOf(offer)}`;
+  return `${offer.dataSource}|${offer.airlineCode}|${offer.originCode}>${offer.destinationCode}|${departDayOf(offer)}`;
 }
 
 /**

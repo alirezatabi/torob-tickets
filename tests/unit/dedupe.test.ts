@@ -54,6 +54,16 @@ describe("deduplication", () => {
     expect(groups[0]?.hasPriceSpread).toBe(true);
   });
 
+  it("keeps crawled prices in a separate group from demo prices for the identical flight", () => {
+    const groups = groupOffers([
+      offer({ id: "demo:1", providerId: "demo", price: cheap }),
+      offer({ id: "crawl:1", providerId: "crawl", price: pricey, dataSource: "crawled" }),
+    ]);
+    expect(groups).toHaveLength(2);
+    expect(groups.map((group) => group.offers[0]?.dataSource).sort()).toEqual(["crawled", "demo"]);
+    expect(groups.find((group) => group.primary.dataSource === "crawled")?.groupKey).toContain("|crawled");
+  });
+
   it("never attaches an unnumbered offer to a numbered flight", () => {
     // The product compares *this* flight, not "something on the same airline at the same
     // time". Without a number on one side, one group would mix a confirmed identity with a
