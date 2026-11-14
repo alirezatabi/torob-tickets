@@ -1235,15 +1235,18 @@ function projectNetwork(
     const angle = Math.min((km / 6371) * (180 / Math.PI), 175);
     const arc = flightArc(origin, destination, angle, camera, 96);
     // Elevated, all-cyan lanes. The smooth lift is zero at real city endpoints and peaks mid-flight.
-    // Keep the flight arc gently elevated; a high dome can look like a loop when it meets the limb.
-    const maxLift = Math.min(0.11, 0.035 + (angle / 180) * 0.07 + (routeIndex % 3) * 0.004);
-    const liftAt = (t: number) => maxLift * Math.sin(Math.PI * t);
+    const maxLift = Math.min(0.18, 0.06 + (angle / 180) * 0.11 + (routeIndex % 3) * 0.006);
+    const liftAt = (t: number) => {
+      const sine = Math.sin(Math.PI * t);
+      // Broaden the arch through the whole flight while keeping both city endpoints on the surface.
+      return maxLift * sine * (1 + 0.28 * (1 - sine));
+    };
     let path = "";
-    let run: string[] = [];
+    let run: [number, number][] = [];
     let visiblePoints: [number, number][] = [];
     let outerPath = "";
     const flush = () => {
-      if (run.length > 1) path += `M${run.join("L")}`;
+      if (run.length > 1) path += smoothSvgPath(run);
       if (visiblePoints.length > 1) outerPath += projectFlightLimb(visiblePoints, camera);
       run = [];
       visiblePoints = [];
@@ -1260,7 +1263,7 @@ function projectNetwork(
       const screenX = camera.cx + camera.radius * x;
       const screenY = camera.cy - camera.radius * z;
       visiblePoints.push([screenX, screenY]);
-      run.push(`${Math.round(screenX)} ${Math.round(screenY)}`);
+      run.push([screenX, screenY]);
     }
     flush();
 
@@ -1301,11 +1304,41 @@ function projectNetwork(
   });
 }
 
+function smoothSvgPath(points: [number, number][], tension = 0.85): string {
+  if (points.length < 2) return "";
+  const format = (point: [number, number]) => `${point[0].toFixed(1)} ${point[1].toFixed(1)}`;
+  return `M${format(points[0]!)}${smoothCurveCommands(points, format, tension)}`;
+}
+
+/** Convert sampled route points to a smooth Catmull–Rom spline with matching endpoint tangents. */
+function smoothCurveCommands(
+  points: [number, number][],
+  format: (point: [number, number]) => string,
+  tension = 0.85,
+): string {
+  let commands = "";
+  for (let index = 0; index < points.length - 1; index += 1) {
+    const previous = points[Math.max(0, index - 1)]!;
+    const start = points[index]!;
+    const end = points[index + 1]!;
+    const next = points[Math.min(points.length - 1, index + 2)]!;
+    const controlA: [number, number] = [
+      start[0] + ((end[0] - previous[0]) * tension) / 6,
+      start[1] + ((end[1] - previous[1]) * tension) / 6,
+    ];
+    const controlB: [number, number] = [
+      end[0] - ((next[0] - start[0]) * tension) / 6,
+      end[1] - ((next[1] - start[1]) * tension) / 6,
+    ];
+    commands += `C${format(controlA)} ${format(controlB)} ${format(end)}`;
+  }
+  return commands;
+}
+
 /** Keep only the first short shell outside the disc, following the real arc tangent. */
 function projectFlightLimb(points: [number, number][], camera: Camera): string {
   const innerRadius = camera.radius;
-  // Keep the off-limb lane close to the silhouette instead of drawing a tall, unnatural hump.
-  const outerRadius = innerRadius * 1.045;
+  const outerRadius = innerRadius * 1.085;
   const innerSquared = innerRadius * innerRadius;
   const outerSquared = outerRadius * outerRadius;
   let path = "";
@@ -1351,9 +1384,7 @@ function projectFlightLimb(points: [number, number][], camera: Camera): string {
         const controlB: [number, number] = [first[0] - direction[0] * reach * 0.55, first[1] - direction[1] * reach * 0.55];
         commands += `C${formatPoint(controlA)} ${formatPoint(controlB)} ${formatPoint(first)}`;
       }
-      for (let index = 1; index < run.length; index += 1) {
-        commands += `L${formatPoint(run[index]!)}`;
-      }
+      commands += smoothCurveCommands(run, formatPoint, 0.82);
       if (endTouchesSurface) {
         const surface = projectToSurface(last);
         const direction = normalize([last[0] - previous[0], last[1] - previous[1]]);
