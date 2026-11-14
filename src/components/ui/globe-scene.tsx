@@ -1308,61 +1308,25 @@ function projectNetwork(
   });
 }
 
-function smoothSvgPath(points: [number, number][], tension = 0.85): string {
+function smoothSvgPath(points: [number, number][]): string {
   if (points.length < 2) return "";
   const format = (point: [number, number]) => `${point[0].toFixed(1)} ${point[1].toFixed(1)}`;
-  return `M${format(points[0]!)}${smoothCurveCommands(points, format, tension)}`;
+  return `M${format(points[0]!)}${smoothCurveCommands(points, format)}`;
 }
 
-/** Convert sampled route points to a smooth Catmull–Rom spline with matching endpoint tangents. */
-function smoothCurveCommands(
-  points: [number, number][],
-  format: (point: [number, number]) => string,
-  tension = 0.85,
-  constrainControl?: (point: [number, number]) => [number, number],
-): string {
-  const extrapolate = (edge: [number, number], adjacent: [number, number]): [number, number] => [
-    2 * edge[0] - adjacent[0],
-    2 * edge[1] - adjacent[1],
+/** Round sampled route points with quadratic segments whose control hull cannot overshoot the route. */
+function smoothCurveCommands(points: [number, number][], format: (point: [number, number]) => string): string {
+  if (points.length < 2) return "";
+  if (points.length === 2) return `L${format(points[1]!)}`;
+  const midpoint = (a: [number, number], b: [number, number]): [number, number] => [
+    (a[0] + b[0]) / 2,
+    (a[1] + b[1]) / 2,
   ];
-  const chordParameter = (a: [number, number], b: [number, number]) =>
-    Math.max(1e-3, Math.sqrt(Math.hypot(b[0] - a[0], b[1] - a[1])));
-  let commands = "";
-  for (let index = 0; index < points.length - 1; index += 1) {
-    const start = points[index]!;
-    const end = points[index + 1]!;
-    const previous = index > 0 ? points[index - 1]! : extrapolate(start, end);
-    const next = index + 2 < points.length ? points[index + 2]! : extrapolate(end, start);
-    const beforeLength = chordParameter(previous, start);
-    const segmentLength = chordParameter(start, end);
-    const afterLength = chordParameter(end, next);
-    const startTangent: [number, number] = [
-      (start[0] - previous[0]) / beforeLength -
-        (end[0] - previous[0]) / (beforeLength + segmentLength) +
-        (end[0] - start[0]) / segmentLength,
-      (start[1] - previous[1]) / beforeLength -
-        (end[1] - previous[1]) / (beforeLength + segmentLength) +
-        (end[1] - start[1]) / segmentLength,
-    ];
-    const endTangent: [number, number] = [
-      (end[0] - start[0]) / segmentLength -
-        (next[0] - start[0]) / (segmentLength + afterLength) +
-        (next[0] - end[0]) / afterLength,
-      (end[1] - start[1]) / segmentLength -
-        (next[1] - start[1]) / (segmentLength + afterLength) +
-        (next[1] - end[1]) / afterLength,
-    ];
-    const controlA: [number, number] = [
-      start[0] + (startTangent[0] * segmentLength * tension) / 3,
-      start[1] + (startTangent[1] * segmentLength * tension) / 3,
-    ];
-    const controlB: [number, number] = [
-      end[0] - (endTangent[0] * segmentLength * tension) / 3,
-      end[1] - (endTangent[1] * segmentLength * tension) / 3,
-    ];
-    commands += `C${format(constrainControl?.(controlA) ?? controlA)} ${format(constrainControl?.(controlB) ?? controlB)} ${format(end)}`;
+  let commands = `L${format(midpoint(points[0]!, points[1]!))}`;
+  for (let index = 1; index < points.length - 1; index += 1) {
+    commands += `Q${format(points[index]!)} ${format(midpoint(points[index]!, points[index + 1]!))}`;
   }
-  return commands;
+  return `${commands}L${format(points[points.length - 1]!)}`;
 }
 
 /** Keep only the first short shell outside the disc, following the real arc tangent. */
@@ -1376,64 +1340,20 @@ function projectFlightLimb(points: [number, number][], camera: Camera): string {
   const formatPoint = (point: [number, number]) =>
     `${Math.round(point[0])} ${Math.round(point[1])}`;
   const radiusOf = (point: [number, number]) => Math.hypot(point[0] - camera.cx, point[1] - camera.cy);
-  const constrainToLimb = (point: [number, number]): [number, number] => {
-    const dx = point[0] - camera.cx;
-    const dy = point[1] - camera.cy;
-    const distance = Math.hypot(dx, dy) || 1;
-    const radius = Math.min(outerRadius - 0.5, Math.max(innerRadius, distance));
-    const scale = radius / distance;
-    return [camera.cx + dx * scale, camera.cy + dy * scale];
-  };
   const projectToSurface = (point: [number, number]): [number, number] => {
     const dx = point[0] - camera.cx;
     const dy = point[1] - camera.cy;
     const scale = innerRadius / (Math.hypot(dx, dy) || 1);
     return [camera.cx + dx * scale, camera.cy + dy * scale];
   };
-  const normalize = (vector: [number, number]): [number, number] => {
-    const length = Math.hypot(vector[0], vector[1]) || 1;
-    return [vector[0] / length, vector[1] / length];
-  };
-  const surfaceTangent = (point: [number, number], direction: [number, number]): [number, number] => {
-    const normal = normalize([point[0] - camera.cx, point[1] - camera.cy]);
-    const projection = direction[0] * normal[0] + direction[1] * normal[1];
-    const tangent: [number, number] = [
-      direction[0] - normal[0] * projection,
-      direction[1] - normal[1] * projection,
-    ];
-    if (Math.hypot(tangent[0], tangent[1]) < 0.1) return [-normal[1], normal[0]];
-    return normalize(tangent);
-  };
   const flush = () => {
     if (run.length > 1) {
       const first = run[0]!;
-      const second = run[1]!;
       const last = run[run.length - 1]!;
-      const previous = run[run.length - 2]!;
-      const startTouchesSurface = radiusOf(first) > innerRadius + 0.25;
-      const endTouchesSurface = radiusOf(last) > innerRadius + 0.25;
-      let commands = `M${formatPoint(startTouchesSurface ? projectToSurface(first) : first)}`;
-      if (startTouchesSurface) {
-        const surface = projectToSurface(first);
-        const direction = normalize([second[0] - first[0], second[1] - first[1]]);
-        const tangent = surfaceTangent(surface, direction);
-        const reach = radiusOf(first) - innerRadius;
-        const controlA: [number, number] = [surface[0] + tangent[0] * reach * 0.55, surface[1] + tangent[1] * reach * 0.55];
-        const controlB: [number, number] = [first[0] - direction[0] * reach * 0.55, first[1] - direction[1] * reach * 0.55];
-        commands += `C${formatPoint(constrainToLimb(controlA))} ${formatPoint(constrainToLimb(controlB))} ${formatPoint(first)}`;
-      }
-      // Keep spline handles inside the limb shell; unconstrained handles can form spikes as the globe turns.
-      commands += smoothCurveCommands(run, formatPoint, 0.62, constrainToLimb);
-      if (endTouchesSurface) {
-        const surface = projectToSurface(last);
-        const direction = normalize([last[0] - previous[0], last[1] - previous[1]]);
-        const tangent = surfaceTangent(surface, direction);
-        const reach = radiusOf(last) - innerRadius;
-        const controlA: [number, number] = [last[0] + direction[0] * reach * 0.55, last[1] + direction[1] * reach * 0.55];
-        const controlB: [number, number] = [surface[0] - tangent[0] * reach * 0.55, surface[1] - tangent[1] * reach * 0.55];
-        commands += `C${formatPoint(constrainToLimb(controlA))} ${formatPoint(constrainToLimb(controlB))} ${formatPoint(surface)}`;
-      }
-      path += commands;
+      const points = [...run];
+      if (radiusOf(first) > innerRadius + 0.25) points.unshift(projectToSurface(first));
+      if (radiusOf(last) > innerRadius + 0.25) points.push(projectToSurface(last));
+      path += `M${formatPoint(points[0]!)}${smoothCurveCommands(points, formatPoint)}`;
     }
     run = [];
   };

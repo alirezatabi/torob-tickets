@@ -38,7 +38,7 @@ describe("globe hydration", () => {
     const networkLanes = [...container.querySelectorAll<SVGGElement>("[data-network-flight]")];
     expect(networkLanes.length).toBeGreaterThan(0);
     expect(networkLanes.every((lane) => lane.getAttribute("stroke") === "#43baff")).toBe(true);
-    expect(networkLanes.every((lane) => lane.querySelector("path")?.getAttribute("d")?.includes("C"))).toBe(true);
+    expect(networkLanes.every((lane) => lane.querySelector("path")?.getAttribute("d")?.includes("Q"))).toBe(true);
     expect(networkLanes.every((lane) =>
       lane.getAttribute("data-origin-visible") === "true" || lane.getAttribute("data-destination-visible") === "true",
     )).toBe(true);
@@ -62,7 +62,7 @@ describe("globe hydration", () => {
     const flightExtensions = [...container.querySelectorAll<SVGGElement>("[data-flight-extension]")];
     expect(flightExtensions.length).toBeGreaterThan(0);
     expect(flightExtensions.some((extension) =>
-      [...extension.querySelectorAll("path")].some((path) => path.getAttribute("d")?.includes("C")),
+      [...extension.querySelectorAll("path")].some((path) => path.getAttribute("d")?.includes("Q")),
     )).toBe(true);
     for (const extension of flightExtensions) {
       const path = extension.querySelector("path")?.getAttribute("d") ?? "";
