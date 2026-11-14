@@ -3,7 +3,7 @@ import { hydrateRoot, type Root } from "react-dom/client";
 import { renderToString } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { GlobeScene } from "@/components/ui/globe-scene";
+import { GlobeScene, shouldShowNetworkRoute } from "@/components/ui/globe-scene";
 
 describe("globe hydration", () => {
   let root: Root | undefined;
@@ -18,6 +18,14 @@ describe("globe hydration", () => {
     container = undefined;
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
+  });
+
+  it("waits for a newly visible endpoint to move toward the globe center before showing a route", () => {
+    expect(shouldShowNetworkRoute(-0.4, -0.6)).toBe(false);
+    expect(shouldShowNetworkRoute(0.2, -0.15)).toBe(false);
+    expect(shouldShowNetworkRoute(-0.15, 0.51)).toBe(false);
+    expect(shouldShowNetworkRoute(0.52, -0.15)).toBe(true);
+    expect(shouldShowNetworkRoute(0.1, 0.12)).toBe(true);
   });
 
   it("keeps SVG ids and projected marker attributes identical between server and client", async () => {

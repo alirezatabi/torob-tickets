@@ -1217,6 +1217,18 @@ const NETWORK_ROUTES: { from: number; to: number }[] = [
   { from: 11, to: 5 }, // Mumbai–Singapore
 ];
 
+const NETWORK_HORIZON_DEPTH = 0.08;
+const NETWORK_CENTER_ENTRY_DEPTH = 0.52;
+
+export function shouldShowNetworkRoute(originDepth: number, destinationDepth: number): boolean {
+  const originVisible = originDepth > NETWORK_HORIZON_DEPTH;
+  const destinationVisible = destinationDepth > NETWORK_HORIZON_DEPTH;
+  if (!originVisible && !destinationVisible) return false;
+  if (originVisible && destinationVisible) return true;
+  // If the other city is beyond the horizon, wait until the visible city is well inside the disc.
+  return Math.max(originDepth, destinationDepth) >= NETWORK_CENTER_ENTRY_DEPTH;
+}
+
 function projectNetwork(
   camera: Camera,
 ): {
@@ -1231,9 +1243,11 @@ function projectNetwork(
   return NETWORK_ROUTES.flatMap(({ from, to }, routeIndex) => {
     const origin = NETWORK_LOCATIONS[from]!;
     const destination = NETWORK_LOCATIONS[to]!;
-    const originOnVisibleHemisphere = rotate(camera.m, toVec(origin[0], origin[1])).y < -0.08;
-    const destinationOnVisibleHemisphere = rotate(camera.m, toVec(destination[0], destination[1])).y < -0.08;
-    if (!originOnVisibleHemisphere && !destinationOnVisibleHemisphere) return [];
+    const originViewDepth = -rotate(camera.m, toVec(origin[0], origin[1])).y;
+    const destinationViewDepth = -rotate(camera.m, toVec(destination[0], destination[1])).y;
+    const originOnVisibleHemisphere = originViewDepth > NETWORK_HORIZON_DEPTH;
+    const destinationOnVisibleHemisphere = destinationViewDepth > NETWORK_HORIZON_DEPTH;
+    if (!shouldShowNetworkRoute(originViewDepth, destinationViewDepth)) return [];
 
     const km = distanceKm(origin, destination);
     const angle = Math.min((km / 6371) * (180 / Math.PI), 175);
