@@ -1,0 +1,76 @@
+# ————— Dependencies —————
+node_modules/
+.pnp
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/releases
+
+# ————— Next.js build output —————
+/.next/
+/out/
+/build
+next-env.d.ts
+*.tsbuildinfo
+
+# ————— Testing —————
+/coverage/
+/playwright-report/
+/blob-report/
+/test-results/
+/.playwright/
+
+# ————— Prisma —————
+# Generated client and any local database files/dumps
+/prisma/client/
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+/prisma/*.dump
+/prisma/backups/
+
+# ————— Environment files (real secrets never get committed) —————
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.env.*.local
+!.env.example
+
+# ————— Editors & OS —————
+.idea/
+.vscode/*
+!.vscode/extensions.json
+*.swp
+.DS_Store
+Thumbs.db
+
+# ————— Logs —————
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# ————— Misc —————
+.vercel
+.eslintcache
+*.pem
+
+# ————— Prisma 7 —————
+# Generated client (npm run db:generate writes it here)
+/src/generated/
+# …but the generator's folder marker is source, not output: it tells Node the generated client is
+# ESM, which is what silences the MODULE_TYPELESS_PACKAGE_JSON warning. See the script that writes it.
+!/src/generated/prisma/package.json
+
+# ————— Local crawler snapshots and worker status (runtime/source data; never commit) —————
+/data/crawl/
+
+# ————— Provider diagnostics (opt-in; may contain source content) —————
+/.provider-snapshots/
+
+# Local mirror of a source page for manual/offline verification (see docs/PROVIDERS.md).
+.mirror/

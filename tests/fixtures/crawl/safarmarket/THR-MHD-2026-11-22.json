@@ -1,0 +1,85 @@
+{
+  "captureNote": "Sanitized excerpt copied from user-provided Safarmarket DevTools JSON response; fields unrelated to parsing omitted and provider booking URLs removed.",
+  "code": 200,
+  "result": {
+    "flights": [
+      {
+        "flightId": "0",
+        "providersCount": 5,
+        "minPrice": 81840000,
+        "flightClass": "ECONOMY",
+        "leave": {
+          "flightNo": "FP7438",
+          "stopsCount": 0,
+          "airlineName": "Fly Persia",
+          "airlineNameFa": "فلای پرشیا",
+          "airlineCode": "FP",
+          "departureTime": "2026-11-22 14:20",
+          "arrivalTime": "2026-11-22 15:40",
+          "duration": 80,
+          "sellType": "CHARTER",
+          "legs": [
+            {
+              "flightNo": "FP7438",
+              "airlineName": "Fly Persia",
+              "airlineNameFa": "فلای پرشیا",
+              "airlineCode": "FP",
+              "departureAirportCode": "THR",
+              "arrivalAirportCode": "MHD",
+              "departureTime": "2026-11-22 14:20",
+              "arrivalTime": "2026-11-22 15:40",
+              "airPlaneType": "Boeing",
+              "flightDuration": 80
+            }
+          ],
+          "capacity": 9,
+          "charter": true,
+          "reservable": true
+        },
+        "providers": [
+          {
+            "id": "929b9270-2856-11ee-b805-a0d3c1053c24",
+            "price": 81840000,
+            "title": "لحظه پرواز",
+            "titleEn": "faza24",
+            "coreId": 143,
+            "outboundCapacity": 9,
+            "outBoundBaggages": [
+              { "passengerType": "ADULT", "weightKg": "20", "pieces": 1 }
+            ],
+            "outBoundCancellationPolicies": [
+              { "policy": "30%", "description": "از زمان صدور بلیط تا 12 ظهر 3 روز قبل از پرواز" }
+            ],
+            "url": null
+          },
+          {
+            "id": "ff564447-534e-11ea-93d6-e55f2cbe37d5",
+            "price": 82568798,
+            "title": "قاصدک24",
+            "titleEn": "ghasedak24",
+            "coreId": 16,
+            "outboundCapacity": 9,
+            "outBoundBaggages": [
+              { "passengerType": "child", "weightKg": "20", "pieces": 1 }
+            ],
+            "outBoundCancellationPolicies": [],
+            "url": null
+          },
+          {
+            "id": "87756799-5810-11ec-aa99-04ea56b3d864",
+            "price": 82896000,
+            "title": "اسنپ تریپ",
+            "titleEn": "snapptrip",
+            "coreId": 189,
+            "outboundCapacity": 9,
+            "outBoundBaggages": [
+              { "passengerType": "ADULT", "weightKg": "20", "pieces": 0 }
+            ],
+            "outBoundCancellationPolicies": [],
+            "url": null
+          }
+        ]
+      }
+    ]
+  }
+}
