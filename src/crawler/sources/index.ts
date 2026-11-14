@@ -11,7 +11,7 @@ export function getCrawlSource(id: string): CrawlSource | undefined { return CRA
 export function isCrawlSourceId(value: string): value is CrawlSourceId { return CRAWL_SOURCES.some((source) => source.id === value); }
 
 export const CRAWLER_PARSER_STATUS: Record<CrawlSourceId, string> = {
-  safarmarket: "fixture-backed-parser; blocked-session-and-reCAPTCHA-request; currency-and-time-zone-unresolved",
+  safarmarket: "fixture-backed-parser; credential-free-captured-POST; currency-and-time-zone-unresolved",
   flightio: "NOT_IMPLEMENTED: نیاز به fixture واقعی",
   mrbilit: "NOT_IMPLEMENTED: نیاز به fixture واقعی",
   alibaba: "NOT_IMPLEMENTED: نیاز به fixture واقعی",

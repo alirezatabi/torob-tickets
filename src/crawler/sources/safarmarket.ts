@@ -8,16 +8,39 @@ export const safarmarketSource: CrawlSource = {
   name: "Safarmarket",
   origin,
   buildRequests(query) {
-    // A body was supplied, but the captured request also included client/session-bound fields and a
-    // transient reCAPTCHA header. Never replay browser credentials or challenge tokens; no verified
-    // unauthenticated request contract is available, so keep the source fail-closed.
-    void query;
-    return [{
-      url: `${origin}/api/flight/v3/search`,
-      method: "POST",
-      body: null,
-      blockedReason: "Captured request uses client/session-bound fields and a reCAPTCHA header; credential/challenge replay is unsupported.",
-    }];
+    if (!/^[A-Z]{3}$/.test(query.originCode) || !/^[A-Z]{3}$/.test(query.destinationCode)
+      || !/^\d{4}-\d{2}-\d{2}$/.test(query.departDate)
+      || !Number.isInteger(query.passengers) || query.passengers < 1) {
+      return [{ url: `${origin}/api/flight/v3/search`, method: "POST", body: null, blockedReason: "Invalid route, date, or adult passenger count." }];
+    }
+    // Use only the captured JSON payload fields. Client-specific IPInfo is kept null rather than
+    // copying the redacted browser values; cookies, auth tokens and reCAPTCHA headers are never sent.
+    const body = JSON.stringify({
+      platform: "WEB_DESKTOP",
+      uid: "",
+      limit: 250,
+      compress: false,
+      productType: "LFLI",
+      searchValidity: 2,
+      cid: 1,
+      checksum: 1,
+      IPInfo: null,
+      searchFilter: {
+        // The captured request selected all classes; preserve both observed flags instead of inferring from query.cabin.
+        sourceAirportCode: query.originCode,
+        targetAirportCode: query.destinationCode,
+        sourceIsCity: true,
+        targetIsCity: true,
+        leaveDate: query.departDate,
+        returnDate: "",
+        adultCount: query.passengers,
+        childCount: 0,
+        infantCount: 0,
+        economy: true,
+        business: true,
+      },
+    });
+    return [{ url: `${origin}/api/flight/v3/search`, method: "POST", body }];
   },
   parseRaw(body, context): RawOffer[] {
     let decoded: unknown;

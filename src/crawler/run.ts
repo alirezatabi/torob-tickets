@@ -3,7 +3,7 @@ import { normalizeRawOffers } from "./normalize";
 import { writeSnapshot } from "./store";
 import type { CrawlQuery, CrawlSource, CrawlSnapshot } from "./types";
 
-export interface CrawlRunOptions { client?: CrawlHttpClient; enabled?: boolean }
+export interface CrawlRunOptions { client?: CrawlHttpClient; enabled?: boolean; saveSnapshot?: typeof writeSnapshot }
 export async function runSource(source: CrawlSource, query: CrawlQuery, options: CrawlRunOptions = {}): Promise<CrawlSnapshot> {
   const enabled = options.enabled ?? process.env.CRAWLER_ENABLED === "1";
   if (!enabled) throw new Error("Crawler is disabled. Set CRAWLER_ENABLED=1 for an explicit local job.");
@@ -13,10 +13,10 @@ export async function runSource(source: CrawlSource, query: CrawlQuery, options:
   const raw = [];
   for (const request of requests) {
     if (request.blockedReason) throw new Error(`${source.id}: ${request.blockedReason}`);
-    // The HTTP client intentionally supports only GET until a source has a captured,
-    // verified request body and method-specific safety tests. Do not send guessed POSTs.
-    if (request.method !== "GET") throw new Error(`${source.id}: ${request.method} request execution is not enabled without verified request details`);
-    const response = await client.get(request.url);
+    if (request.method === "POST" && request.body === null) throw new Error(`${source.id}: POST body is missing`);
+    const response = request.method === "GET"
+      ? await client.get(request.url)
+      : await client.postJson(request.url, request.body!);
     raw.push(...source.parseRaw(await response.text(), {
       route: `${query.originCode}-${query.destinationCode}`,
       date: query.departDate,
@@ -32,6 +32,6 @@ export async function runSource(source: CrawlSource, query: CrawlQuery, options:
     date: query.departDate,
     offers,
   };
-  await writeSnapshot(snapshot);
+  await (options.saveSnapshot ?? writeSnapshot)(snapshot);
   return snapshot;
 }

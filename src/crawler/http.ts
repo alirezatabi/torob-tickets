@@ -46,7 +46,18 @@ export class CrawlHttpClient {
   async get(url: string): Promise<Response> {
     const target = new URL(url);
     await this.assertAllowed(target);
-    return this.request(target);
+    return this.request(target, { method: "GET" });
+  }
+
+  /** JSON POST without browser credentials; never follows redirects or retries a non-idempotent request. */
+  async postJson(url: string, body: string): Promise<Response> {
+    const target = new URL(url);
+    await this.assertAllowed(target);
+    return this.request(target, {
+      method: "POST",
+      body,
+      headers: { accept: "application/json", "content-type": "application/json" },
+    });
   }
 
   private async assertAllowed(target: URL): Promise<void> {
@@ -55,7 +66,7 @@ export class CrawlHttpClient {
     if (!pending) {
       pending = this.enqueue(target.host, async () => {
         let response: Response;
-        try { response = await this.rawFetch(new URL("/robots.txt", origin)); }
+        try { response = await this.rawFetch(new URL("/robots.txt", origin), { method: "GET" }); }
         catch { throw new CrawlError("ROBOTS_UNAVAILABLE", `Could not fetch robots.txt for ${origin}`); }
         if (!response.ok) throw new CrawlError("ROBOTS_UNAVAILABLE", `robots.txt returned HTTP ${response.status}`);
         return response.text();
@@ -74,12 +85,13 @@ export class CrawlHttpClient {
     return current.finally(() => { if (this.queues.get(host) === current) this.queues.delete(host); });
   }
 
-  /** Each redirect is manually inspected and robots-checked before following it. */
-  private async request(initial: URL): Promise<Response> {
+  /** GET redirects are inspected and robots-checked; POST redirects are rejected rather than replayed. */
+  private async request(initial: URL, init: RequestInit): Promise<Response> {
     let url = initial;
     for (let redirect = 0; redirect <= 5; redirect += 1) {
-      const response = await this.enqueue(url.host, () => this.requestHop(url));
+      const response = await this.enqueue(url.host, () => this.requestHop(url, init));
       if (response.status < 300 || response.status >= 400) return response;
+      if (init.method !== "GET") throw new CrawlError("HTTP_ERROR", `Refusing to redirect ${init.method} request from ${url.origin}${url.pathname}`);
       const location = response.headers.get("location");
       if (!location || redirect === 5) throw new CrawlError("HTTP_ERROR", `Unusable or excessive redirect from ${url.origin}${url.pathname}`);
       const next = new URL(location, url);
@@ -90,13 +102,14 @@ export class CrawlHttpClient {
     throw new CrawlError("HTTP_ERROR", "Redirect limit exceeded");
   }
 
-  private async requestHop(url: URL): Promise<Response> {
-    for (let attempt = 0; attempt < this.attempts; attempt += 1) {
+  private async requestHop(url: URL, init: RequestInit): Promise<Response> {
+    const retryLimit = init.method === "GET" ? this.attempts : 1;
+    for (let attempt = 0; attempt < retryLimit; attempt += 1) {
       let response: Response;
-      try { response = await this.rawFetch(url); }
+      try { response = await this.rawFetch(url, init); }
       catch (error) {
         if (error instanceof CrawlError) throw error;
-        if (attempt + 1 < this.attempts) { await this.sleep(1000 * 2 ** attempt); continue; }
+        if (attempt + 1 < retryLimit) { await this.sleep(1000 * 2 ** attempt); continue; }
         throw new CrawlError("NETWORK_ERROR", `Request failed for ${url.origin}${url.pathname}${error instanceof Error ? `: ${error.name}` : ""}`);
       }
       const body = await response.clone().text();
@@ -105,7 +118,7 @@ export class CrawlHttpClient {
       }
       if (response.status >= 300 && response.status < 400) return response;
       if (response.ok) return response;
-      if ((response.status === 429 || response.status >= 500) && attempt + 1 < this.attempts) {
+      if (init.method === "GET" && (response.status === 429 || response.status >= 500) && attempt + 1 < retryLimit) {
         await this.sleep(parseRetryAfter(response.headers.get("retry-after"), this.clock()) ?? 1000 * 2 ** attempt);
         continue;
       }
@@ -114,7 +127,7 @@ export class CrawlHttpClient {
     throw new CrawlError("NETWORK_ERROR", `Request failed for ${url.origin}${url.pathname}`);
   }
 
-  private async rawFetch(url: URL): Promise<Response> {
+  private async rawFetch(url: URL, init: RequestInit): Promise<Response> {
     if (this.used >= this.limit) throw new CrawlError("REQUEST_LIMIT", `Request ceiling (${this.limit}) reached`);
     const previous = this.lastRequest.get(url.host);
     if (previous !== undefined) {
@@ -123,7 +136,16 @@ export class CrawlHttpClient {
     }
     this.used += 1;
     this.lastRequest.set(url.host, this.clock());
-    return this.fetcher(url, { method: "GET", redirect: "manual", signal: AbortSignal.timeout(this.timeoutMs), headers: { "user-agent": this.ua, accept: "text/html,application/xhtml+xml,text/plain;q=0.9,*/*;q=0.5" } });
+    return this.fetcher(url, {
+      ...init,
+      redirect: "manual",
+      signal: AbortSignal.timeout(this.timeoutMs),
+      headers: {
+        "user-agent": this.ua,
+        accept: "text/html,application/xhtml+xml,text/plain;q=0.9,*/*;q=0.5",
+        ...Object.fromEntries(new Headers(init.headers).entries()),
+      },
+    });
   }
 }
 

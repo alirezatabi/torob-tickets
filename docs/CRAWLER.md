@@ -4,11 +4,11 @@
 
 The crawler is **off by default**. No search page or browser/API request starts a crawl. `/crawl` and `/api/crawl` only read local snapshots; `POST /api/crawl` is rejected. A local operator must set `CRAWLER_ENABLED=1` and start an explicit CLI job. The current flight search still uses the existing demo dataset and the data badge continues to label it as demo.
 
-The shared sandbox does not make live requests to candidate sites, so no live probe result is claimed here. A user-supplied Safarmarket DevTools JSON response excerpt is checked in as a sanitized fixture and supports a conservative response parser. The owner has also supplied the POST payload shape, but the captured browser request included client/session-bound fields and a transient reCAPTCHA header. Those values must never be stored or replayed; Safarmarket remains blocked until an approved unauthenticated request contract is evidenced. Price currency and timezone semantics are also unresolved, so amounts remain unconverted and wall times remain local-only. The other four parser modules deliberately throw `NOT_IMPLEMENTED: نیاز به fixture واقعی`; do not replace them with guessed markup or remembered endpoints.
+The shared sandbox does not make live requests to candidate sites, so no live probe result is claimed here. A user-supplied Safarmarket DevTools JSON response excerpt is checked in as a sanitized fixture and supports a conservative response parser. The owner also supplied a representative POST payload; the local request builder uses its observed fields, with client-specific `IPInfo` set to null. It never replays browser cookies, auth values, or reCAPTCHA tokens. A local operator may explicitly test the credential-free request; if the endpoint requires a challenge or access is denied, the client stops without bypass or retry. Price currency and timezone semantics are unresolved, so amounts remain unconverted and wall times remain local-only. The other four parser modules deliberately throw `NOT_IMPLEMENTED: نیاز به fixture واقعی`; do not replace them with guessed markup or remembered endpoints.
 
 | Source | Parser | Status |
 |---|---|---|
-| Safarmarket | fixture-backed JSON response parser | endpoint observed; request body, price currency, timezone unresolved; blocked from network execution |
+| Safarmarket | fixture-backed JSON response parser | captured POST shape; credential-free local test only; currency/timezone unresolved |
 
 ### Safarmarket fixture findings
 
@@ -20,7 +20,7 @@ Fixture: `tests/fixtures/crawl/safarmarket/THR-MHD-2026-11-22.json`. It is a san
 - Price units: neither the fixture nor its fields state IRR or IRT. `price` is kept as the original numeric amount (for example `81840000`) and `currency` remains null. **No rial-to-toman conversion is justified by this fixture.** A response with an explicit unit label/documented unit is needed before conversion.
 - Time/date: source strings are Gregorian-looking local wall times (`2026-11-22 14:20`), with no offset or timezone; no Jalali date field is present in the checked-in excerpt. Raw local strings are preserved as `departureLocal`/`arrivalLocal`; normalized instants stay null. A captured timezone contract or source evidence is needed to create UTC timestamps.
 - Capacity is seller-specific `outboundCapacity` when present, then seller `capacity`, then flight `leave.capacity`; the source field and fallback are both retained as observed. `sellType` is preserved literally (`CHARTER` in the excerpt). Provider URLs were removed during fixture sanitization because their opaque booking/search identifiers were not needed for parsing, so `offerUrl` remains null.
-- Request finding: the owner supplied a representative one-way payload for `POST https://safarmarket.com/api/flight/v3/search`. The observed body includes route/date and passenger/cabin fields plus client-specific `IPInfo`; do not persist the supplied IP-related values as crawler defaults. The accompanying browser request included Cookie/session-like values and a transient reCAPTCHA header. Never store or replay those credentials/challenge values; `buildRequests(query)` deliberately returns `body: null` and `runSource` refuses to send the request. Safarmarket can be reconsidered only if an approved unauthenticated request contract is documented. Currency and timezone evidence are still needed; do not send browser headers or tokens.
+- Request finding: the owner supplied a representative one-way payload for `POST https://safarmarket.com/api/flight/v3/search`. The request builder uses the observed route/date/passenger fields and class flags; `IPInfo` is sent as null rather than copying the redacted, client-specific values. It sends no Cookie, auth, or reCAPTCHA headers. The local operator can test this credential-free request; if the endpoint rejects it or returns a challenge, stop there—do not add browser credentials or replay tokens. Currency and timezone evidence are still needed.
 | Flightio | placeholder | needs real fixture |
 | MrBilit | placeholder | needs real fixture |
 | Alibaba | placeholder | needs real fixture |
@@ -58,19 +58,22 @@ Raw fields are nullable. The conservative normalizer reports invalid facts inste
 
    `response.json` must exist in the project directory; verify with `Test-Path .\\response.json`. A UTF-8 BOM from Windows PowerShell is handled. This writes a timestamped file under `tests/fixtures/crawl/<source>/` (so it will not overwrite an existing fixture, including on case-insensitive Windows filesystems) and drops URL/redirect fields plus common token/cookie fields. For a configured public GET URL, the same command without `--response-file` requires `CRAWLER_ENABLED=1`, uses robots checks, and performs a network capture. Review the full response for personal/session data before committing; sanitization is not a guarantee.
 
-4. For a source whose request builder is complete, parser is fixture-tested, and units/times are understood, run an explicit route/date job. The command writes `data/crawl/latest.json` as a source-keyed manifest (plus ignored per-source runtime snapshots); the root manifest is intentionally not ignored so the owner can review/commit it. Safarmarket remains blocked because its captured browser request included session-bound and reCAPTCHA values that must not be replayed; the other four sources are placeholders, so no source can yet produce a live snapshot.
+4. For a source whose request builder is complete, parser is fixture-tested, and units/times are understood, run an explicit route/date job. The command writes `data/crawl/latest.json` as a source-keyed manifest (plus ignored per-source runtime snapshots); the root manifest is intentionally not ignored so the owner can review/commit it. Safarmarket can now be tested locally with the captured request shape, but the request omits browser credentials and sends `IPInfo: null`; if the server requires a challenge or denies access, the fail-closed client stops. The other four sources remain placeholders.
 
-   ```sh
-   CRAWLER_ENABLED=1 npm run crawl -- --source <id> --route THR-MHD --date YYYY-MM-DD
+   ```powershell
+   $env:CRAWLER_ENABLED = "1"
+   npm run crawl -- --source safarmarket --route THR-MHD --date 2026-11-22 --passengers 1
    ```
+
+   This checks `robots.txt` first, then sends one JSON POST without cookies, auth tokens, or reCAPTCHA headers. The POST is never retried or redirected. Remove the opt-in afterward with `Remove-Item Env:CRAWLER_ENABLED`.
 
 Never enable scheduled or request-triggered crawling until robots/policies, price units, dates, time zones, route identity and refresh behavior have been established from evidence.
 
-Safarmarket's fixture-backed parser extracts provider-level raw quotes, but leaves currency and UTC instants unresolved and is not wired into search or the current GET-only crawl runner. Although the owner supplied the POST payload shape, its captured browser request also included session-bound and reCAPTCHA values; the crawler must not replay these, so Safarmarket remains blocked. The other four parsers still throw the required placeholder error. Capture saves a fixture for inspection; it does not itself create a snapshot. Production snapshots require a deliberate job with an evidenced, approved request contract and safe normalization. The snapshot store refuses `synthetic-test` data.
+Safarmarket's fixture-backed parser extracts provider-level raw quotes, but leaves currency and UTC instants unresolved and is not wired into search. The explicit local crawl runner can send the captured POST shape without browser credentials; client-specific `IPInfo` is null, and challenge/access failures remain terminal. The other four parsers still throw the required placeholder error. Capture saves a fixture for inspection; it does not itself create a snapshot. Snapshots are written only by a deliberate local job with `CRAWLER_ENABLED=1` and safe normalization. The snapshot store refuses `synthetic-test` data.
 
 ## Commands and verification
 
-- `CRAWLER_ENABLED=1 npm run crawl -- --source <id> --route THR-MHD --date YYYY-MM-DD` — explicit local job; currently Safarmarket is blocked for missing POST body and the other sources remain placeholders.
+- `CRAWLER_ENABLED=1 npm run crawl -- --source safarmarket --route THR-MHD --date YYYY-MM-DD` — explicit credential-free Safarmarket POST test; the other sources remain placeholders. On PowerShell, set `$env:CRAWLER_ENABLED = "1"` before running and remove it afterward.
 - `npm run crawl:probe` — optional live, local-only status probe; requires per-source URL configuration, may fail due to network/site policy.
 - `CRAWLER_ENABLED=1 npm run crawl:capture -- --source <id> --route THR-MHD --date YYYY-MM-DD` — save a sanitized capture for fixture review.
 - `npm run typecheck && npm run lint && npm test && npm run build` — local project checks; tests must stay on mocked fetch and never access the network.

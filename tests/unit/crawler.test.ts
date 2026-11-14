@@ -28,17 +28,27 @@ describe("crawl source placeholders", () => {
     expect(safarmarketSource.parseRaw(fixture, { route: "THR-MHD", date: "2026-11-23", url: "" })).toEqual([]);
   });
 
-  it("keeps Safarmarket blocked rather than replaying session-bound or challenge fields", () => {
+  it("builds only the captured Safarmarket POST payload fields and nulls client-specific IPInfo", () => {
     const request = safarmarketSource.buildRequests({ originCode: "THR", destinationCode: "MHD", departDate: "2026-11-22", passengers: 1, cabin: "economy" })[0];
-    expect(request).toMatchObject({ url: "https://safarmarket.com/api/flight/v3/search", method: "POST", body: null });
-    expect(request?.blockedReason).toContain("credential/challenge replay is unsupported");
+    expect(request).toMatchObject({ url: "https://safarmarket.com/api/flight/v3/search", method: "POST" });
+    expect(JSON.parse(request!.body!)).toEqual({
+      platform: "WEB_DESKTOP", uid: "", limit: 250, compress: false, productType: "LFLI", searchValidity: 2, cid: 1, checksum: 1, IPInfo: null,
+      searchFilter: { sourceAirportCode: "THR", targetAirportCode: "MHD", sourceIsCity: true, targetIsCity: true, leaveDate: "2026-11-22", returnDate: "", adultCount: 1, childCount: 0, infantCount: 0, economy: true, business: true },
+    });
+    expect(request).not.toHaveProperty("headers");
   });
 
-  it("does not send a Safarmarket request that requires replaying browser credentials or a challenge", async () => {
-    const fetcher = vi.fn(async () => new Response("should not be called"));
+  it("runs the captured Safarmarket POST path against mocked robots and response fixtures", async () => {
+    const fixture = await readFile(join(process.cwd(), "tests/fixtures/crawl/safarmarket/THR-MHD-2026-11-22.json"), "utf8");
+    const fetcher = vi.fn(async (input: string | URL) => String(input).endsWith("robots.txt")
+      ? new Response("User-agent: *\nAllow: /")
+      : new Response(fixture));
     const client = new CrawlHttpClient({ fetch: fetcher, sleep: async () => undefined });
-    await expect(runSource(safarmarketSource, { originCode: "THR", destinationCode: "MHD", departDate: "2026-11-22", passengers: 1, cabin: "economy" }, { client, enabled: true })).rejects.toThrow("credential/challenge replay is unsupported");
-    expect(fetcher).not.toHaveBeenCalled();
+    const saveSnapshot = vi.fn(async () => "mock-snapshot-path");
+    const snapshot = await runSource(safarmarketSource, { originCode: "THR", destinationCode: "MHD", departDate: "2026-11-22", passengers: 1, cabin: "economy" }, { client, enabled: true, saveSnapshot });
+    expect(snapshot.offers).toHaveLength(3);
+    expect(saveSnapshot).toHaveBeenCalledWith(expect.objectContaining({ source: "safarmarket", route: "THR-MHD", date: "2026-11-22" }));
+    expect(fetcher).toHaveBeenCalledTimes(2);
   });
 
   it("keeps absent Safarmarket facts null", () => {
@@ -50,6 +60,38 @@ describe("crawl source placeholders", () => {
 });
 
 describe("crawler HTTP safeguards", () => {
+  it("sends JSON POST after robots without browser credentials", async () => {
+    const calls: { input: string; init?: RequestInit }[] = [];
+    const fetcher = vi.fn(async (input: string | URL, init?: RequestInit) => {
+      calls.push({ input: String(input), init });
+      return String(input).endsWith("robots.txt") ? new Response("User-agent: *\nAllow: /") : new Response('{"code":200,"result":{"flights":[]}}');
+    });
+    const client = new CrawlHttpClient({ fetch: fetcher, sleep: async () => undefined });
+    const response = await client.postJson("https://example.test/api/search", '{"query":1}');
+    expect(response.status).toBe(200);
+    expect(calls).toHaveLength(2);
+    expect(calls[1]?.init?.method).toBe("POST");
+    expect(calls[1]?.init?.body).toBe('{"query":1}');
+    const headers = new Headers(calls[1]?.init?.headers);
+    expect(headers.get("content-type")).toBe("application/json");
+    expect(headers.get("cookie")).toBeNull();
+    expect(headers.get("recaptcha")).toBeNull();
+    expect(headers.get("x-auth-token")).toBeNull();
+  });
+
+  it("does not retry or follow redirects for POST", async () => {
+    let posts = 0;
+    const fetcher = vi.fn(async (input: string | URL) => {
+      if (String(input).endsWith("robots.txt")) return new Response("User-agent: *\nAllow: /");
+      posts += 1;
+      return new Response(null, { status: 302, headers: { location: "https://other.test/redirect" } });
+    });
+    const client = new CrawlHttpClient({ fetch: fetcher, sleep: async () => undefined });
+    await expect(client.postJson("https://example.test/api/search", "{}")).rejects.toMatchObject({ code: "HTTP_ERROR" });
+    expect(posts).toBe(1);
+    expect(fetcher).toHaveBeenCalledTimes(2);
+  });
+
   it("checks robots first and rejects a disallowed path without requesting it", async () => {
     const fetcher = vi.fn(async (input: string | URL) => new Response(String(input).endsWith("robots.txt") ? "User-agent: *\nDisallow: /private" : "should not happen"));
     const client = new CrawlHttpClient({ fetch: fetcher, sleep: async () => undefined });
