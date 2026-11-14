@@ -15,7 +15,15 @@ async function main(): Promise<void> {
   if (responseFile) {
     // Offline import: useful for DevTools-captured POST responses without guessing/replaying
     // the site's request body. No network access and no CRAWLER_ENABLED opt-in is needed.
-    body = sanitize(await readFile(resolve(responseFile), "utf8"));
+    const inputPath = resolve(responseFile);
+    try {
+      body = sanitize(await readFile(inputPath, "utf8"));
+    } catch (error) {
+      if (error && typeof error === "object" && "code" in error && error.code === "ENOENT") {
+        throw new Error(`Response file not found: ${inputPath}. Save the DevTools response body there, then rerun this command.`);
+      }
+      throw error;
+    }
   } else {
     if (process.env.CRAWLER_ENABLED !== "1") throw new Error("Set CRAWLER_ENABLED=1 to explicitly enable this local network capture.");
     const template = process.env[`CRAWL_URL_${sourceId.toUpperCase()}`];
@@ -34,11 +42,13 @@ async function main(): Promise<void> {
 }
 
 function sanitize(input: string): string {
+  // Windows PowerShell's UTF-8 output may include a BOM; JSON.parse rejects it otherwise.
+  const cleanInput = input.replace(/^\uFEFF/, "");
   try {
-    const parsed: unknown = JSON.parse(input);
+    const parsed: unknown = JSON.parse(cleanInput);
     return `${JSON.stringify(redactJson(parsed), null, 2)}\n`;
   } catch {
-    return input
+    return cleanInput
       .replace(/<input\b([^>]*\btype\s*=\s*["']?hidden["']?[^>]*)>/gi, (tag) => tag.replace(/\bvalue\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, "value=\"[REDACTED]\""))
       .replace(/((?:csrf|xsrf|token|session|auth|secret|cookie)[\w.-]*\s*["']?\s*[:=]\s*["']?)[^\s"'&,;}<]+/gi, "$1[REDACTED]")
       .replace(/(set-cookie\s*:\s*)[^\r\n<]+/gi, "$1[REDACTED]")

@@ -51,10 +51,12 @@ Raw fields are nullable. The conservative normalizer reports invalid facts inste
 3. Capture one permitted public response. For a request you already made in DevTools (especially Safarmarket's POST), save the response body locally and use offline import; this does not make another request or require `CRAWLER_ENABLED`:
 
    ```sh
+   # PowerShell: after copying the Network response body in DevTools
+   Get-Clipboard | Set-Content -Path .\\response.json -Encoding utf8
    npm run crawl:capture -- --source safarmarket --route THR-MHD --date 2026-11-22 --response-file .\\response.json
    ```
 
-   This writes under `tests/fixtures/crawl/<source>/` and drops URL/redirect fields plus common token/cookie fields. For a configured public GET URL, the same command without `--response-file` requires `CRAWLER_ENABLED=1`, uses robots checks, and performs a network capture. Review the full response for personal/session data before committing; sanitization is not a guarantee.
+   `response.json` must exist in the project directory; verify with `Test-Path .\\response.json`. A UTF-8 BOM from Windows PowerShell is handled. This writes under `tests/fixtures/crawl/<source>/` and drops URL/redirect fields plus common token/cookie fields. For a configured public GET URL, the same command without `--response-file` requires `CRAWLER_ENABLED=1`, uses robots checks, and performs a network capture. Review the full response for personal/session data before committing; sanitization is not a guarantee.
 
 4. For a source whose request builder is complete, parser is fixture-tested, and units/times are understood, run an explicit route/date job. The command writes `data/crawl/latest.json` as a source-keyed manifest (plus ignored per-source runtime snapshots); the root manifest is intentionally not ignored so the owner can review/commit it. In the current tree, Safarmarket is blocked until the missing request body is supplied, and the other four sources are placeholders, so no source can yet produce a live snapshot.
 
