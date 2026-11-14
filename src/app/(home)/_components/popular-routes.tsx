@@ -10,18 +10,9 @@ import { formatJalali } from "@/lib/jalali";
 import { getHomeFares, POPULAR_ROUTE_PAIRS, POPULAR_WINDOW_DAYS } from "@/server/popular-routes";
 
 /**
- * «پرفروش‌های هفته» — the homepage's fare strip.
- *
- * A price comparison site normally fills this slot from its own sales data (“1,240 tickets sold
- * this week”). This demo has no sales, so it does not invent them: what it shows is the **cheap
- * end of the week** — the floor fare across a curated set of routes, and the cheapest fare of
- * each route next to it. Every number comes from the same `selectCheapestOffer` the results page
- * uses, so no card can advertise a fare the search will not show, and the kicker is counted from
- * the same pass as the cards instead of being estimated.
- *
- * Both entry points are honest about what they are (a price yesterday, a search today):
- *   • the headline links to the route+day whose price it quotes;
- *   • each card links to its own route and day, so the price you tap is the price you land on.
+ * Snapshot-backed fare strip. The provider registry includes only Safarmarket snapshots,
+ * so every displayed price was captured from that source; routes without a matching snapshot
+ * are omitted rather than filled with demo or estimated prices.
  */
 export async function PopularRoutes({ limit = 6 }: { limit?: number }) {
   const { routes, week } = await getHomeFares({ limit, routes: POPULAR_ROUTE_PAIRS });
@@ -43,7 +34,7 @@ export async function PopularRoutes({ limit = 6 }: { limit?: number }) {
           <div>
             <p className="text-[0.62rem] font-bold tracking-wide text-saffron-700">رصد قیمت در مسیرهای منتخب</p>
             <h2 id="popular-heading" className="mt-0.5 text-sm font-extrabold text-ink-900 sm:text-base">
-              پرفروش‌های هفته
+              نرخ‌های ثبت‌شده از Safarmarket
             </h2>
           </div>
         </div>
@@ -133,8 +124,8 @@ export async function PopularRoutes({ limit = 6 }: { limit?: number }) {
       <p className="mt-4 flex items-start gap-2 rounded-xl bg-teal-50/70 px-3 py-2 text-[0.62rem] leading-5 text-ink-500">
         <span className="mt-1.5 size-1.5 shrink-0 rounded-full bg-teal-500" aria-hidden="true" />
         <span>
-          بر اساس دادهٔ نمونه، ارزان‌ترین نرخِ هر مسیر در {toPersianDigits(POPULAR_WINDOW_DAYS)} روز آینده؛
-          هر کارت به همان روزی می‌رود که قیمتش را نشان می‌دهد.
+          فقط نرخ‌های خوانده‌شده از snapshot محلی Safarmarket در بازهٔ {toPersianDigits(POPULAR_WINDOW_DAYS)} روز آینده؛
+          موجودی و قیمت نهایی هنگام خرید باید در خود منبع بررسی شود.
         </span>
       </p>
     </section>

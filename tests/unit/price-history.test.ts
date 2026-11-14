@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { getPriceHistory, HISTORY_RANGE_LABELS_FA } from "@/modules/history/price-history";
+import { buildHistoryWhere, getPriceHistory, HISTORY_RANGE_LABELS_FA } from "@/modules/history/price-history";
 
 /**
  * History segmentation is asserted at the contract level: without a database the
@@ -8,6 +8,10 @@ import { getPriceHistory, HISTORY_RANGE_LABELS_FA } from "@/modules/history/pric
  * looks like "prices never changed".
  */
 describe("price history without a database", () => {
+  it("excludes legacy demo-search observations and reads only uncoupled crawl history", () => {
+    expect(buildHistoryWhere({ originCity: "THR", destinationCity: "MHD" }, "30d")).toMatchObject({ searchId: null });
+  });
+
   it("reports unavailability with an actionable Persian reason", async () => {
     const previous = process.env.DATABASE_URL;
     delete process.env.DATABASE_URL;

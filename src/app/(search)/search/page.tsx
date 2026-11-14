@@ -69,15 +69,13 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
   }
 
   const providersOk = outcome.health.filter((health) => health.ok).length;
-  const hasSampleData = outcome.offers.some((offer) => offer.dataSource === "demo");
   const hasRealData = outcome.offers.some((offer) => offer.dataSource === "live" || offer.dataSource === "crawled");
   const hasLocalSnapshot = (outcome.rawCounts.safarmarket ?? 0) > 0;
-  const sourceLabel = query.filters.dataSource === "demo"
-    ? "فقط دادهٔ نمونه"
-    : query.filters.dataSource === "real"
-      ? hasRealData ? "فقط دادهٔ واقعی" : hasLocalSnapshot ? "snapshot موجود · نرخ قابل نمایش نیست" : "دادهٔ واقعی · snapshotی برای این مسیر/تاریخ نیست"
-      : hasSampleData && hasRealData ? "دادهٔ نمونه و واقعی"
-        : hasRealData ? "دادهٔ واقعی" : "دادهٔ نمونه";
+  const sourceLabel = hasRealData
+    ? "نرخ از snapshot واقعی Safarmarket"
+    : hasLocalSnapshot
+      ? "snapshot موجود است · نرخ قابل‌نمایش نیست"
+      : "برای این مسیر/تاریخ snapshot واقعی نداریم";
   const hasResults = flights.length > 0;
   // The strip's position travels in `?strip=`, so tapping a chip does not re-anchor the strip
   // (`resolveStripStart` rejects a start that would hide the selected day or point into the past).
@@ -132,7 +130,7 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
                     <span className="mx-1.5 text-ink-300">·</span>
                     ارزان‌ترین اول
                   </p>
-                  <p className="text-[0.62rem] text-ink-400" title={hasRealData ? "دادهٔ واقعی از snapshot محلی است و موجودی یا تازه‌بودن آن در این صفحه دوباره تأیید نمی‌شود." : "این نتایج از دادهٔ نمونهٔ درون‌برنامه هستند."}>
+                  <p className="text-[0.62rem] text-ink-400" title="نرخ از snapshot محلی Safarmarket است؛ موجودی و قیمت نهایی در این صفحه دوباره تأیید نمی‌شود.">
                     {sourceLabel}
                   </p>
                 </div>
@@ -258,7 +256,7 @@ function EmptyState({ query, hasLocalSnapshot }: { query: { originCode: string; 
           ? hasLocalSnapshot
             ? "snapshot محلی برای این مسیر و تاریخ خوانده شد، اما در این جست‌وجو نرخ قابل نمایش پیدا نشد؛ ممکن است cabin یا اطلاعات ضروری ثبت‌شده با درخواست سازگار نباشد."
             : "برای این مسیر و تاریخ snapshot واقعی محلی در دسترس نیست. snapshotهای ذخیره‌شده در جست‌وجوی اصلی نمایش داده می‌شوند؛ روز دیگری را انتخاب کنید."
-          : "دادهٔ نمونه مسیرهای داخلی و منطقه‌ای را پوشش می‌دهد. روز دیگری را از نوار تاریخ بالا انتخاب کنید."}
+          : "در این نصب فقط snapshotهای ذخیره‌شدهٔ Safarmarket نمایش داده می‌شوند. برای تاریخ دیگری جست‌وجو کنید یا وضعیت snapshotهای موجود را ببینید."}
       </p>
       <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
         <Link

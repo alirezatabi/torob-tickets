@@ -31,7 +31,7 @@ async function main(): Promise<void> {
     console.log("\nبرای مسیر واقعی:");
     console.log('  1) CREATE DATABASE torob_tickets;');
     console.log('  2) $env:DATABASE_URL="postgresql://postgres:PASS@localhost:5432/torob_tickets?schema=public"');
-    console.log("  3) npm run db:generate; npm run db:push; npm run db:seed");
+    console.log("  3) npm run db:generate; npm run db:push (demo seeding is disabled)");
     return;
   }
 

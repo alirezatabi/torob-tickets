@@ -52,11 +52,16 @@ export async function runSearch(
   options: { now?: Date; providers?: typeof FLIGHT_PROVIDERS; includeCrawled?: boolean } = {},
 ): Promise<SearchOutcome> {
   const now = options.now ?? new Date();
+  // The shipped site is real-data-only. Demo adapters remain usable by isolated unit tests,
+  // but every non-test search is forced to the real-source filter regardless of URL params.
+  const effectiveQuery: TripQuery = process.env.NODE_ENV === "test"
+    ? query
+    : { ...query, filters: { ...query.filters, dataSource: "real" } };
   const allowCrawled = options.includeCrawled ?? process.env.NODE_ENV !== "test";
   const allProviders = (options.providers ?? FLIGHT_PROVIDERS).filter((provider) => provider.mode !== "crawled" || allowCrawled);
   const providers = allProviders.filter((provider) => {
-    if (query.filters.dataSource === "demo") return provider.mode === "demo";
-    if (query.filters.dataSource === "real") return provider.mode !== "demo";
+    if (effectiveQuery.filters.dataSource === "demo") return provider.mode === "demo";
+    if (effectiveQuery.filters.dataSource === "real") return provider.mode !== "demo";
     return true;
   });
   const startedAt = Date.now();
@@ -65,10 +70,8 @@ export async function runSearch(
     providers.map(async (adapter) => {
       const t0 = Date.now();
       try {
-        // `now` is passed down so demo pricing, freshness and capacity are reproducible
-        // (B15): the pipeline's clock is the only clock.
-        const records = await withTimeout(adapter.search(query, { now }), PROVIDER_TIMEOUT_MS, adapter.name);
-        const normalized = adapter.normalize(records, query);
+        const records = await withTimeout(adapter.search(effectiveQuery, { now }), PROVIDER_TIMEOUT_MS, adapter.name);
+        const normalized = adapter.normalize(records, effectiveQuery);
         return {
           adapter,
           offers: normalized.offers,
@@ -96,8 +99,7 @@ export async function runSearch(
   const rawCounts: Record<string, number> = {};
 
   for (const result of results) {
-    // No matching local snapshot is the normal state on a fresh checkout; keep the demo
-    // provider report unchanged until a real snapshot exists for this exact route/date.
+    // No matching local snapshot is a normal empty state; never fill it with sample offers.
     if (result.adapter.mode === "crawled" && result.rawCount === 0 && result.error === undefined) continue;
     offers.push(...result.offers);
     rawCounts[result.adapter.id] = result.rawCount;
@@ -119,12 +121,12 @@ export async function runSearch(
   // Keep only offers that really depart on the requested **local** day, and — when that day
   // is today — only those still on sale (a 14:00 departure cannot be sold at 16:00).
   const onDate = offers.filter(
-    (offer) => tripMatchesOfferDate(query, offer) && isWithinSalesWindow(offer, now),
+    (offer) => tripMatchesOfferDate(effectiveQuery, offer) && isWithinSalesWindow(offer, now),
   );
-  const ranked = rankOffers(onDate, query.filters);
+  const ranked = rankOffers(onDate, effectiveQuery.filters);
 
   return {
-    query,
+    query: effectiveQuery,
     offers: onDate,
     ranked,
     health,

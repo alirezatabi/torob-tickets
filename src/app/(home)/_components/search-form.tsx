@@ -260,7 +260,7 @@ export function SearchForm({ initialOrigin = "", initialDestination = "" }: { in
 
           <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
             <p className="text-[0.7rem] leading-5 text-ink-400">
-              قیمت‌ها نمونه‌اند، نه لحظه‌ای.
+              فقط snapshot محلی Safarmarket نمایش داده می‌شود؛ موجودی لحظه‌ای دوباره تأیید نمی‌شود.
             </p>
             <button type="button" onClick={submitForm} disabled={busy} className="btn-primary min-w-[11rem] text-sm">
               {pending ? <Loader2 className="size-4 animate-spin" /> : <ArrowLeft className="size-4" />}

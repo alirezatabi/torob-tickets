@@ -117,7 +117,7 @@ export async function getPriceHistory(query: HistoryQuery): Promise<HistoryResul
   try {
     const db = await getDb();
     rows = await db.priceObservation.findMany({
-      where: buildWhere(query, range),
+      where: buildHistoryWhere(query, range),
       orderBy: { observedAt: "asc" },
       take: 5_000,
     });
@@ -187,8 +187,10 @@ export async function getPriceHistory(query: HistoryQuery): Promise<HistoryResul
   };
 }
 
-function buildWhere(query: HistoryQuery, range: HistoryRange): Where {
-  const where: Where = {};
+export function buildHistoryWhere(query: HistoryQuery, range: HistoryRange): Where {
+  // Real crawler observations are written without a FlightSearch. Legacy demo-backed searches
+  // linked their observations to a search row; exclude them even before optional DB cleanup.
+  const where: Where = { searchId: null };
   if (query.offerKey) where.offerKey = query.offerKey;
   if (query.groupKey) where.groupKey = query.groupKey;
   if (query.originCity || query.destinationCity) {

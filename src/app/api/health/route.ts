@@ -1,59 +1,46 @@
 import { NextResponse } from "next/server";
 
 import { checkDatabase, dbMode } from "@/modules/db/prisma";
-import { describeDemoProviders, SEARCH_MODE } from "@/modules/catalog/demo-providers";
-import { CRAWL_SOURCES, CRAWLER_PARSER_STATUS } from "@/crawler/sources";
 import { getCrawlSnapshots } from "@/crawler/snapshot-provider";
+import { readCrawlWorkerStatus } from "@/crawler/worker-status";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-/**
- * GET /api/health — operational status, no secrets.
- *
- * Shows, honestly: that the only data source is the demo dataset, which demo providers
- * exist, and whether the database answers. Deliberately not a "green checkmark" —
- * `degraded` is a normal, expected state here.
- */
+/** GET /api/health — reports local Safarmarket snapshot and worker status, without secrets. */
 export async function GET() {
-  const db = await checkDatabase();
-  const providers = describeDemoProviders();
-  const crawlSnapshots = await getCrawlSnapshots(CRAWL_SOURCES.map((source) => source.id));
+  const [database, worker, snapshots] = await Promise.all([
+    checkDatabase(),
+    readCrawlWorkerStatus(),
+    getCrawlSnapshots(["safarmarket"]),
+  ]);
+  const snapshotSummaries = snapshots.map(({ source, fetchedAt, route, date, offers }) => ({
+    source,
+    fetchedAt,
+    route,
+    date,
+    rawOfferCount: offers.length,
+  }));
+  const status = database.ok && worker?.state === "running" ? "ok" : "degraded";
 
-  return NextResponse.json(
-    {
-      status: db.ok ? "ok" : "degraded",
-      mode: SEARCH_MODE,
-      dataSource: {
-        kind: "demo",
-        noteFa: "جستجوی فعلی از دادهٔ نمونه استفاده می‌کند؛ خزش شبکه‌ای در درخواست کاربر اجرا نمی‌شود.",
-      },
-      crawler: {
-        enabledForLocalJobs: process.env.CRAWLER_ENABLED === "1",
-        trigger: "local-cli-only",
-        snapshots: crawlSnapshots.map(({ source, fetchedAt, offers }) => ({ source, fetchedAt, count: offers.length })),
-        parserStatus: CRAWLER_PARSER_STATUS,
-      },
-      database: {
-        mode: dbMode(),
-        ok: db.ok,
-        message: db.message,
-      },
-      providers: providers.map((provider) => ({
-        id: provider.id,
-        name: provider.name,
-        sourceKind: provider.sourceKind,
-        canClaimAvailability: provider.canClaimAvailability,
-        missingFactsFa: provider.missingFactsFa,
-      })),
-      checks: {
-        databaseHint: db.ok
-          ? "تاریخچهٔ قیمت ثبت می‌شود."
-          : "برای ثبت تاریخچه، DATABASE_URL را تنظیم و `npm run db:push` را اجرا کنید.",
-        dataSourceHint: "این نسخه اتصالی به منبع بیرونی ندارد؛ همهٔ قیمت‌ها دادهٔ نمونه‌اند.",
-      },
-      time: new Date().toISOString(),
+  return NextResponse.json({
+    status,
+    dataSource: {
+      kind: "safarmarket-local-snapshot",
+      noteFa: "فقط snapshotهای واقعی ذخیره‌شده نمایش داده می‌شوند؛ این endpoint خودش crawl اجرا نمی‌کند.",
     },
-    { headers: { "cache-control": "no-store" } },
-  );
+    crawler: {
+      enabledForLocalJobs: process.env.CRAWLER_ENABLED === "1",
+      trigger: "separate-worker-process",
+      worker,
+      snapshots: snapshotSummaries,
+    },
+    database: { mode: dbMode(), ok: database.ok, message: database.message },
+    providers: [{ id: "safarmarket", name: "Safarmarket", mode: "crawled", snapshotCount: snapshotSummaries.length }],
+    checks: {
+      databaseHint: database.ok ? "تاریخچهٔ قیمت در PostgreSQL قابل ثبت است." : "برای تاریخچه DATABASE_URL و schema دیتابیس لازم است.",
+      dataSourceHint: "جست‌وجو فقط از snapshot واقعی محلی Safarmarket می‌خواند؛ نبود snapshot به دادهٔ ساختگی تبدیل نمی‌شود.",
+    },
+    time: new Date().toISOString(),
+  }, { headers: { "cache-control": "no-store" } });
 }

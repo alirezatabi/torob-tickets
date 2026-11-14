@@ -201,7 +201,7 @@ export default async function ComparePage({ searchParams }: ComparePageProps) {
               {rows.map(({ offer }) => (
                 <td key={offer.id} className="pt-3">
                   <span className="block w-full rounded-lg bg-ink-100 px-2 py-2 text-center text-[0.7rem] text-ink-500">
-                    دادهٔ نمونه · {offer.providerName}
+                    snapshot واقعی · {offer.providerName}
                   </span>
                 </td>
               ))}
@@ -237,7 +237,7 @@ export default async function ComparePage({ searchParams }: ComparePageProps) {
       </section>
 
       <p className="mt-6 text-[0.65rem] leading-5 text-ink-400">
-        «نامشخص» یعنی منبع آن را اعلام نکرده؛ حدس نمی‌زنیم. قیمت‌ها نمونه‌اند، نه لحظه‌ای.
+        «نامشخص» یعنی منبع آن را اعلام نکرده؛ حدس نمی‌زنیم. قیمت‌ها از snapshot محلی‌اند و موجودی لحظه‌ای را تضمین نمی‌کنند.
       </p>
     </div>
   );
