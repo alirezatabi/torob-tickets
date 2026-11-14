@@ -1,5 +1,6 @@
-import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
-import { dirname, join } from "node:path";
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
+import { atomicWriteFile } from "./atomic-file";
 import type { CrawlSnapshot } from "./types";
 
 export const CRAWL_DATA_DIR = join(process.cwd(), "data", "crawl");
@@ -103,8 +104,5 @@ async function readSnapshotFile(path: string): Promise<CrawlSnapshotFile | null>
 }
 
 async function atomicWrite(path: string, contents: string): Promise<void> {
-  await mkdir(dirname(path), { recursive: true });
-  const temp = `${path}.${process.pid}.tmp`;
-  await writeFile(temp, contents, { mode: 0o600 });
-  await rename(temp, path);
+  await atomicWriteFile(path, contents);
 }

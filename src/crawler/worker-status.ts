@@ -1,5 +1,6 @@
-import { readFile, rename, writeFile, mkdir } from "node:fs/promises";
-import { dirname, join } from "node:path";
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
+import { atomicWriteFile } from "./atomic-file";
 
 export interface CrawlWorkerStatus {
   state: "running" | "stopped" | "error";
@@ -23,8 +24,5 @@ export async function readCrawlWorkerStatus(): Promise<CrawlWorkerStatus | null>
 }
 
 export async function writeCrawlWorkerStatus(status: CrawlWorkerStatus): Promise<void> {
-  await mkdir(dirname(statusPath), { recursive: true });
-  const temp = `${statusPath}.${process.pid}.tmp`;
-  await writeFile(temp, `${JSON.stringify(status, null, 2)}\n`, { mode: 0o600 });
-  await rename(temp, statusPath);
+  await atomicWriteFile(statusPath, `${JSON.stringify(status, null, 2)}\n`);
 }
