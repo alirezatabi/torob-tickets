@@ -9,6 +9,7 @@ describe("continuous crawler configuration", () => {
   it("accepts unique directional domestic airport pairs and bounded schedule settings", () => {
     const config = loadWorkerConfig({
       CRAWLER_ROUTES: "thr-mhd,THR-SYZ,THR-MHD",
+      CRAWLER_SOURCES: "safarmarket,basisfly,safarmarket",
       CRAWLER_INTERVAL_MINUTES: "120",
       CRAWLER_HORIZON_DAYS: "3",
       CRAWLER_REQUEST_DELAY_MS: "12000",
@@ -17,6 +18,7 @@ describe("continuous crawler configuration", () => {
       { originCode: "THR", destinationCode: "MHD" },
       { originCode: "THR", destinationCode: "SYZ" },
     ]);
+    expect(config.sources).toEqual(["safarmarket", "basisfly"]);
     expect(config.intervalMs).toBe(2 * 60 * 60_000);
     expect(config.horizonDays).toBe(3);
     expect(config.requestDelayMs).toBe(12_000);
@@ -27,7 +29,9 @@ describe("continuous crawler configuration", () => {
     expect(() => loadWorkerConfig({ CRAWLER_ROUTES: "THR-MHD", CRAWLER_INTERVAL_MINUTES: "1" })).toThrow(/between 60 and 1440/);
     expect(() => loadWorkerConfig({ CRAWLER_ROUTES: "THR-MHD", CRAWLER_HORIZON_DAYS: "15" })).toThrow(/between 1 and 14/);
     expect(() => loadWorkerConfig({ CRAWLER_ROUTES: "THR-MHD", CRAWLER_REQUEST_DELAY_MS: "2000" })).toThrow(/between 3000 and 60000/);
+    expect(() => loadWorkerConfig({ CRAWLER_ROUTES: "THR-MHD", CRAWLER_SOURCES: "alibaba" })).toThrow(/CRAWLER_SOURCES accepts only/);
     const routeCodes = Array.from({ length: 40 }, (_, value) => String.fromCharCode(65 + Math.floor(value / 676), 65 + Math.floor(value / 26) % 26, 65 + value % 26));
     expect(() => loadWorkerConfig({ CRAWLER_ROUTES: routeCodes.map((code) => `THR-${code}`).join(",") })).toThrow(/per-cycle HTTP request ceiling/);
+    expect(() => loadWorkerConfig({ CRAWLER_ROUTES: routeCodes.slice(0, 20).map((code) => `THR-${code}`).join(","), CRAWLER_SOURCES: "safarmarket,basisfly" })).toThrow(/38 total source\/route\/date queries/);
   });
 });

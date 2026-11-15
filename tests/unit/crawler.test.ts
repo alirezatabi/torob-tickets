@@ -6,12 +6,13 @@ import { CrawlHttpClient } from "@/crawler/http";
 import { writeSnapshot, readSnapshot, readSnapshotsForSources } from "@/crawler/store";
 import { CRAWL_SOURCES } from "@/crawler/sources";
 import { safarmarketSource } from "@/crawler/sources/safarmarket";
+import { basisflySource } from "@/crawler/sources/basisfly";
 import { normalizeRawOffers } from "@/crawler/normalize";
 import { runSource } from "@/crawler/run";
 
 describe("crawl source placeholders", () => {
   it("keeps the four sources without real captures explicitly blocked", () => {
-    for (const source of CRAWL_SOURCES.filter((item) => item.id !== "safarmarket")) {
+    for (const source of CRAWL_SOURCES.filter((item) => item.id !== "safarmarket" && item.id !== "basisfly")) {
       expect(() => source.buildRequests({ originCode: "THR", destinationCode: "MHD", departDate: "2026-12-01", passengers: 1, cabin: "economy" })).toThrow("NOT_IMPLEMENTED: نیاز به fixture واقعی");
       expect(() => source.parseRaw("<html></html>", { route: "THR-MHD", date: "2026-12-01", url: source.origin })).toThrow("NOT_IMPLEMENTED: نیاز به fixture واقعی");
     }
@@ -38,6 +39,99 @@ describe("crawl source placeholders", () => {
       searchFilter: { sourceAirportCode: "THR", targetAirportCode: "MHD", sourceIsCity: true, targetIsCity: true, leaveDate: "2026-11-22", returnDate: "", adultCount: 1, childCount: 0, infantCount: 0, economy: true, business: true },
     });
     expect(request).not.toHaveProperty("headers");
+  });
+
+  it("parses Basisfly wrapped proposals conservatively, preserving source currency and unknown timezone", () => {
+    const body = JSON.stringify([{ sources: [{ data: [{
+      Locations: { "1211083": { Code: "MHD" }, "1203548": { Code: "THR" } },
+      FlightProposals: [
+        { FlightId: "opaque-a", PriceInfo: { Total: 119194000, Currency: "IRR" }, Provider: { Name: "Seller A" }, FlightGroup: [{
+          GroupId: "fare-1", RoutesInfo: [
+            { Origin: 1211083, Destination: 1203548, AirlineCode: "IR", FlightNumber: "IR452", DepartureDateTime: "2026-11-15T08:00:00+03:30", ArrivalDateTime: "2026-11-15T09:20:00+03:30" },
+          ], Baggages: [{ PassengerType: "ADT", Pieces: 1, Weight: 20, Unit: "KG" }], AvailableSeats: 4,
+        }] },
+        { FlightId: "opaque-b", PriceInfo: { Total: 120000000, Currency: "IRR" }, FlightGroup: [{
+          GroupId: "fare-2", RoutesInfo: [{ Origin: 1211083, Destination: 1203548, AirlineCode: "IR", FlightNumber: "IR452", DepartureTime: "2026-11-15 08:00", ArrivalTime: "2026-11-15 09:20" }],
+        }] },
+      ],
+    }] }] }]);
+    const offers = basisflySource.parseRaw(body, { route: "MHD-THR", date: "2026-11-15", url: basisflySource.origin });
+    expect(offers).toHaveLength(2);
+    expect(offers[0]).toMatchObject({ id: "opaque-a:fare-1", origin: "MHD", destination: "THR", departAt: "2026-11-15T04:30:00.000Z", arriveAt: "2026-11-15T05:50:00.000Z", airlineCode: "IR", flightNumber: "IR452", amount: 119194000, currency: "IRR", seats: 4, offerUrl: null });
+    expect(offers[0]?.sourceSegments).toHaveLength(1);
+    expect((offers[0]?.sourceSegments as Array<{ departureLocal: string }>)[0]?.departureLocal).toBe("2026-11-15T08:00:00+03:30");
+    expect(offers[1]?.departAt).toBeNull();
+    expect(offers[1]?.currency).toBe("IRR");
+    expect(basisflySource.parseRaw(body, { route: "IKA-THR", date: "2026-11-15", url: "" })).toEqual([]);
+  });
+
+  it("requires an operator-supplied Basisfly template and never includes a SessionId", () => {
+    vi.stubEnv("BASISFLY_REQUEST_TEMPLATE", "");
+    try {
+      const request = basisflySource.buildRequests({ originCode: "MHD", destinationCode: "THR", departDate: "2026-11-15", passengers: 1, cabin: "economy" })[0];
+      expect(request).toMatchObject({ url: "https://ota.basisfly.com/v2/api/flight/lazysearch", method: "POST", body: null });
+      expect(request?.blockedReason).toMatch(/BASISFLY_REQUEST_TEMPLATE/);
+      expect(JSON.stringify(request)).not.toMatch(/SessionId\s*[:=]/);
+    } finally { vi.unstubAllEnvs(); }
+  });
+
+  it("fails closed when the private Basisfly header value is not configured", () => {
+    vi.stubEnv("BASISFLY_REQUEST_TEMPLATE", JSON.stringify({
+      Origin: "{{ORIGIN_ID}}", Destination: "{{DESTINATION_ID}}", Date: "{{DATE}}", Pax: "{{PASSENGERS}}",
+    }));
+    vi.stubEnv("SECRET_TOROB", "");
+    try {
+      const request = basisflySource.buildRequests({ originCode: "MHD", destinationCode: "THR", departDate: "2026-11-15", passengers: 1, cabin: "economy" })[0];
+      expect(request?.body).toBeNull();
+      expect(request?.headers).toBeUndefined();
+      expect(request?.blockedReason).toMatch(/Set SECRET_TOROB/);
+    } finally { vi.unstubAllEnvs(); }
+  });
+
+  it("substitutes only explicit Basisfly route/date/passenger placeholders and rejects credential fields", () => {
+    vi.stubEnv("BASISFLY_REQUEST_TEMPLATE", JSON.stringify({
+      command: "lazysearch", dmnid: 9, lid: 2,
+      TripGroup: [{ Origin: "{{ORIGIN_ID}}", Destination: "{{DESTINATION_ID}}", Date: "{{DATE}}", Passengers: "{{PASSENGERS}}", Cabin: "{{CABIN}}" }],
+    }));
+    vi.stubEnv("SECRET_TOROB", "test-only-placeholder-secret");
+    try {
+      const request = basisflySource.buildRequests({ originCode: "MHD", destinationCode: "THR", departDate: "2026-11-15", passengers: 2, cabin: "economy" })[0];
+      expect(JSON.parse(request!.body!)).toEqual({
+        command: "lazysearch", dmnid: 9, lid: 2,
+        TripGroup: [{ Origin: 1211083, Destination: 1203548, Date: "2026-11-15", Passengers: 2, Cabin: "economy" }],
+      });
+      expect(request!.body).not.toContain("SessionId");
+    } finally { vi.unstubAllEnvs(); }
+
+    vi.stubEnv("BASISFLY_REQUEST_TEMPLATE", JSON.stringify({ command: "lazysearch", SessionId: "" }));
+    vi.stubEnv("SECRET_TOROB", "test-only-placeholder-secret");
+    try {
+      const blocked = basisflySource.buildRequests({ originCode: "MHD", destinationCode: "THR", departDate: "2026-11-15", passengers: 1, cabin: "economy" })[0];
+      expect(blocked?.body).toBeNull();
+      expect(blocked?.blockedReason).toMatch(/Remove credential-like field SessionId/);
+    } finally { vi.unstubAllEnvs(); }
+  });
+
+  it("sends SECRET_TOROB only on the Basisfly POST, never on robots.txt", async () => {
+    vi.stubEnv("BASISFLY_REQUEST_TEMPLATE", JSON.stringify({
+      Origin: "{{ORIGIN_ID}}", Destination: "{{DESTINATION_ID}}", Date: "{{DATE}}", Pax: "{{PASSENGERS}}",
+    }));
+    vi.stubEnv("SECRET_TOROB", "test-only-placeholder-secret");
+    try {
+      const calls: { url: string; init?: RequestInit }[] = [];
+      const fetcher = vi.fn(async (input: string | URL, init?: RequestInit) => {
+        calls.push({ url: String(input), init });
+        return String(input).endsWith("robots.txt") ? new Response("User-agent: *\nAllow: /") : new Response("[]");
+      });
+      const client = new CrawlHttpClient({ fetch: fetcher, sleep: async () => undefined });
+      const saveSnapshot = vi.fn(async () => "mock-basisfly-snapshot");
+      await runSource(basisflySource, { originCode: "MHD", destinationCode: "THR", departDate: "2026-11-15", passengers: 1, cabin: "economy" }, { client, enabled: true, saveSnapshot });
+      expect(calls).toHaveLength(2);
+      expect(new Headers(calls[0]?.init?.headers).get("SECRET_TOROB")).toBeNull();
+      expect(new Headers(calls[1]?.init?.headers).get("SECRET_TOROB")).toBe("test-only-placeholder-secret");
+      expect(JSON.stringify(calls[1]?.init?.body)).not.toContain("test-only-placeholder-secret");
+      expect(saveSnapshot).toHaveBeenCalledOnce();
+    } finally { vi.unstubAllEnvs(); }
   });
 
   it("runs the captured Safarmarket POST path against mocked robots and response fixtures", async () => {

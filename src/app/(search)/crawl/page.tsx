@@ -26,7 +26,7 @@ export default async function CrawlPage() {
     <section className="mt-5 rounded-xl border border-ink-200 bg-white p-4 text-sm">
       <h2 className="font-bold text-ink-900">Worker دوره‌ای</h2>
       <p className="mt-2 text-ink-600">{worker?.state === "running" ? "در حال اجرا" : "وضعیت زنده در دسترس نیست"}{worker?.heartbeatAt ? ` · آخرین heartbeat ${worker.heartbeatAt}` : ""}</p>
-      {worker?.lastCycleAt && <p className="mt-1 text-xs text-ink-500">آخرین چرخه: {worker.lastCycleAt} · {toPersianDigits(worker.lastCycle?.snapshotsWritten ?? 0)} snapshot ذخیره شد · {toPersianDigits(worker.lastCycle?.observationsWritten ?? 0)} نقطهٔ قیمت ثبت شد</p>}
+      {worker?.lastCycleAt && <p className="mt-1 text-xs text-ink-500">آخرین چرخه: {worker.lastCycleAt} · {toPersianDigits(worker.lastCycle?.routesAttempted ?? 0)} درخواست منبع · {toPersianDigits(worker.lastCycle?.snapshotsWritten ?? 0)} snapshot · {toPersianDigits(worker.lastCycle?.observationsWritten ?? 0)} نقطهٔ قیمت · {toPersianDigits(worker.lastCycle?.failures ?? 0)} خطا</p>}
       {worker?.lastError && <p className="mt-1 text-xs text-danger-600">آخرین خطا: {worker.lastError}</p>}
       {!worker && <p className="mt-1 text-xs leading-5 text-ink-500">برای راه‌اندازی دائم، دستورهای systemd در <code dir="ltr">deploy/torob-crawler.service</code> و راهنمای <code>docs/CRAWLER.md</code> را ببینید.</p>}
     </section>

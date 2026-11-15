@@ -1,4 +1,4 @@
-export const CRAWL_SOURCE_IDS = ["safarmarket", "flightio", "mrbilit", "alibaba", "flytoday"] as const;
+export const CRAWL_SOURCE_IDS = ["safarmarket", "basisfly", "flightio", "mrbilit", "alibaba", "flytoday"] as const;
 export type CrawlSourceId = (typeof CRAWL_SOURCE_IDS)[number];
 
 /** Untrusted source facts. Unknown fields stay null; normalization never guesses. */
@@ -30,6 +30,8 @@ export interface CrawlRequestSpec {
   method: "GET" | "POST";
   /** Exact source-observed payload. Null means the request is deliberately blocked. */
   body: string | null;
+  /** Per-request credentials/headers; never copied into snapshots or logs. */
+  headers?: Record<string, string>;
   blockedReason?: string;
 }
 

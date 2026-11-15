@@ -1,3 +1,4 @@
+import "dotenv/config";
 import { runSource } from "../src/crawler/run";
 import { CRAWL_SOURCES, getCrawlSource, isCrawlSourceId } from "../src/crawler/sources";
 

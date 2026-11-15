@@ -16,7 +16,7 @@ export async function runSource(source: CrawlSource, query: CrawlQuery, options:
     if (request.method === "POST" && request.body === null) throw new Error(`${source.id}: POST body is missing`);
     const response = request.method === "GET"
       ? await client.get(request.url)
-      : await client.postJson(request.url, request.body!);
+      : await client.postJson(request.url, request.body!, request.headers);
     raw.push(...source.parseRaw(await response.text(), {
       route: `${query.originCode}-${query.destinationCode}`,
       date: query.departDate,

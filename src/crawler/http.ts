@@ -50,13 +50,13 @@ export class CrawlHttpClient {
   }
 
   /** JSON POST without browser credentials; never follows redirects or retries a non-idempotent request. */
-  async postJson(url: string, body: string): Promise<Response> {
+  async postJson(url: string, body: string, headers: Record<string, string> = {}): Promise<Response> {
     const target = new URL(url);
     await this.assertAllowed(target);
     return this.request(target, {
       method: "POST",
       body,
-      headers: { accept: "application/json", "content-type": "application/json" },
+      headers: { accept: "application/json", "content-type": "application/json", ...headers },
     });
   }
 

@@ -6,7 +6,7 @@ export interface CrawlWorkerStatus {
   state: "running" | "stopped" | "error";
   heartbeatAt: string;
   lastCycleAt?: string;
-  lastCycle?: { routesAttempted: number; snapshotsWritten: number; observationsWritten: number };
+  lastCycle?: { routesAttempted: number; snapshotsWritten: number; observationsWritten: number; failures?: number; lastError?: string };
   lastError?: string;
 }
 
