@@ -1,0 +1,473 @@
+@import "tailwindcss";
+
+/* ————————————————————————————————————————————————
+   Design tokens — a travel product identity of its own:
+   deep Persian-ink neutrals, jade/teal for trust, saffron for price.
+   Every surface in the app is built from these few primitives so a
+   visual change here propagates everywhere.
+   ———————————————————————————————————————————————— */
+@theme {
+  --color-ink-950: #050b14;
+  --color-ink-900: #0b1424;
+  --color-ink-800: #141f33;
+  --color-ink-700: #22304a;
+  --color-ink-600: #3a4a67;
+  --color-ink-500: #5b6b86;
+  --color-ink-400: #8593ab;
+  --color-ink-300: #b4bfd0;
+  --color-ink-200: #dde4ee;
+  --color-ink-100: #eef2f8;
+  --color-ink-50: #f7f9fc;
+
+  --color-saffron-700: #92400e;
+  --color-saffron-600: #b45309;
+  --color-saffron-500: #d97706;
+  --color-saffron-400: #f59e0b;
+  --color-saffron-300: #fbbf24;
+  --color-saffron-100: #fef3c7;
+  --color-saffron-50: #fffbeb;
+
+  --color-teal-800: #0a4d47;
+  --color-teal-700: #0d6b60;
+  --color-teal-600: #0f8a78;
+  --color-teal-500: #14a894;
+  --color-teal-400: #35c6b2;
+  --color-teal-100: #d3f2ec;
+  --color-teal-50: #ecfaf7;
+
+  --color-berry-600: #b02a4a;
+  --color-berry-500: #d13a5e;
+  --color-berry-50: #fdf2f5;
+
+  --font-sans: "Vazirmatn Variable", "Vazirmatn", system-ui, sans-serif;
+
+  --radius-card: 1.25rem;
+  --radius-field: 0.8rem;
+
+  /* Two-layer shadows: a tight contact shadow plus a wide, low-opacity ambient one.
+     This reads as "lifted surface" instead of "bordered box with a blur". */
+  --shadow-soft: 0 1px 1px rgb(11 20 36 / 0.03), 0 1px 3px rgb(11 20 36 / 0.04), 0 12px 28px -18px rgb(11 20 36 / 0.22);
+  --shadow-lifted: 0 1px 2px rgb(11 20 36 / 0.04), 0 10px 24px -12px rgb(11 20 36 / 0.16), 0 28px 56px -32px rgb(11 20 36 / 0.28);
+  --shadow-float: 0 1px 1px rgb(11 20 36 / 0.04), 0 30px 60px -30px rgb(13 107 96 / 0.35);
+
+  --surface: #ffffff;
+  --surface-muted: color-mix(in oklab, var(--color-ink-50) 70%, #fff);
+}
+
+@layer base {
+  * {
+    border-color: var(--color-ink-200);
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+    font-feature-settings: "ss01";
+    scroll-behavior: smooth;
+  }
+
+  body {
+    background-color: var(--color-ink-50);
+    background-image: linear-gradient(180deg, #fff 0rem, var(--color-ink-50) 42rem);
+    color: var(--color-ink-900);
+    font-family: var(--font-sans);
+    font-synthesis-weight: none;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  ::selection {
+    background-color: var(--color-teal-100);
+    color: var(--color-teal-800);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-teal-500);
+    outline-offset: 2px;
+  }
+
+  h1,
+  h2,
+  h3 {
+    letter-spacing: -0.015em;
+    text-wrap: balance;
+  }
+
+  /* Numerals never break across lines and align in columns. */
+  .nums {
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+}
+
+@layer components {
+  /* ——— Surfaces ——— */
+  .card {
+    background-color: var(--surface);
+    border: 1px solid color-mix(in oklab, var(--color-ink-200) 70%, transparent);
+    border-radius: var(--radius-card);
+    box-shadow: var(--shadow-soft);
+  }
+
+  .card-hover {
+    transition: transform 240ms cubic-bezier(0.22, 1, 0.36, 1), box-shadow 240ms ease, border-color 240ms ease;
+  }
+
+  .card-hover:hover {
+    transform: translateY(-3px);
+    box-shadow: var(--shadow-lifted);
+    border-color: color-mix(in oklab, var(--color-teal-500) 28%, var(--color-ink-200));
+  }
+
+  /* Glass panel with a hairline top highlight — reads as glass, not as a grey overlay. */
+  .glass {
+    background-color: color-mix(in oklab, #fff 76%, transparent);
+    backdrop-filter: saturate(180%) blur(16px);
+    box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.6);
+  }
+
+  /* Sticky bars that sit over content need an edge that appears only when scrolled. */
+  .edge-fade {
+    box-shadow: 0 1px 0 color-mix(in oklab, var(--color-ink-200) 70%, transparent),
+      0 10px 30px -24px rgb(11 20 36 / 0.5);
+  }
+
+  /* ——— Fields ——— */
+  .field,
+  .input {
+    width: 100%;
+    border-radius: var(--radius-field);
+    border: 1px solid color-mix(in oklab, var(--color-ink-200) 90%, transparent);
+    background-color: #fff;
+    padding: 0.68rem 0.9rem;
+    font-size: 0.9rem;
+    color: var(--color-ink-900);
+    transition: border-color 160ms ease, box-shadow 160ms ease, background-color 160ms ease;
+    box-shadow: inset 0 1px 2px rgb(11 20 36 / 0.03);
+  }
+
+  .field::placeholder,
+  .input::placeholder {
+    color: var(--color-ink-400);
+  }
+
+  .field:hover,
+  .input:hover {
+    border-color: var(--color-ink-300);
+  }
+
+  .field:focus,
+  .input:focus {
+    outline: none;
+    border-color: var(--color-teal-500);
+    background-color: #fff;
+    box-shadow: 0 0 0 4px color-mix(in oklab, var(--color-teal-500) 14%, transparent);
+  }
+
+  .label {
+    display: block;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--color-ink-500);
+    margin-bottom: 0.4rem;
+  }
+
+  /* ——— Buttons ——— */
+  .btn-primary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    border-radius: var(--radius-field);
+    background-image: linear-gradient(180deg, var(--color-teal-600), var(--color-teal-700));
+    color: #fff;
+    font-weight: 700;
+    padding: 0.78rem 1.25rem;
+    transition: filter 160ms ease, transform 160ms ease, box-shadow 200ms ease;
+    box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.18), 0 8px 20px -12px rgb(13 107 96 / 0.7);
+  }
+
+  .btn-primary:hover {
+    filter: brightness(1.06);
+    box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.22), 0 12px 26px -12px rgb(13 107 96 / 0.8);
+  }
+
+  .btn-primary:active {
+    transform: translateY(1px) scale(0.995);
+  }
+
+  .btn-primary:disabled {
+    filter: grayscale(0.15) brightness(0.96);
+    opacity: 0.85;
+    cursor: progress;
+  }
+
+  .btn-ghost {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+    border-radius: 0.75rem;
+    border: 1px solid var(--color-ink-200);
+    background-color: #fff;
+    color: var(--color-ink-700);
+    font-size: 0.85rem;
+    font-weight: 600;
+    padding: 0.45rem 0.8rem;
+    transition: background-color 160ms ease, border-color 160ms ease, color 160ms ease;
+  }
+
+  .btn-ghost:hover {
+    background-color: var(--color-ink-50);
+    border-color: var(--color-teal-400);
+    color: var(--color-teal-700);
+  }
+
+  /* ——— Small pieces ——— */
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    border-radius: 999px;
+    border: 1px solid var(--color-ink-200);
+    background-color: #fff;
+    padding: 0.28rem 0.65rem;
+    font-size: 0.72rem;
+    font-weight: 500;
+    color: var(--color-ink-600);
+  }
+
+  .eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    color: var(--color-teal-700);
+  }
+
+  .skeleton {
+    background: linear-gradient(
+      90deg,
+      var(--color-ink-100) 25%,
+      var(--color-ink-50) 37%,
+      var(--color-ink-100) 63%
+    );
+    background-size: 400% 100%;
+    animation: shimmer 1.4s ease infinite;
+    border-radius: 0.7rem;
+  }
+
+  /* Decorative mesh used behind the hero — no stock imagery. */
+  .mesh {
+    background-image:
+      radial-gradient(38rem 24rem at 78% -8%, color-mix(in oklab, var(--color-teal-400) 26%, transparent), transparent 70%),
+      radial-gradient(30rem 20rem at 12% 0%, color-mix(in oklab, var(--color-saffron-300) 22%, transparent), transparent 72%),
+      radial-gradient(34rem 26rem at 50% 120%, color-mix(in oklab, var(--color-teal-600) 14%, transparent), transparent 70%);
+  }
+
+  /* ——— Modern primitives ——— */
+
+  /* Metric tile: big tabular number, quiet label. Used instead of prose summaries. */
+  .metric {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+  }
+
+  .metric-value {
+    font-size: 1.35rem;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    color: var(--color-ink-900);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .metric-label {
+    font-size: 0.68rem;
+    color: var(--color-ink-400);
+  }
+
+  /* Segmented control look for tabs / range switchers. */
+  .segmented {
+    display: inline-flex;
+    gap: 0.15rem;
+    padding: 0.2rem;
+    border-radius: 999px;
+    background-color: color-mix(in oklab, var(--color-ink-100) 80%, transparent);
+    border: 1px solid color-mix(in oklab, var(--color-ink-200) 70%, transparent);
+  }
+
+  /* Status dot with a soft halo — replaces icon+text status sentences. */
+  .dot {
+    display: inline-block;
+    inline-size: 0.4rem;
+    block-size: 0.4rem;
+    border-radius: 999px;
+    background-color: currentColor;
+    box-shadow: 0 0 0 3px color-mix(in oklab, currentColor 18%, transparent);
+  }
+
+  /* Zebra-free divider rhythm for dense lists. */
+  .divide-hairline > * + * {
+    border-top: 1px solid color-mix(in oklab, var(--color-ink-200) 60%, transparent);
+  }
+
+  .grid-lines {
+    background-image:
+      linear-gradient(to left, color-mix(in oklab, var(--color-ink-300) 55%, transparent) 1px, transparent 1px),
+      linear-gradient(to bottom, color-mix(in oklab, var(--color-ink-300) 40%, transparent) 1px, transparent 1px);
+    background-size: 46px 46px;
+    mask-image: radial-gradient(70% 60% at 50% 0%, #000 30%, transparent 100%);
+  }
+}
+
+/* Staggered entrance for lists: cards rise a few pixels into place, one after another.
+   The reduced-motion block at the bottom of this file collapses it to nothing. */
+@keyframes stagger-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0 50%;
+  }
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes float-plane {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-6px);
+  }
+}
+
+.animate-rise {
+  animation: rise 380ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.animate-float {
+  animation: float-plane 6s ease-in-out infinite;
+}
+
+.brand-gradient-text {
+  background-image: linear-gradient(105deg, var(--color-teal-600), var(--color-teal-500) 45%, var(--color-teal-800));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.stagger-item {
+  animation: stagger-in 0.42s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* The 3D globe is dragged by touch: never let the browser scroll the page during the gesture. */
+[data-globe="live"] svg {
+  touch-action: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+  }
+
+  html {
+    scroll-behavior: auto;
+  }
+}
+
+/* Reserve space for the compare tray so it never covers the last card. */
+body:has([data-compare-tray]) main {
+  padding-bottom: 5rem;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
+/* The homepage search sits over the dark hero, so keep its surface in that palette. */
+@layer utilities {
+  .home-search-panel {
+    background: linear-gradient(145deg, rgb(14 34 56 / 94%), rgb(7 20 36 / 96%));
+    border-color: rgb(125 211 252 / 20%);
+    box-shadow: 0 20px 54px -28px rgb(0 0 0 / 76%), inset 0 1px 0 rgb(226 242 255 / 7%);
+    color: #eef5ff;
+    backdrop-filter: blur(18px) saturate(135%);
+  }
+
+  .home-search-panel .segmented,
+  .home-trip-type {
+    background-color: rgb(2 12 24 / 55%);
+    border-color: rgb(148 186 216 / 22%);
+  }
+
+  .home-search-panel .label,
+  .home-search-panel .text-ink-400,
+  .home-search-panel .text-ink-500 {
+    color: #b4c4d8;
+  }
+
+  .home-search-panel .field,
+  .home-search-panel .input {
+    background-color: rgb(226 240 255 / 7%);
+    border-color: rgb(148 186 216 / 27%);
+    color: #f3f8ff;
+    box-shadow: inset 0 1px 0 rgb(255 255 255 / 3%);
+  }
+
+  .home-search-panel .field::placeholder,
+  .home-search-panel .input::placeholder {
+    color: #91a9c5;
+  }
+
+  .home-search-panel .field:hover,
+  .home-search-panel .input:hover {
+    border-color: rgb(125 211 252 / 55%);
+  }
+
+  .home-search-panel .field:focus,
+  .home-search-panel .input:focus {
+    background-color: rgb(226 240 255 / 10%);
+    border-color: #49a9f1;
+    box-shadow: 0 0 0 4px rgb(73 169 241 / 18%);
+  }
+
+  .home-search-panel select option {
+    background-color: #0e2238;
+    color: #eef5ff;
+  }
+}

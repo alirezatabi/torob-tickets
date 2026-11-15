@@ -1,0 +1,21 @@
+[Unit]
+Description=Torob Tickets Safarmarket crawler worker
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=torob
+Group=torob
+WorkingDirectory=/opt/torob-tickets
+EnvironmentFile=/etc/torob-tickets/crawler.env
+ExecStart=/usr/bin/npm run crawl:worker
+Restart=on-failure
+RestartSec=30
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ReadWritePaths=/opt/torob-tickets/data/crawl
+
+[Install]
+WantedBy=multi-user.target
