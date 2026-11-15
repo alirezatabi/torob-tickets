@@ -29,6 +29,8 @@ export const LIVE_AIRLINES: LiveAirline[] = [
   { code: "B9", fa: "ایران ایرتور", en: "Iran Airtour" },
   { code: "I3", fa: "آتا ایر", en: "ATA Airlines" },
   { code: "NV", fa: "کارون", en: "Karun Airlines" },
+  // Saha's confirmed three-letter designator is ICAO IRZ; NV belongs to Karun.
+  { code: "IRZ", fa: "ساها", en: "Saha Airlines" },
   { code: "IS", fa: "سپهران", en: "Sepahan Airlines" },
   { code: "QB", fa: "قشم ایر", en: "Qeshm Air" },
   { code: "ATS", fa: "اطلس ایر", en: "Atlas Air" },
@@ -40,6 +42,7 @@ export const LIVE_AIRLINES: LiveAirline[] = [
   { code: "VR", fa: "وارش", en: "Varesh Airlines" },
   { code: "AXV", fa: "آوا", en: "Ava Airlines" },
   { code: "CPN", fa: "کاسپین", en: "Caspian Airlines" },
+  { code: "IV", fa: "کاسپین", en: "Caspian Airlines" }, // IATA; CPN is the source/internal code
   // A7 is printed next to "آسا جت" on the live search page.
   { code: "A7", fa: "آسا جت", en: "Asa Jet" },
   { code: "IRX", fa: "ایران ایرتور (نماد جایگزین)", en: "Iran Airtour (alt)" },
@@ -98,7 +101,7 @@ const FA_TO_CODE: Record<string, string> = {
   "ایران تور": "B9",
   آتا: "I3",
   "آتا ایر": "I3",
-  ساها: "NV",
+  ساها: "IRZ",
   کارون: "NV",
   سپهران: "IS",
   قشم: "QB",

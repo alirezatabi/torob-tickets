@@ -14,7 +14,7 @@ const TYPES = { svg: "image/svg+xml", png: "image/png" } as const;
  * GET /airline-logos/<CODE>.<svg|png> — one bundled carrier logo, served from the repo.
  *
  * The airlines' marks live in the source tree (not on a CDN) so the app renders identities
- * with no network at all. Only the 23 codes in `AIRLINE_LOGO_ASSETS` are reachable: the
+ * with no network at all. Only codes declared in `AIRLINE_LOGO_ASSETS` are reachable: the
  * code is looked up in that table first, so no request can name an arbitrary file.
  *
  * Immutable for a year — a logo changes only when we ship a new build.

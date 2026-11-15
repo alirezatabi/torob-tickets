@@ -6,9 +6,12 @@ import { describe, expect, it } from "vitest";
 import { AIRLINES, getAirline } from "@/lib/airlines";
 import { GET as serveAirlineLogo } from "@/app/airline-logos/[file]/route";
 import { AIRLINE_LOGO_ASSETS, airlineLogoPath } from "@/lib/airlines/logos";
+import { LIVE_AIRLINES, resolveAirlineCode } from "@/modules/airlines/registry";
 
 const LOGO_DIR = path.join(process.cwd(), "src", "lib", "airlines", "logos");
 const readme = readFileSync(path.join(process.cwd(), "README.md"), "utf8");
+const report = readFileSync(path.join(process.cwd(), "docs", "REPORT-02.md"), "utf8");
+const logoSources = readFileSync(path.join(process.cwd(), "docs", "airline-logo-sources-fa.md"), "utf8");
 
 describe("authentic airline logos", () => {
   it("bundles an authentic logo file for every catalogued airline", () => {
@@ -38,8 +41,8 @@ describe("authentic airline logos", () => {
     expect(airlineLogoPath("ir")).toBe("/airline-logos/IR.svg");
   });
 
-  it("serves both newly added original marks, including Mehr's three-letter ICAO code", async () => {
-    for (const file of ["IJ.png", "MEH.png"]) {
+  it("serves the newly bundled Iranian marks, including three-letter codes", async () => {
+    for (const file of ["IJ.png", "MEH.png", "FP.png", "AXV.png", "A7.png", "NSN.png", "IRZ.png", "CPN.png", "NV.png", "I3.png", "DZD.png"]) {
       const response = await serveAirlineLogo(new Request(`http://localhost/airline-logos/${file}`), {
         params: Promise.resolve({ file }),
       });
@@ -53,7 +56,9 @@ describe("authentic airline logos", () => {
       .filter(([, asset]) => asset.format === "png")
       .map(([code]) => code)
       .sort();
-    expect(raster).toEqual(["HY", "IA", "IJ", "MEH", "XQ", "ZV"]);
+    expect(raster).toEqual([
+      "A7", "AXV", "CPN", "DZD", "FP", "HY", "I3", "IA", "IJ", "IRZ", "MEH", "NSN", "NV", "XQ", "ZV",
+    ]);
   });
 
   it("ships self-contained SVGs with no scripts or remote references", () => {
@@ -68,7 +73,32 @@ describe("authentic airline logos", () => {
     }
   });
 
-  it("does not invent or draw a logo for an unknown airline", () => {
+  it("resolves the requested Iranian carriers without confusing IATA and ICAO aliases", () => {
+    const requested = [
+      ["FP", "FlyPersia"], ["AXV", "Ava Airlines"], ["ATS", "Atlas Air"], ["A7", "Asa Jet"],
+      ["VR", "Varesh Airlines"], ["NSN", "Nasim Air"], ["IRZ", "Saha Airlines"],
+      ["CPN", "Caspian Airlines"], ["IS", "Sepahan Airlines"], ["I3", "ATA Airlines"],
+      ["NV", "Karun Airlines"], ["DZD", "Yazd Air"], ["TKN", "Fly Kish"],
+    ];
+    for (const [code, name] of requested) {
+      expect(LIVE_AIRLINES.some((airline) => airline.code === code && airline.en === name), `${code} ${name}`).toBe(true);
+    }
+
+    expect(resolveAirlineCode({ nameFa: "ساها" })).toEqual({ code: "IRZ", nameFa: "ساها" });
+    expect(resolveAirlineCode({ nameFa: "کارون" })).toEqual({ code: "NV", nameFa: "کارون" });
+    expect(resolveAirlineCode({ logoUrl: "https://example.test/logos/IV.png" })).toEqual({ code: "IV", nameFa: "کاسپین" });
+    expect(airlineLogoPath("IV")).toBe("/airline-logos/CPN.png");
+    expect(airlineLogoPath("UZ")).toBe("/airline-logos/DZD.png");
+    expect(airlineLogoPath("unknown", "هواپیمایی آوا")).toBe("/airline-logos/AXV.png");
+    expect(airlineLogoPath("unknown", "فلای پرشیا")).toBe("/airline-logos/FP.png");
+    expect(airlineLogoPath("unknown", "Qatar Airways")).toBeNull();
+  });
+
+  it("uses the neutral fallback when a requested carrier has no sufficiently verified asset", () => {
+    expect(airlineLogoPath("ATS")).toBeNull();
+    expect(airlineLogoPath("VR")).toBeNull();
+    expect(airlineLogoPath("IS")).toBeNull();
+    expect(airlineLogoPath("TKN")).toBeNull();
     expect(airlineLogoPath("ZZ")).toBeNull();
   });
 
@@ -76,6 +106,8 @@ describe("authentic airline logos", () => {
     expect(readme).toContain("۲۵ ایرلاین");
     expect(readme).toContain("معراج");
     expect(readme).toContain("مهر");
-    expect(Object.keys(AIRLINE_LOGO_ASSETS).length).toBe(AIRLINES.length);
+    expect(Object.keys(AIRLINE_LOGO_ASSETS).length).toBeGreaterThan(AIRLINES.length);
+    expect(report).toContain("۱۸. لوگوهای درخواست‌شدهٔ ایرلاین‌های ایرانی");
+    expect(logoSources).toContain("Airhex");
   });
 });
