@@ -6,7 +6,28 @@ import {
   cleanup,
 } from "@testing-library/react";
 import { createElement } from "react";
-import { afterEach } from "vitest";
+import { afterEach, vi } from "vitest";
+import type * as SearchService from "@/server/search-service";
+
+// This suite tests the detail-page renderer, not the live-data boundary. Its deliberately
+// test-only demo offers are injected behind a mocked service; production searchTrips is tested
+// separately to enforce the real-snapshot-only rule.
+vi.mock("@/server/search-service", async (importOriginal) => {
+  const actual = await importOriginal<typeof SearchService>();
+  const { runSearch: runDemoSearch } = await import("@/providers/search");
+  return {
+    ...actual,
+    searchTrips: async (
+      query: Parameters<typeof actual.searchTrips>[0],
+      sort: Parameters<typeof actual.searchTrips>[1],
+      options?: Parameters<typeof actual.searchTrips>[2],
+    ) => {
+      const testQuery = { ...query, filters: { ...query.filters, dataSource: "demo" as const } };
+      const outcome = await runDemoSearch(testQuery, options?.now ? { now: options.now } : {});
+      return actual.viewFromOutcome(outcome, testQuery, sort);
+    },
+  };
+});
 
 import { createQuery } from "@/domain/trip";
 import { groupOffers } from "@/dedupe/group";

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { DEFAULT_SORT, parseSearchParams, SORT_KEYS } from "@/lib/search-params";
 import type { SortKey } from "@/ranking/score";
 import { searchTrips } from "@/server/search-service";
+import { clientKey, rateLimit, SEARCH_RATE_LIMIT } from "@/modules/api/rate-limit";
 
 export const runtime = "nodejs";
 
@@ -13,6 +14,14 @@ export const runtime = "nodejs";
  * strip show, because all three call `selectCheapestOffer`.
  */
 export async function GET(request: Request) {
+  const budget = rateLimit(`search:${clientKey(request)}`, SEARCH_RATE_LIMIT);
+  if (!budget.ok) {
+    return NextResponse.json(
+      { error: "تعداد جست‌وجوها زیاد است؛ کمی بعد دوباره تلاش کنید." },
+      { status: 429, headers: { "retry-after": String(budget.retryAfterSeconds), "cache-control": "no-store" } },
+    );
+  }
+
   const url = new URL(request.url);
   const raw = Object.fromEntries(url.searchParams.entries());
   const parsed = parseSearchParams(raw);
@@ -71,7 +80,8 @@ export async function GET(request: Request) {
         weights: view.results.ranked.weights,
       },
       meta: {
-        demoData: true,
+        demoData: false,
+        dataSource: "local-snapshot",
         fetchedAt: outcome.fetchedAt,
         totalMs: outcome.totalMs,
         passengers: parsed.query.passengers,

@@ -83,13 +83,12 @@ async function createClient(): Promise<RuntimeClient> {
   let PrismaClient: new (options: { adapter: unknown; log?: string[] }) => RuntimeClient;
   let PrismaPg: new (options: { connectionString: string }) => unknown;
   try {
-    // Both live in the ESM graph but only after `npm run db:generate`, so they are
-    // loaded through non-literal specifiers: webpack leaves these as runtime imports
-    // instead of failing the build when the generated folder does not exist yet
-    // (that keeps the zero-config demo buildable and self-contained).
-    const load = new Function("specifier", "return import(specifier)") as (
-      specifier: string,
-    ) => Promise<Record<string, unknown>>;
+    // The generated client is created after install and is absent from a clean checkout.
+    // Keep this a native runtime import (not eval/new Function) so Next does not try to
+    // resolve a generated path during a database-free build. The file-URL fallback below
+    // handles plain Node/tsx callers where the `@/` alias is not defined.
+    const load = (specifier: string): Promise<Record<string, unknown>> =>
+      import(/* webpackIgnore: true */ specifier) as Promise<Record<string, unknown>>;
     const generated = await loadGeneratedClient(load);
     const adapterPkg = await load("@prisma/adapter-pg");
     PrismaClient = generated.PrismaClient as typeof PrismaClient;

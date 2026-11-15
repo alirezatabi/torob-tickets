@@ -10,7 +10,6 @@ import { explainTradeoff, refundLabel, baggageLabel } from "@/ranking/explain";
 import type { FlightOffer, OfferGroup } from "@/domain/flight";
 import type { ScoredOffer } from "@/ranking/score";
 import { parseSelectionParam } from "@/lib/selection-param";
-import { DemoBadge } from "@/components/ui/demo-badge";
 import { cn } from "@/lib/cn";
 
 export const metadata: Metadata = {
@@ -97,7 +96,6 @@ export default async function ComparePage({ searchParams }: ComparePageProps) {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <DemoBadge />
           <Link
             href={`/search?origin=${query.originCode}&destination=${query.destinationCode}&date=${query.departDate}`}
             className="btn-ghost text-xs"

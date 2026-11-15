@@ -3,12 +3,17 @@ import { NextResponse } from "next/server";
 import { checkDatabase, dbMode } from "@/modules/db/prisma";
 import { getCrawlSnapshots } from "@/crawler/snapshot-provider";
 import { readCrawlWorkerStatus } from "@/crawler/worker-status";
+import { clientKey, HEALTH_RATE_LIMIT, rateLimit } from "@/modules/api/rate-limit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 /** GET /api/health — reports local Safarmarket snapshot and worker status, without secrets. */
-export async function GET() {
+export async function GET(request: Request) {
+  const budget = rateLimit(`health:${clientKey(request)}`, HEALTH_RATE_LIMIT);
+  if (!budget.ok) {
+    return NextResponse.json({ error: "تعداد درخواست‌ها زیاد است؛ کمی بعد دوباره تلاش کنید." }, { status: 429, headers: { "retry-after": String(budget.retryAfterSeconds), "cache-control": "no-store" } });
+  }
   const [database, worker, snapshots] = await Promise.all([
     checkDatabase(),
     readCrawlWorkerStatus(),

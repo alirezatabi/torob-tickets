@@ -1,23 +1,13 @@
-/**
- * A tiny fixed-window rate limiter for the LLM-backed routes (B23).
- *
- * Why it exists: `/api/intent` and `/api/explain` can spend money (one model call each).
- * Without any limit, a loop of curl requests is an open tap. The limiter is deliberately
- * in-process — the project is a modular monolith and the constraint list forbids Redis —
- * and it is honest about what that means: on a multi-instance/serverless deployment each
- * instance keeps its own window (documented in the README, see B21).
- */
+import { isIP } from "node:net";
 
+/** In-process fixed-window limiter. In multi-instance deployments each process has its own budget. */
 export interface RateLimitOptions {
-  /** Window length in milliseconds. */
   windowMs: number;
-  /** How many requests one client may make per window. */
   limit: number;
 }
 
 export interface RateLimitResult {
   ok: boolean;
-  /** Seconds until the current window resets (0 when allowed). */
   retryAfterSeconds: number;
   remaining: number;
 }
@@ -27,29 +17,58 @@ interface Window {
   resetAt: number;
 }
 
+export const RATE_LIMIT_BUCKET_CAP = 10_000;
+const CLEANUP_EVERY = 64;
+const MAX_KEY_LENGTH = 256;
 const buckets = new Map<string, Window>();
+let callsSinceCleanup = 0;
 
 /** Test hook: forget every window (never called from application code). */
 export function resetRateLimits(): void {
   buckets.clear();
+  callsSinceCleanup = 0;
+}
+
+/** Test hook for asserting the memory cap. */
+export function rateLimitBucketCount(): number {
+  return buckets.size;
 }
 
 /**
- * Identify the caller. Behind a proxy the first `x-forwarded-for` hop is the client; without
- * one we fall back to a single shared bucket, which is the conservative choice.
+ * Do not trust forwarding headers from arbitrary clients. Set TRUST_PROXY=1 only when a
+ * controlled reverse proxy overwrites X-Real-IP or appends its client address to X-Forwarded-For.
+ * Without that deployment opt-in, all direct requests share one conservative bucket.
  */
 export function clientKey(request: Request): string {
-  const forwarded = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim();
-  if (forwarded) return forwarded;
-  return request.headers.get("x-real-ip")?.trim() || "anonymous";
+  if (process.env.TRUST_PROXY !== "1") return "anonymous";
+
+  const realIp = request.headers.get("x-real-ip")?.trim();
+  if (realIp && isIP(realIp)) return realIp;
+
+  const forwarded = request.headers.get("x-forwarded-for") ?? "";
+  const trustedLastHop = forwarded.split(",").map((part) => part.trim()).filter((part) => isIP(part)).at(-1);
+  return trustedLastHop ?? "anonymous";
 }
 
 export function rateLimit(key: string, options: RateLimitOptions, now: Date = new Date()): RateLimitResult {
   const current = now.getTime();
-  const existing = buckets.get(key);
+  const safeKey = key.slice(0, MAX_KEY_LENGTH) || "anonymous";
+  callsSinceCleanup += 1;
+  if (callsSinceCleanup >= CLEANUP_EVERY) {
+    pruneExpired(current);
+    callsSinceCleanup = 0;
+  }
 
+  const existing = buckets.get(safeKey);
   if (!existing || existing.resetAt <= current) {
-    buckets.set(key, { count: 1, resetAt: current + options.windowMs });
+    if (buckets.size >= RATE_LIMIT_BUCKET_CAP) {
+      pruneExpired(current);
+      if (buckets.size >= RATE_LIMIT_BUCKET_CAP) {
+        const oldest = buckets.keys().next().value as string | undefined;
+        if (oldest) buckets.delete(oldest);
+      }
+    }
+    buckets.set(safeKey, { count: 1, resetAt: current + options.windowMs });
     return { ok: true, retryAfterSeconds: 0, remaining: options.limit - 1 };
   }
 
@@ -65,6 +84,15 @@ export function rateLimit(key: string, options: RateLimitOptions, now: Date = ne
   return { ok: true, retryAfterSeconds: 0, remaining: options.limit - existing.count };
 }
 
-/** The two LLM-backed endpoints share these budgets. */
+function pruneExpired(now: number): void {
+  for (const [key, window] of buckets) {
+    if (window.resetAt <= now) buckets.delete(key);
+  }
+}
+
 export const INTENT_RATE_LIMIT: RateLimitOptions = { windowMs: 60_000, limit: 20 };
 export const EXPLAIN_RATE_LIMIT: RateLimitOptions = { windowMs: 60_000, limit: 30 };
+export const SEARCH_RATE_LIMIT: RateLimitOptions = { windowMs: 60_000, limit: 60 };
+export const CRAWL_STATUS_RATE_LIMIT: RateLimitOptions = { windowMs: 60_000, limit: 60 };
+export const HEALTH_RATE_LIMIT: RateLimitOptions = { windowMs: 60_000, limit: 120 };
+export const HISTORY_RATE_LIMIT: RateLimitOptions = { windowMs: 60_000, limit: 60 };

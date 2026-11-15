@@ -5,16 +5,11 @@ import { getCity } from "@/lib/cities";
 import { getDayPrices } from "@/server/day-prices";
 
 /**
- * “پرفروش‌ترین مسیرهای امروز” — the homepage's honest best-seller list.
+ * “ارزان‌ترین نرخ‌های مسیرهای منتخب” — a snapshot-backed fare list, not a sales counter.
  *
- * Why it is not a popularity counter: this demo has no sales, so a “sold 1,240 tickets” badge
- * would be a lie. What it *can* say truthfully is which of the demo's routes offer the cheapest
- * fare today, because that number comes from the same `selectCheapestOffer` the results page
- * uses. So every card is **a price**, not a sales figure, and the section says so.
- *
- * Sorting is “cheapest fare of the route” — the ranking a traveller can act on now. A route with
- * no flight, or with nothing purchasable, is dropped rather than shown with a fake price: an
- * empty card on the homepage is worse than one fewer card.
+ * Every displayed price is derived from a local provider snapshot through the same pricing rule
+ * as the results page. A route without a matching real snapshot is omitted, never filled with a
+ * timetable value or an estimate.
  */
 
 export interface PopularRoute {

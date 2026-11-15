@@ -29,8 +29,12 @@ export async function searchTrips(
   sort: SortKey,
   options: { now?: Date } = {},
 ): Promise<SearchResultView> {
-  const outcome = await runSearch(query, options.now ? { now: options.now } : {});
-  return viewFromOutcome(outcome, query, sort);
+  // Every site/API entry point goes through this façade: URL filters cannot opt the product
+  // back into the in-memory demo adapters, even in test builds. Unit tests that need demo
+  // providers exercise runSearch directly instead.
+  const realQuery: TripQuery = { ...query, filters: { ...query.filters, dataSource: "real" } };
+  const outcome = await runSearch(realQuery, options.now ? { now: options.now } : {});
+  return viewFromOutcome(outcome, realQuery, sort);
 }
 
 /** Same view from an already-fetched outcome (the live pipeline reuses this). */

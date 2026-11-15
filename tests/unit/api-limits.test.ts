@@ -1,5 +1,5 @@
 import { describe, expect, it, beforeEach } from "vitest";
-import { clientKey, rateLimit, resetRateLimits } from "@/modules/api/rate-limit";
+import { clientKey, rateLimit, rateLimitBucketCount, resetRateLimits } from "@/modules/api/rate-limit";
 import { POST as intentPost } from "@/app/api/intent/route";
 
 /**
@@ -35,9 +35,27 @@ describe("rate limiter", () => {
     expect(rateLimit("k", options, new Date(start.getTime() + 1_001)).ok).toBe(true);
   });
 
-  it("keys on the forwarded client address", () => {
-    expect(clientKey(request({}, { "x-forwarded-for": "9.9.9.9, 10.0.0.1" }))).toBe("9.9.9.9");
-    expect(clientKey(request({}))).toBe("anonymous");
+  it("keeps its in-memory bucket count bounded under unique keys", () => {
+    const now = new Date("2026-11-20T10:00:00Z");
+    const options = { windowMs: 60_000, limit: 1 };
+    for (let index = 0; index < 10_250; index++) {
+      rateLimit(`client-${index}`, options, now);
+    }
+    expect(rateLimitBucketCount()).toBeLessThanOrEqual(10_000);
+  });
+
+  it("uses forwarded client addresses only when a trusted proxy is explicitly enabled", () => {
+    const previous = process.env.TRUST_PROXY;
+    try {
+      process.env.TRUST_PROXY = "0";
+      expect(clientKey(request({}, { "x-forwarded-for": "9.9.9.9, 10.0.0.1" }))).toBe("anonymous");
+      process.env.TRUST_PROXY = "1";
+      expect(clientKey(request({}, { "x-forwarded-for": "9.9.9.9, 10.0.0.1" }))).toBe("10.0.0.1");
+      expect(clientKey(request({}))).toBe("anonymous");
+    } finally {
+      if (previous === undefined) delete process.env.TRUST_PROXY;
+      else process.env.TRUST_PROXY = previous;
+    }
   });
 });
 

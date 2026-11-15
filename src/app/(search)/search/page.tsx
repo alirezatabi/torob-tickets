@@ -40,8 +40,9 @@ export async function generateMetadata({ searchParams }: SearchPageProps): Promi
 
 export default async function SearchPage({ searchParams }: SearchPageProps) {
   const raw = flatten(await searchParams);
-  // Origin + destination is all the product needs: no date means "today in Tehran" (B1).
-  const parsed = parseSearchParams(raw);
+  const now = new Date();
+  // Share one clock across date validation, search, and the date strip to avoid midnight drift.
+  const parsed = parseSearchParams(raw, { now });
 
   if (!parsed.ok) {
     return <SearchProblem reason={parsed.reason} missing={parsed.missing} invalidDate={parsed.invalid === "date"} />;
@@ -54,7 +55,7 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
       ? (raw.sort as SortKeyParam)
       : DEFAULT_SORT;
   const query = parsed.query;
-  const view = await searchTrips(query, sortParam);
+  const view = await searchTrips(query, sortParam, { now });
   const { outcome, flights } = view;
 
   // Audit trail (B22). It is awaited — a floating promise can be cancelled the moment the
@@ -79,7 +80,7 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
   const hasResults = flights.length > 0;
   // The strip's position travels in `?strip=`, so tapping a chip does not re-anchor the strip
   // (`resolveStripStart` rejects a start that would hide the selected day or point into the past).
-  const today = isoToday();
+  const today = isoToday(now);
   const stripStart = resolveStripStart(
     typeof raw.strip === "string" ? raw.strip : null,
     query.departDate,
@@ -98,6 +99,7 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
             selectedDate={query.departDate}
             stripStart={stripStart}
             today={today}
+            now={now}
           />
         </Suspense>
       </div>
@@ -161,14 +163,16 @@ async function DateStripSection({
   selectedDate,
   stripStart,
   today,
+  now,
 }: {
   query: Parameters<typeof getDayPrices>[0];
   sort: SortKeyParam;
   selectedDate: string;
   stripStart: string;
   today: string;
+  now: Date;
 }) {
-  const prices = await getDayPrices(query, { from: stripStart, days: DATE_STRIP_DAYS });
+  const prices = await getDayPrices(query, { from: stripStart, days: DATE_STRIP_DAYS, now });
   const sortParam = sort === DEFAULT_SORT ? null : sort;
   // Every chip keeps the window where it is; only the day changes.
   const href = (date: string, strip: string = stripStart) =>
@@ -244,7 +248,7 @@ function SearchProblem({ reason, missing, invalidDate }: { reason: string; missi
   );
 }
 
-function EmptyState({ query, hasLocalSnapshot }: { query: { originCode: string; destinationCode: string; departDate: string; filters: { dataSource: "all" | "demo" | "real" } }; hasLocalSnapshot: boolean }) {
+function EmptyState({ query, hasLocalSnapshot }: { query: { originCode: string; destinationCode: string; departDate: string }; hasLocalSnapshot: boolean }) {
   return (
     <div className="card p-10 text-center">
       <span className="mx-auto grid size-11 place-items-center rounded-full bg-ink-100 text-ink-500">
@@ -252,11 +256,9 @@ function EmptyState({ query, hasLocalSnapshot }: { query: { originCode: string; 
       </span>
       <h2 className="mt-4 text-base font-bold">برای این مسیر و تاریخ پروازی پیدا نشد</h2>
       <p className="mx-auto mt-2 max-w-sm text-sm leading-6 text-ink-500">
-        {query.filters.dataSource === "real"
-          ? hasLocalSnapshot
-            ? "snapshot محلی برای این مسیر و تاریخ خوانده شد، اما در این جست‌وجو نرخ قابل نمایش پیدا نشد؛ ممکن است cabin یا اطلاعات ضروری ثبت‌شده با درخواست سازگار نباشد."
-            : "برای این مسیر و تاریخ snapshot واقعی محلی در دسترس نیست. snapshotهای ذخیره‌شده در جست‌وجوی اصلی نمایش داده می‌شوند؛ روز دیگری را انتخاب کنید."
-          : "در این نصب فقط snapshotهای ذخیره‌شدهٔ Safarmarket نمایش داده می‌شوند. برای تاریخ دیگری جست‌وجو کنید یا وضعیت snapshotهای موجود را ببینید."}
+        {hasLocalSnapshot
+          ? "snapshot واقعی Safarmarket برای این مسیر و تاریخ خوانده شد، اما نرخ قابل‌نمایش پیدا نشد؛ ممکن است cabin یا اطلاعات ضروری ثبت‌شده با درخواست سازگار نباشد."
+          : "برای این مسیر و تاریخ snapshot واقعی Safarmarket در این نصب موجود نیست. در نتیجهٔ زنده حدس یا نرخ نمونه نشان نمی‌دهیم."}
       </p>
       <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
         <Link
@@ -265,7 +267,10 @@ function EmptyState({ query, hasLocalSnapshot }: { query: { originCode: string; 
         >
           روز بعد
         </Link>
-        <Link href="/" className="btn-primary text-sm">
+        <Link href="/crawl" className="btn-primary text-sm">
+          دیدن snapshotهای ثبت‌شده
+        </Link>
+        <Link href="/" className="btn-ghost text-sm">
           جستجوی جدید
         </Link>
       </div>

@@ -10,10 +10,21 @@ import { LIVE_AIRLINES, resolveAirlineCode } from "@/modules/airlines/registry";
 
 const LOGO_DIR = path.join(process.cwd(), "src", "lib", "airlines", "logos");
 const readme = readFileSync(path.join(process.cwd(), "README.md"), "utf8");
-const report = readFileSync(path.join(process.cwd(), "docs", "REPORT-02.md"), "utf8");
 const logoSources = readFileSync(path.join(process.cwd(), "docs", "airline-logo-sources-fa.md"), "utf8");
 
 describe("authentic airline logos", () => {
+  it("trims separate wordmarks where the source has a standalone symbol", () => {
+    const dimensions = (code: string) => {
+      const png = readFileSync(path.join(LOGO_DIR, `${code}.png`));
+      expect(png.subarray(1, 4).toString("ascii")).toBe("PNG");
+      return { width: png.readUInt32BE(16), height: png.readUInt32BE(20) };
+    };
+    expect(dimensions("CPN")).toEqual({ width: 184, height: 156 });
+    expect(dimensions("A7")).toEqual({ width: 820, height: 640 });
+    expect(dimensions("NSN")).toEqual({ width: 76, height: 82 });
+    expect(dimensions("IRZ")).toEqual({ width: 27, height: 54 });
+  });
+
   it("bundles an authentic logo file for every catalogued airline", () => {
     for (const airline of AIRLINES) {
       const src = airlineLogoPath(airline.code);
@@ -107,7 +118,7 @@ describe("authentic airline logos", () => {
     expect(readme).toContain("معراج");
     expect(readme).toContain("مهر");
     expect(Object.keys(AIRLINE_LOGO_ASSETS).length).toBeGreaterThan(AIRLINES.length);
-    expect(report).toContain("۱۸. لوگوهای درخواست‌شدهٔ ایرلاین‌های ایرانی");
+    expect(logoSources).toContain("# منابع و وضعیت مجوز لوگوهای ایرانی");
     expect(logoSources).toContain("Airhex");
   });
 });

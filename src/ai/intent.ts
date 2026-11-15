@@ -1,5 +1,5 @@
 import { CITIES } from "@/lib/cities";
-import { isoToday } from "@/lib/jalali";
+import { isValidCivilDate, isoToday } from "@/lib/jalali";
 import { completeJson, isLlmEnabled, parseJsonObject, type ChatMessage } from "./llm";
 import { parseNaturalLanguage } from "./nlParser";
 import { parseIntent, type ParsedIntent } from "./schema";
@@ -55,13 +55,13 @@ export async function understandIntent(text: string, options: { today?: string }
     maxStops: validated.intent.maxStops ?? baseline.maxStops,
     baggageRequired: validated.intent.baggageRequired || baseline.baggageRequired,
     refundableOnly: validated.intent.refundableOnly || baseline.refundableOnly,
-    departDate: validated.intent.departDate ?? baseline.departDate,
+    departDate: baseline.departDate ?? validated.intent.departDate,
     originCode: validated.intent.originCode ?? baseline.originCode,
     destinationCode: validated.intent.destinationCode ?? baseline.destinationCode,
     missing: computeMissing({
       originCode: validated.intent.originCode ?? baseline.originCode,
       destinationCode: validated.intent.destinationCode ?? baseline.destinationCode,
-      departDate: validated.intent.departDate ?? baseline.departDate,
+      departDate: baseline.departDate ?? validated.intent.departDate,
     }),
   };
 
@@ -107,7 +107,7 @@ function buildMessages(text: string, today: string): ChatMessage[] {
 }
 
 /** Coerce loose model output into the schema's expectations before validation. */
-function normalizeLlmPayload(payload: unknown, baseline: ParsedIntent, today: string): unknown {
+export function normalizeLlmPayload(payload: unknown, baseline: ParsedIntent, today: string): unknown {
   if (typeof payload !== "object" || payload === null) return null;
   const raw = payload as Record<string, unknown>;
   const asCode = (value: unknown): string | null => {
@@ -115,8 +115,11 @@ function normalizeLlmPayload(payload: unknown, baseline: ParsedIntent, today: st
     const upper = value.trim().toUpperCase();
     return CITIES.some((c) => c.code === upper) ? upper : null;
   };
-  const asDate = (value: unknown): string | null =>
-    typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value.trim()) ? value.trim() : null;
+  const asDate = (value: unknown): string | null => {
+    if (typeof value !== "string") return null;
+    const date = value.trim();
+    return /^\d{4}-\d{2}-\d{2}$/.test(date) && isValidCivilDate(date) && date >= today ? date : null;
+  };
 
   return {
     originCode: asCode(raw.originCode),
